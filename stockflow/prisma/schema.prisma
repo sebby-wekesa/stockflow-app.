@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+enum Role {
+  ADMIN      // Can see reports, manage BOM, and release orders
+  OPERATOR   // Can only see their department queue and log weights
+  WAREHOUSE  // Can only log raw material intake
+}
+
+enum ProductionStatus {
+  PENDING       // Waiting for Manager Review 
+  APPROVED      // Released to production [cite: 46]
+  IN_PRODUCTION // Moving through departments [cite: 47]
+  COMPLETED     // Finished goods added to stock [cite: 48]
+  REJECTED      // Sent back by Manager [cite: 51]
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  password        String
+  name            String?
+  role            Role       @default(OPERATOR)
+  department      String?    // e.g., "Cutting", "Forging" (for Operators)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  stageLogs       StageLog[]
+}
+
+model Design {
+  id               String            @id @default(cuid())
+  name             String            // e.g., Hex Bolt M12 [cite: 67]
+  code             String            @unique // e.g., HB-M12 [cite: 74]
+  description      String?
+  targetDimensions String?           // Stores specs like 12mm x 70mm [cite: 71]
+  targetWeight     Float?            // Estimated yield kg per unit [cite: 135]
+  // New Phase 2 Fields
+  rawMaterialId    String?           // Links to the specific rod needed (e.g., M12 High Tensile)
+  kgPerUnit        Float             @default(0.0) // The BOM consumption rate
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  stages           Stage[]
+  productionOrders ProductionOrder[]
+}
+
+model Stage {
+  id          String     @id @default(cuid())
+  name        String     // e.g., Cutting, Forging, Threading [cite: 65]
+  department  String     // The department responsible for this stage [cite: 65]
+  sequence    Int        // Order of operations [cite: 68]
+  designId    String
+  design      Design     @relation(fields: [designId], references: [id], onDelete: Cascade)
+  stageLogs   StageLog[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([designId, sequence])
+}
+
+model ProductionOrder {
+  id            String           @id @default(cuid())
+  orderNumber   String           @unique // e.g., PO-0040 [cite: 93]
+  designId      String
+  design        Design           @relation(fields: [designId], references: [id])
+  quantity      Int              @default(1)
+  targetKg      Float            // Total initial weight (In) [cite: 55]
+  status        ProductionStatus @default(PENDING)
+  priority      Priority         @default(MEDIUM)
+  
+  // Handoff Tracking
+  currentStage  Int              @default(1) // Current sequence number
+  currentDept   String?          // Current department queue (e.g., "Cutting") [cite: 99]
+  
+  assignedTo    String?
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  logs          StageLog[]
+}
+
+model StageLog {
+  id          String          @id @default(cuid())
+  orderId     String
+  order       ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stageId     String?
+  stage       Stage?          @relation(fields: [stageId], references: [id])
+  stageName   String
+  sequence    Int
+
+  // KG Traceability: Enforces In = Out + Scrap [cite: 55, 78]
+  kgIn        Float           // Weight received from previous stage [cite: 77]
+  kgOut       Float           // Weight passed forward [cite: 77]
+  kgScrap     Float           // Weight lost [cite: 77]
+  scrapReason String?         // e.g., "Off-cuts", "Scale", "Swarf" [cite: 65, 153]
+  department  String?         // Department responsible for this stage log [new field]
+
+  operatorId  String
+  operator    User            @relation(fields: [operatorId], references: [id])
+  notes       String?
+  completedAt DateTime        @default(now())
+}
+
+model RawMaterial {
+  id            String   @id @default(cuid())
+  materialName  String   // e.g., "High-Tensile Steel"
+  diameter      String   // e.g., "M12"
+  availableKg   Float    @default(0) // Available for reservation
+  reservedKg    Float    @default(0) // Reserved for production
+  supplier      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
