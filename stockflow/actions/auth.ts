@@ -22,6 +22,7 @@ function verifyPassword(password: string, storedHash: string): boolean {
 export async function signIn(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const remember = formData.get("remember") === "on";
 
   // Validate input
   const validation = loginSchema.safeParse({ email, password });
@@ -59,7 +60,7 @@ export async function signIn(formData: FormData) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7, // 30 days if remember, else 7 days
   });
 
   // Redirect based on role
