@@ -1,19 +1,28 @@
-"use client"
-import { useState, useEffect } from 'react'
-import { fetchStock } from './actions'
+import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth'
 
-export default function OperatorPage() {
-  const [data, setData] = useState([])
+export default async function OperatorPage() {
+  const user = await requireAuth()
 
-  useEffect(() => {
-    fetchStock().then(setData)
-  }, [])
+  const jobs = await prisma.productionOrder.findMany({
+    where: {
+      currentDept: user.department,
+      status: "IN_PRODUCTION",
+    },
+    include: { design: true },
+    orderBy: { priority: 'desc' }
+  })
 
   return (
     <div>
-      {/* Your interactive buttons here work fine! */}
-      <button onClick={() => console.log("Still interactive!")}>Add Item</button>
-      {data.map(item => <div key={item.id}>{item.name}</div>)}
+      <h1>Operator Dashboard - {user.department}</h1>
+      {jobs.map(job => (
+        <div key={job.id}>
+          <h2>{job.design.name} - {job.orderNumber}</h2>
+          <p>Priority: {job.priority}</p>
+          <p>Quantity: {job.quantity}</p>
+        </div>
+      ))}
     </div>
   )
 }

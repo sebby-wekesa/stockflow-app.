@@ -5,6 +5,13 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
 import { scryptSync } from "crypto";
+import * as jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 
 function verifyPassword(password: string, storedHash: string): boolean {
   const [salt, hash] = storedHash.split(":");
@@ -34,13 +41,18 @@ export async function signIn(formData: FormData) {
     return { error: "Invalid email or password. Please try again." };
   }
 
-  // Create session cookie
+  // Create JWT token
   const cookieStore = await cookies();
-  const sessionToken = Buffer.from(JSON.stringify({ 
-    userId: user.id, 
-    email: user.email,
-    timestamp: Date.now()
-  })).toString("base64");
+  const sessionToken = jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      department: user.department
+    },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 
   cookieStore.set("auth-token", sessionToken, {
     httpOnly: true,
@@ -50,17 +62,8 @@ export async function signIn(formData: FormData) {
     maxAge: 60 * 60 * 24 * 7, // 7 days
   });
 
-  // Set user-role cookie for middleware
-  cookieStore.set("user-role", user.role, {
-    httpOnly: false, // Allow client-side access
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  });
-
   // Redirect based on role
-  const redirectPath = user.role === 'ADMIN' ? '/admin/dashboard' : '/operator/queue';
+  const redirectPath = user.role === 'ADMIN' ? '/dashboard' : '/operator_queue';
   redirect(redirectPath);
 }
 

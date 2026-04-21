@@ -2,14 +2,39 @@
 
 import { useState, useEffect } from "react";
 import { getOperatorData } from "./actions";
-import { DepartmentQueue } from "@/components/DepartmentQueue";
+import OperatorQueue from "@/components/production/OperatorQueue";
 import { Factory, Terminal, Activity, Info } from "lucide-react";
 
 export default function OperatorPage() {
   const [designs, setDesigns] = useState<any[]>([]);
-  
+  const [jobs, setJobs] = useState<any[]>([]);
+
   // In a real scenario, this comes from the logged-in user's profile
-  const userDept = "Cutting"; 
+  const userDept = "Cutting";
+
+  const fetchJobs = async () => {
+    try {
+      const response = await fetch(`/api/production-orders?dept=${userDept}&status=IN_PRODUCTION`);
+      if (response.ok) {
+        const result = await response.json();
+        // Transform to match Job interface
+        const transformedJobs = result.data.map((order: any) => ({
+          id: order.id,
+          orderNumber: order.code,
+          design: {
+            name: order.designName,
+            targetDimensions: order.targetDimensions,
+          },
+          currentStage: order.currentStage,
+          targetKg: order.targetKg,
+          priority: order.priority,
+        }));
+        setJobs(transformedJobs);
+      }
+    } catch (error) {
+      console.error('Failed to fetch jobs:', error);
+    }
+  }; 
 
   useEffect(() => {
     const fetchData = async () => {
@@ -19,6 +44,7 @@ export default function OperatorPage() {
       }
     };
     fetchData();
+    fetchJobs();
   }, []);
 
   return (
@@ -89,7 +115,7 @@ export default function OperatorPage() {
         </div>
         
         <div className="p-6">
-          <DepartmentQueue userDept={userDept} />
+          <OperatorQueue jobs={jobs} operatorDept={userDept} onJobComplete={fetchJobs} />
         </div>
       </section>
 

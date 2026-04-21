@@ -14,7 +14,7 @@ const roleColors: Record<Role, string> = {
 const roleNames: Record<Role, string> = {
   ADMIN: "Admin / Owner",
   MANAGER: "Production Manager",
-  OPERATOR: "Operator — Cutting",
+  OPERATOR: "Operator", // will be overridden
   SALES: "Sales Team",
   PACKAGING: "Packaging Team",
   WAREHOUSE: "Warehouse Team",
@@ -75,11 +75,11 @@ const roleNavItems: Record<Role, any[]> = {
   ],
 };
 
-export function Sidebar({ user }: { user: { role: Role, name: string } }) {
+export function Sidebar({ user }: { user: { role: Role, name: string, department?: string } }) {
   const pathname = usePathname();
   const navItems = roleNavItems[user.role];
   const roleColor = roleColors[user.role];
-  const roleNameDisplay = roleNames[user.role];
+  const roleNameDisplay = user.role === 'OPERATOR' && user.department ? `Operator — ${user.department}` : roleNames[user.role];
 
   return (
     <div className="sidebar">

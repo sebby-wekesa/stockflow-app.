@@ -1,5 +1,12 @@
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
+import * as jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
 
 export type Role = "ADMIN" | "MANAGER" | "OPERATOR" | "SALES" | "PACKAGING" | "WAREHOUSE";
 
@@ -18,7 +25,7 @@ export async function getUser() {
   if (!token) return null;
 
   try {
-    const decoded = JSON.parse(Buffer.from(token, "base64").toString("utf-8"));
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
     });

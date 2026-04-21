@@ -64,6 +64,45 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Handoff Logic: Determine next stage or complete order
+    const nextStage = await prisma.stage.findFirst({
+      where: {
+        designId: order.designId,
+        sequence: { gt: order.currentStage }
+      },
+      orderBy: { sequence: 'asc' }
+    });
+
+    if (nextStage) {
+      // Update order to next stage
+      await prisma.productionOrder.update({
+        where: { id: orderId },
+        data: {
+          currentStage: nextStage.sequence,
+          currentDept: nextStage.department
+        }
+      });
+    } else {
+      // No more stages: Complete the order and create finished good
+      await prisma.productionOrder.update({
+        where: { id: orderId },
+        data: { status: 'COMPLETED' }
+      });
+
+      // Calculate finished good quantity based on output weight and BOM
+      const quantity = Math.floor(outputWeight / order.design.kgPerUnit);
+      if (quantity > 0) {
+        await prisma.finishedGood.create({
+          data: {
+            designId: order.designId,
+            productionOrderId: orderId,
+            quantity,
+            location: department // Store in current department's location
+          }
+        });
+      }
+    }
+
     return NextResponse.json(
       {
         success: true,

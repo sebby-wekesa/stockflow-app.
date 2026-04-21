@@ -9,7 +9,10 @@ datasource db {
 
 enum Role {
   ADMIN      // Can see reports, manage BOM, and release orders
+  MANAGER    // Can approve and manage production orders
   OPERATOR   // Can only see their department queue and log weights
+  SALES      // Can view sales-related data
+  PACKAGING  // Can handle packaging operations
   WAREHOUSE  // Can only log raw material intake
 }
 
@@ -36,9 +39,12 @@ model User {
   name            String?
   role            Role       @default(OPERATOR)
   department      String?    // e.g., "Cutting", "Forging" (for Operators)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   stageLogs       StageLog[]
+  saleOrders      SaleOrder[]
 }
 
 model Design {
@@ -55,6 +61,7 @@ model Design {
   updatedAt        DateTime          @updatedAt
   stages           Stage[]
   productionOrders ProductionOrder[]
+  saleOrders       SaleOrder[]
 }
 
 model Stage {
@@ -80,17 +87,21 @@ model ProductionOrder {
   targetKg      Float            // Total initial weight (In) [cite: 55]
   status        ProductionStatus @default(PENDING)
   priority      Priority         @default(MEDIUM)
-  
+
   // Handoff Tracking
   currentStage  Int              @default(1) // Current sequence number
   currentDept   String?          // Current department queue (e.g., "Cutting") [cite: 99]
-  
+
   assignedTo    String?
   approvedBy    String?
   approvedAt    DateTime?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   logs          StageLog[]
+  finishedGoods FinishedGood[]
+
+  @@index([status, createdAt])
+  @@index([currentDept, status])
 }
 
 model StageLog {
@@ -115,13 +126,117 @@ model StageLog {
   completedAt DateTime        @default(now())
 }
 
+model Organization {
+  id        String     @id @default(cuid())
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  users     User[]
+  branches  Branch[]
+}
+
+model Branch {
+  id             String       @id @default(cuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Supplier {
+  id             String                @id @default(cuid())
+  name           String
+  contactInfo    String?
+  rawMaterials   RawMaterial[]
+  receipts       RawMaterialReceipt[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+}
+
+model Customer {
+  id        String     @id @default(cuid())
+  name      String
+  contactInfo String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  saleOrders SaleOrder[]
+}
+
+model Item {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String?  // e.g., "Raw Material", "Finished Good"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model RawMaterial {
-  id            String   @id @default(cuid())
-  materialName  String   // e.g., "High-Tensile Steel"
-  diameter      String   // e.g., "M12"
-  availableKg   Float    @default(0) // Available for reservation
-  reservedKg    Float    @default(0) // Reserved for production
-  supplier      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id            String                @id @default(cuid())
+  materialName  String                // e.g., "High-Tensile Steel"
+  diameter      String                // e.g., "M12"
+  availableKg   Float                 @default(0) // Available for reservation
+  reservedKg    Float                 @default(0) // Reserved for production
+  supplierId    String?
+  supplier      Supplier?             @relation(fields: [supplierId], references: [id])
+  receipts      RawMaterialReceipt[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+}
+
+model RawMaterialReceipt {
+  id            String       @id @default(cuid())
+  rawMaterialId String
+  rawMaterial   RawMaterial  @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+  quantity      Float        // kg received
+  supplierId    String?
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id])
+  receivedAt    DateTime     @default(now())
+}
+
+model FinishedGood {
+  id                String          @id @default(cuid())
+  designId          String
+  design            Design          @relation(fields: [designId], references: [id])
+  productionOrderId String?
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id])
+  quantity          Int
+  location          String?         // branch or warehouse
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+enum SaleStatus {
+  PENDING     // Waiting for packaging
+  PACKAGING   // Being prepared
+  PACKAGED    // Ready for pickup/shipping
+  SHIPPED     // Sent to customer
+  CANCELLED
+}
+
+model SaleOrder {
+  id             String     @id @default(cuid())
+  designId       String
+  design         Design     @relation(fields: [designId], references: [id])
+  quantity       Int        // Units requested
+  customerId     String?
+  customer       Customer?  @relation(fields: [customerId], references: [id])
+  status         SaleStatus @default(PENDING)
+  salesRepId     String     // User who created the order
+  salesRep       User       @relation(fields: [salesRepId], references: [id])
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model StockTransaction {
+  id             String   @id @default(cuid())
+  itemType       String   // 'raw' or 'finished'
+  itemId         String   // rawMaterialId or finishedGoodId
+  transactionType String  // 'receipt', 'consumption', 'sale', etc.
+  quantity       Float
+  reason         String?
+  performedBy    String   // userId
+  createdAt      DateTime @default(now())
 }
