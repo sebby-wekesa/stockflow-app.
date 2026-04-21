@@ -111,12 +111,12 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
 
   const onSubmit = async (data: StageLogForm) => {
     if (!selectedOrder) {
-      showToast('error', 'Please select an order')
+      showToast('Please select an order', 'error')
       return
     }
 
     if (!isBalanceValid) {
-      showToast('error', 'Weight does not balance. Please adjust output and scrap weights.')
+      showToast('Weight does not balance. Please adjust output and scrap weights.', 'error')
       return
     }
 
@@ -131,7 +131,7 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
       })
 
       if (result.error) {
-        showToast('error', result.error)
+        showToast(result.error, 'error')
         return
       }
 
@@ -142,7 +142,7 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
         origin: { y: 0.6 },
       })
 
-      showToast('success', `Stage logged successfully for ${selectedOrder.code}`)
+      showToast(`Stage logged successfully for ${selectedOrder.code}`, 'success')
 
       // Reset form
       reset()
@@ -153,14 +153,14 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
       onSuccess?.()
     } catch (error) {
       console.error('Submission error:', error)
-      showToast('error', 'Failed to log stage. Please try again.')
+      showToast('Failed to log stage. Please try again.', 'error')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <>
+    <ToastProvider>
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -355,8 +355,6 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
           </form>
         </div>
       </motion.div>
-
-      <Toast />
-    </>
+    </ToastProvider>
   )
 }

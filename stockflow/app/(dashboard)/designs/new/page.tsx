@@ -1,5 +1,5 @@
-import { createDesign } from "@/actions/design";
-import { StageInput } from "@/components/StageInput";
+import { createDesign } from "../../../lib/actions/design";
+import { StageInput } from "../../../../components/StageInput";
 
 export default function NewDesignPage() {
   return (
