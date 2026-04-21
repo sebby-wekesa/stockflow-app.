@@ -1,85 +1,88 @@
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Role } from "@/lib/auth";
 
-const roleColors: Record<Role, string> = {
-  ADMIN: "var(--accent)",
-  MANAGER: "var(--accent)",
-  OPERATOR: "var(--purple)",
-  SALES: "var(--teal)",
-  PACKAGING: "var(--green)",
-  WAREHOUSE: "var(--muted)",
+const roleColors: Record<string, string> = {
+  admin: "var(--accent)",
+  manager: "var(--accent)",
+  operator: "var(--purple)",
+  sales: "var(--teal)",
+  packaging: "var(--green)",
+  warehouse: "var(--muted)",
 };
 
-const roleNames: Record<Role, string> = {
-  ADMIN: "Admin / Owner",
-  MANAGER: "Production Manager",
-  OPERATOR: "Operator", // will be overridden
-  SALES: "Sales Team",
-  PACKAGING: "Packaging Team",
-  WAREHOUSE: "Warehouse Team",
+const roleNames: Record<string, string> = {
+  admin: "Admin / Owner",
+  manager: "Production Manager",
+  operator: "Operator — Cutting",
+  sales: "Sales Team",
+  packaging: "Packaging Team",
+  warehouse: "Warehouse Team",
 };
 
-const roleNavItems: Record<Role, any[]> = {
-  ADMIN: [
+const roleNavItems: Record<string, any[]> = {
+  admin: [
     { section: "Overview" },
-    { label: "Dashboard", href: "/dashboard" },
+    { id: 'dashboard', label: 'Dashboard' },
     { section: "Production" },
-    { label: "Design templates", href: "/designs" },
-    { label: "Production orders", href: "/orders", badge: "4" },
-    { label: "Departments", href: "/departments" },
+    { id: 'designs', label: 'Design templates' },
+    { id: 'orders', label: 'Production orders', badge: "4" },
+    { id: 'departments', label: 'Departments' },
     { section: "Inventory" },
-    { label: "Raw materials", href: "/rawmaterials" },
-    { label: "Finished goods", href: "/finishedgoods" },
+    { id: 'rawmaterials', label: 'Raw materials' },
+    { id: 'finishedgoods', label: 'Finished goods' },
     { section: "Sales" },
-    { label: "Sales orders", href: "/sales", badge: "2" },
-    { label: "Packaging queue", href: "/packaging" },
+    { id: 'sales', label: 'Sales orders', badge: "2" },
+    { id: 'packaging', label: 'Packaging queue' },
     { section: "Settings" },
-    { label: "Users & roles", href: "/users" },
+    { id: 'users', label: 'Users & roles' },
   ],
-  MANAGER: [
+  manager: [
     { section: "Overview" },
-    { label: "Dashboard", href: "/manager_dash" },
+    { id: 'manager_dash', label: 'Dashboard' },
     { section: "Approvals" },
-    { label: "Order approvals", href: "/approvals", badge: "3", badgeColor: "red" },
+    { id: 'approvals', label: 'Order approvals', badge: "3", badgeColor: "red" },
     { section: "Production" },
-    { label: "All orders", href: "/orders" },
-    { label: "Dept queues", href: "/departments" },
+    { id: 'orders', label: 'All orders' },
+    { id: 'departments', label: 'Dept queues' },
     { section: "Reports" },
-    { label: "Scrap report", href: "/scrap" },
-    { label: "Raw materials", href: "/rawmaterials" },
+    { id: 'scrap', label: 'Scrap report' },
+    { id: 'rawmaterials', label: 'Raw materials' },
   ],
-  OPERATOR: [
+  operator: [
     { section: "My Work" },
-    { label: "Job queue", href: "/operator_queue", badge: "3", badgeColor: "purple" },
-    { label: "Log output", href: "/operator_log" },
+    { id: 'operator_queue', label: 'Job queue', badge: "3", badgeColor: "purple" },
+    { id: 'operator_log', label: 'Log output' },
     { section: "History" },
-    { label: "Completed jobs", href: "/operator_history" },
+    { id: 'operator_history', label: 'Completed jobs' },
   ],
-  SALES: [
+  sales: [
     { section: "Catalogue" },
-    { label: "Available stock", href: "/catalogue" },
-    { label: "Place order", href: "/place_order" },
+    { id: 'catalogue', label: 'Available stock' },
+    { id: 'place_order', label: 'Place order' },
     { section: "My Orders" },
-    { label: "Order history", href: "/my_orders" },
+    { id: 'my_orders', label: 'Order history' },
   ],
-  PACKAGING: [
+  packaging: [
     { section: "Fulfilment" },
-    { label: "Pending orders", href: "/pack_queue", badge: "5", badgeColor: "purple" },
-    { label: "Fulfilled today", href: "/pack_done" },
+    { id: 'pack_queue', label: 'Pending orders', badge: "5", badgeColor: "purple" },
+    { id: 'pack_done', label: 'Fulfilled today' },
   ],
-  WAREHOUSE: [
+  warehouse: [
     { section: "Receiving" },
-    { label: "Receive stock", href: "/receive" },
-    { label: "Stock levels", href: "/rawmaterials" },
+    { id: 'receive', label: 'Receive stock' },
+    { id: 'rawmaterials', label: 'Stock levels' },
   ],
 };
 
-export function Sidebar({ user }: { user: { role: Role, name: string, department?: string } }) {
-  const pathname = usePathname();
-  const navItems = roleNavItems[user.role];
-  const roleColor = roleColors[user.role];
-  const roleNameDisplay = user.role === 'OPERATOR' && user.department ? `Operator — ${user.department}` : roleNames[user.role];
+interface SidebarProps {
+  currentRole: string;
+  currentScreen: string;
+  onNavigate: (screen: string) => void;
+}
+
+export function Sidebar({ currentRole, currentScreen, onNavigate }: SidebarProps) {
+  const navItems = roleNavItems[currentRole];
+  const roleColor = roleColors[currentRole];
+  const roleName = roleNames[currentRole];
 
   return (
     <div className="sidebar">
@@ -90,7 +93,7 @@ export function Sidebar({ user }: { user: { role: Role, name: string, department
       <div className="role-badge">
         <div className="role-label">Signed in as</div>
         <div className="role-name" style={{ color: roleColor }}>
-          {roleNameDisplay}
+          {roleName}
         </div>
       </div>
       <nav className="nav">
@@ -103,20 +106,20 @@ export function Sidebar({ user }: { user: { role: Role, name: string, department
             );
           }
 
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isActive = currentScreen === item.id;
           const bc = item.badgeColor ? ` ${item.badgeColor}` : "";
           const badge = item.badge ? <span className={`nav-badge${bc}`}>{item.badge}</span> : null;
 
           return (
-            <Link
-              key={item.href}
-              href={item.href!}
+            <div
+              key={item.id}
               className={`nav-item ${isActive ? "active" : ""}`}
+              onClick={() => onNavigate(item.id)}
             >
               <span className="nav-dot"></span>
               {item.label}
               {badge}
-            </Link>
+            </div>
           );
         })}
       </nav>
