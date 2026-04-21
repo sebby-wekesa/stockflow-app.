@@ -57,7 +57,7 @@ function summarizeByDept(logs: any[]): DepartmentBreakdown[] {
 export async function getMonthlyYieldReport(): Promise<MonthlyYieldReport> {
   const logs = await prisma.stageLog.findMany({
     where: {
-      createdAt: {
+      completedAt: {
         gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) // Last 30 days
       }
     }

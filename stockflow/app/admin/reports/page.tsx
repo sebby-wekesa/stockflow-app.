@@ -1,6 +1,8 @@
 import { getMonthlyYieldReport } from "@/app/actions/reports";
 import { YieldReportView } from "@/components/admin/YieldReportView";
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminReportsPage() {
   const reportData = await getMonthlyYieldReport();
 

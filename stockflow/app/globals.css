@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-stockflow-bg: #0e0f11;
+  --color-stockflow-surface: #161719;
+  --color-stockflow-border: #2a2d32;
+  --color-stockflow-accent: #f0c040;
+  --color-stockflow-purple: #8b7cf8;
+  --color-stockflow-teal: #2ec4a0;
+  --color-stockflow-muted: #7a8090;
+  --font-family-syne: "Syne", sans-serif;
+  --font-family-dmsans: "DM Sans", sans-serif;
+  --font-family-dmmono: "DM Mono", monospace;
+}
+
 :root {
   --bg: #0e0f11;
   --surface: #161719;

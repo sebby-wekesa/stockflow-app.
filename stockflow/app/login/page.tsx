@@ -1,162 +1,58 @@
-"use client";
-
-import { useActionState, useRef, useEffect, useState } from "react";
-import { signIn } from "@/actions/auth";
-import { Eye, EyeOff } from "lucide-react";
-
-type AuthState = { error: string } | null;
-
 export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(async (prevState: AuthState, formData: FormData) => {
-    return await signIn(formData);
-  }, null);
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [formErrors, setFormErrors] = useState<{email?: string, password?: string}>({});
-
-  const emailInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-focus email input on mount
-  useEffect(() => {
-    emailInputRef.current?.focus();
-  }, []);
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-100" style={{ background: '#0e0f11' }}>
-      <div className="w-full max-w-md p-8 rounded-lg border bg-zinc-800 border-zinc-700">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-[Syne] text-yellow-400">
-            StockFlow
-          </h1>
-          <p className="text-sm mt-2 text-zinc-400 uppercase tracking-widest">
+    <div className="flex min-h-screen items-center justify-center bg-stockflow-bg font-dmsans text-[#e8eaed]">
+      <div className="w-full max-w-[400px] space-y-8 p-6">
+        {/* Logo Section */}
+        <div className="flex flex-col items-center">
+          <div className="font-syne text-3xl font-extrabold tracking-tighter text-stockflow-accent">
+            STOCKFLOW
+          </div>
+          <div className="mt-1 text-[10px] uppercase tracking-[2px] text-stockflow-muted">
             Manufacturing Platform
-          </p>
+          </div>
         </div>
 
-        {/* Form */}
-        <form action={formAction} className="space-y-6">
-          {/* Error Message */}
-          {state?.error && (
-            <div className="p-4 bg-red-900/20 border border-red-700/50 text-red-300 rounded-lg text-sm flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <span>{state.error}</span>
-            </div>
-          )}
-
-          {/* Email Input */}
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-xs uppercase tracking-wider font-medium text-zinc-400 block">
-              Email Address
-            </label>
-            <input
-              ref={emailInputRef}
-              type="email"
-              id="email"
-              name="email"
-              required
-              autoComplete="email"
-              disabled={pending}
-              className="w-full px-4 py-3 rounded-md bg-zinc-700 border border-zinc-600 text-zinc-100 font-[DM_Sans] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder="you@company.com"
-              aria-label="Email address"
-              aria-required="true"
-              aria-invalid={!!formErrors.email}
-              aria-describedby={formErrors.email ? "email-error" : undefined}
-            />
-            {formErrors.email && (
-              <p id="email-error" className="text-xs text-red-400" role="alert">
-                {formErrors.email}
-              </p>
-            )}
+        {/* Login Card */}
+        <div className="rounded-[10px] border border-stockflow-border bg-stockflow-surface p-8 shadow-2xl">
+          <div className="mb-6 text-center">
+            <h2 className="font-syne text-xl font-bold">Secure Access</h2>
+            <p className="text-sm text-stockflow-muted">Enter operator credentials</p>
           </div>
 
-          {/* Password Input */}
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-xs uppercase tracking-wider font-medium text-zinc-400 block">
-              Password
-            </label>
-            <div className="relative">
+          <form className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] uppercase tracking-wider text-stockflow-muted">
+                Email Address
+              </label>
               <input
-                type={showPassword ? "text" : "password"}
-                id="password"
-                name="password"
-                required
-                disabled={pending}
-                autoComplete="current-password"
-                className="w-full px-4 py-3 pr-12 rounded-md bg-zinc-700 border border-zinc-600 text-zinc-100 font-[DM_Sans] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 disabled:opacity-60 disabled:cursor-not-allowed"
-                placeholder="••••••••"
-                aria-label="Password"
-                aria-required="true"
-                aria-invalid={!!formErrors.password}
-                aria-describedby={formErrors.password ? "password-error" : undefined}
+                type="email"
+                className="w-full rounded-md border border-[#353a40] bg-[#1e2023] p-3 text-sm focus:border-stockflow-accent focus:outline-none"
+                placeholder="name@stockflow.com"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-300 transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                disabled={pending}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
             </div>
-            {formErrors.password && (
-              <p id="password-error" className="text-xs text-red-400" role="alert">
-                {formErrors.password}
-              </p>
-            )}
-          </div>
 
-          {/* Remember Me */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="remember"
-              name="remember"
-              className="w-4 h-4 bg-zinc-700 border-zinc-600 rounded focus:ring-yellow-400 focus:ring-2 text-yellow-400"
-              disabled={pending}
-            />
-            <label htmlFor="remember" className="ml-2 text-sm text-zinc-400">
-              Remember me for 7 days
-            </label>
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] uppercase tracking-wider text-stockflow-muted">
+                Access Token / Password
+              </label>
+              <input
+                type="password"
+                className="w-full rounded-md border border-[#353a40] bg-[#1e2023] p-3 text-sm focus:border-stockflow-accent focus:outline-none"
+                placeholder="••••••••"
+              />
+            </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full py-3 px-4 font-semibold rounded-md bg-yellow-400 text-black transition-all duration-200 mt-8 flex items-center justify-center gap-2 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:ring-offset-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-yellow-400 disabled:scale-100 active:scale-95"
-            aria-busy={pending}
-            aria-label={pending ? "Signing in..." : "Sign in"}
-          >
-            {pending ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Signing in...</span>
-              </>
-            ) : (
-              <>
-                <span>Sign In</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </>
-            )}
-          </button>
-        </form>
+            <button className="mt-6 w-full rounded-md bg-stockflow-accent py-3 text-sm font-bold text-black transition-all hover:bg-[#f5d060]">
+              AUTHENTICATE
+            </button>
+          </form>
+        </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-8 border-t border-zinc-700">
-          <p className="text-xs text-center text-zinc-400">
-            Need help? Check the{' '}
-            <a href="/README.md" className="font-medium text-yellow-400 hover:text-yellow-300 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:ring-offset-zinc-800 rounded">
-              setup guide
+        <div className="text-center text-xs text-stockflow-muted">
+          <p>Don&apos;t have an account?
+            <a href="/signup" className="ml-1 text-stockflow-accent hover:underline">
+              Request Access
             </a>
           </p>
         </div>

@@ -1,15 +1,9 @@
 import { PrismaClient, Role } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg'
 import { scryptSync, randomBytes } from 'crypto';
 
-// In Prisma 7, if it fails to find the URL in config,
-// we must explicitly tell it to look at the environment
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-})
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+const prisma = new PrismaClient({ adapter })
 
 // Simple password hashing function matching auth system
 function hashPassword(password: string): string {
