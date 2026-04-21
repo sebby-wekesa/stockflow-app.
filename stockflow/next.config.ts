@@ -7,8 +7,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  serverExternalPackages: ['@prisma/client'],
   experimental: {
-    serverExternalPackages: ['@prisma/client'],
+    // Keep other experimental stuff here if you have any
   },
 };
 
