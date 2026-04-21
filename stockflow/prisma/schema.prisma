@@ -17,12 +17,19 @@ enum Role {
 }
 
 enum ProductionStatus {
-  PENDING       // Waiting for Manager Review 
+  PENDING       // Waiting for Manager Review
   APPROVED      // Released to production [cite: 46]
   IN_PRODUCTION // Moving through departments [cite: 47]
   COMPLETED     // Finished goods added to stock [cite: 48]
   REJECTED      // Sent back by Manager [cite: 51]
   CANCELLED
+}
+
+enum ScrapReason {
+  MACHINE_FAULT    // Tool breakage, equipment issues
+  MATERIAL_DEFECT  // Cracked rod, poor quality material
+  HUMAN_ERROR      // Incorrect settings, operator mistakes
+  PROCESS_LOSS     // Standard swarf, off-cuts, normal waste
 }
 
 enum Priority {
@@ -62,6 +69,7 @@ model Design {
   stages           Stage[]
   productionOrders ProductionOrder[]
   saleOrders       SaleOrder[]
+  finishedGoods    FinishedGood[]
 }
 
 model Stage {
@@ -117,7 +125,7 @@ model StageLog {
   kgIn        Float           // Weight received from previous stage [cite: 77]
   kgOut       Float           // Weight passed forward [cite: 77]
   kgScrap     Float           // Weight lost [cite: 77]
-  scrapReason String?         // e.g., "Off-cuts", "Scale", "Swarf" [cite: 65, 153]
+  scrapReason ScrapReason?    // Categorized reason for scrap [cite: 65, 153]
   department  String?         // Department responsible for this stage log [new field]
 
   operatorId  String
