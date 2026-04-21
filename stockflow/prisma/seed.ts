@@ -1,7 +1,8 @@
+import "dotenv/config";
 import { PrismaClient, Role } from '@prisma/client';
 import { scryptSync, randomBytes } from 'crypto';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
 
 // Simple password hashing function matching auth system
 function hashPassword(password: string): string {
