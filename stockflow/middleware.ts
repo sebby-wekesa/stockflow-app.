@@ -23,6 +23,22 @@ const rolePermissions: Record<string, string[]> = {
 };
 
 export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // --- THE HARD BYPASS ---
+  // If the request is for any static asset, image, or system file,
+  // stop the middleware immediately and let it through.
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('/static/') ||
+    pathname.includes('.') // Catches .js, .css, .ico, .png, etc.
+  ) {
+    return NextResponse.next();
+  }
+
+  // --- YOUR REDIRECT LOGIC ---
+  // Only now do we check for the session/auth
   const token = request.cookies.get('auth-token')?.value;
   let user: UserClaims | null = null;
 
@@ -34,11 +50,8 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  const { pathname } = request.nextUrl;
-
-  // Public routes
-  const publicRoutes = ['/login', '/api/auth'];
-  if (publicRoutes.some(route => pathname.startsWith(route))) {
+  // If the path is specifically /login, don't redirect to /login again!
+  if (pathname === '/login') {
     return NextResponse.next();
   }
 
