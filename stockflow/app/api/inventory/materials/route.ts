@@ -2,11 +2,18 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-api'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
   try {
     const materials = await prisma.rawMaterial.findMany({
       where: {
+        org_id: auth.user.org_id,
         availableKg: {
           gt: 0, // Only show materials with available stock
         },
@@ -17,15 +24,11 @@ export async function GET(request: NextRequest) {
       ],
     })
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: materials,
-      },
-      { status: 200 }
-    )
+    return NextResponse.json({
+      success: true,
+      data: materials,
+    })
   } catch (error) {
-    console.error('Error fetching raw materials:', error)
     return NextResponse.json(
       { error: 'Failed to fetch raw materials' },
       { status: 500 }

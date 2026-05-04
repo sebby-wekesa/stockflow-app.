@@ -43,7 +43,7 @@ export async function createDesign(data: {
     revalidatePath("/dashboard/admin/designs");
     return { success: true, design };
   } catch (error: any) {
-    console.error("Design Save Error:", error);
+
     if (error.code === 'P2002') return { error: "Design Code already exists." };
     return { error: "Failed to save design template." };
   }

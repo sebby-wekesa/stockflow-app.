@@ -2,21 +2,27 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireRole } from '@/lib/auth-api'
+import { createProductionOrderWithReservationSchema } from '@/lib/validations'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ["admin", "manager"]);
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   try {
     const body = await request.json()
-    const { designId, materialId, quantity, customerRef } = body
+    const validation = createProductionOrderWithReservationSchema.safeParse(body)
 
-    // Validate required fields
-    if (!designId || !materialId || !quantity) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: designId, materialId, quantity' },
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
       )
     }
 
-    if (quantity <= 0) {
+    const { designId, materialId, quantity, customerRef } = validation.data
       return NextResponse.json(
         { error: 'Quantity must be greater than 0' },
         { status: 400 }
@@ -109,7 +115,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error: any) {
-    console.error('Error creating production order:', error)
+
     return NextResponse.json(
       { error: error.message || 'Failed to create production order' },
       { status: 500 }

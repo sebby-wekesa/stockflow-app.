@@ -1,22 +1,18 @@
 export const dynamic = 'force-dynamic';
 
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
-import { getUser, requireRole } from "@/lib/auth";
+import { requireRole } from "@/lib/auth-api";
 import { stageCompletionSchema } from "@/lib/validations";
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
+  const body = await request.json();
   try {
-    // 1. Verify Authentication & Role [cite: 55, 137]
-    const user = await getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    // Check if user has OPERATOR or ADMIN role
-    if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') {
-      return NextResponse.json({ error: "Forbidden: Only operators can log production" }, { status: 403 });
+    // 1. Verify Authentication & Role
+    const auth = await requireRole(request, ["operator", "admin"]);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const body = await req.json();
 
     // 2. Get the current order with full stage sequence to identify the stage details
     const order = await prisma.productionOrder.findUnique({
@@ -50,7 +46,7 @@ export async function POST(req: Request) {
       ...body,
       stageName: currentStage.name,
       sequence: currentStage.sequence,
-      operatorId: user.id,
+      operatorId: auth.user.id,
       department: currentStage.department,
     };
 
@@ -101,7 +97,6 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error("Stage logging error:", error);
     return NextResponse.json({ error: "Failed to log stage" }, { status: 500 });
   }
 }

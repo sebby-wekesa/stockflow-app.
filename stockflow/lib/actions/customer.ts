@@ -50,7 +50,7 @@ export async function getOrderProgress(orderId: string) {
       lastUpdate: order.updatedAt
     };
   } catch (error) {
-    console.error("Failed to fetch order progress:", error);
+
     return null;
   }
 }

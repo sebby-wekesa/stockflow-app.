@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // No URL lines here anymore!
 }
 
 enum Role {

@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error("Factory Handoff Error:", error);
+
     return NextResponse.json({ error: "Failed to move order to next stage" }, { status: 500 });
   }
 }

@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireRole } from "@/lib/auth-api";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    await requireRole("ADMIN");
+    const auth = await requireRole(request, ["admin"]);
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     // --- 1. Department Yield Stats (grouped by department) ---
     // Note: We use stageName field for grouping as requested.
@@ -88,7 +91,6 @@ export async function GET() {
     if (error?.message === "Unauthorized" || error?.message === "Forbidden: Insufficient permissions") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error("[analytics/yield] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -58,3 +58,53 @@ export const designSchema = z.object({
 });
 
 export type DesignInput = z.infer<typeof designSchema>;
+
+// API validation schemas
+export const createProductionOrderSchema = z.object({
+  orderNumber: z.string().min(1, "Order number is required"),
+  designId: z.string().min(1, "Design ID is required"),
+  initialWeight: z.number().positive("Initial weight must be positive"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH"], {
+    errorMap: () => ({ message: "Priority must be LOW, MEDIUM, or HIGH" })
+  }),
+});
+
+export const createProductionOrderWithReservationSchema = z.object({
+  designId: z.string().min(1, "Design ID is required"),
+  materialId: z.string().min(1, "Material ID is required"),
+  quantity: z.number().positive("Quantity must be positive"),
+  customerRef: z.string().optional(),
+});
+
+export const updateOrderStatusSchema = z.object({
+  status: z.enum([
+    "PENDING",
+    "IN_PRODUCTION",
+    "COMPLETED",
+    "CANCELLED",
+    "ON_HOLD"
+  ]),
+  notes: z.string().optional(),
+});
+
+export const rawMaterialIntakeSchema = z.object({
+  materialName: z.string().min(1, "Material name is required"),
+  diameter: z.number().positive("Diameter must be positive"),
+  length: z.number().positive("Length must be positive"),
+  weightKg: z.number().positive("Weight must be positive"),
+  supplierId: z.string().optional(),
+  batchNumber: z.string().optional(),
+  receivedDate: z.string().datetime().optional(),
+});
+
+export const logEntrySchema = z.object({
+  orderId: z.string().min(1, "Order ID is required"),
+  stageId: z.string().optional(),
+  operatorId: z.string().min(1, "Operator ID is required"),
+  department: z.string().min(1, "Department is required"),
+  kgIn: z.number().min(0, "kgIn cannot be negative"),
+  kgOut: z.number().min(0, "kgOut cannot be negative"),
+  kgScrap: z.number().min(0, "kgScrap cannot be negative"),
+  scrapReason: z.string().optional(),
+  notes: z.string().optional(),
+});

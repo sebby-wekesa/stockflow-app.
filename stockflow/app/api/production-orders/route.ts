@@ -2,22 +2,27 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireRole } from '@/lib/auth-api'
+import { createProductionOrderSchema } from '@/lib/validations'
 
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ["admin", "manager"]);
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   try {
     const body = await request.json()
-    const { orderNumber, designId, initialWeight, priority } = body
+    const validation = createProductionOrderSchema.safeParse(body)
 
-    // Validate required fields
-    if (!orderNumber || !designId || !initialWeight || !priority) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
       )
     }
 
-    // Validate priority enum
-    if (!['LOW', 'MEDIUM', 'HIGH'].includes(priority)) {
+    const { orderNumber, designId, initialWeight, priority } = validation.data
       return NextResponse.json(
         { error: 'Invalid priority value' },
         { status: 400 }
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error creating production order:', error)
+
     return NextResponse.json(
       { error: 'Failed to create production order' },
       { status: 500 }
@@ -81,6 +86,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ["admin", "manager", "operator"]);
+  if ('error' in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
@@ -165,7 +175,7 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    console.error('Production orders fetch error:', error)
+
     return NextResponse.json(
       { error: 'Failed to fetch production orders' },
       { status: 500 }

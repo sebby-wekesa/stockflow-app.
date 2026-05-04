@@ -2,10 +2,21 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jwt from 'jsonwebtoken';
 
+// Validate critical environment variables
 const JWT_SECRET = process.env.JWT_SECRET;
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET;
+const NEXTAUTH_URL = process.env.NEXTAUTH_URL;
 
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
+}
+
+if (!NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is required');
+}
+
+if (!NEXTAUTH_URL) {
+  throw new Error('NEXTAUTH_URL environment variable is required');
 }
 
 type UserClaims = {
@@ -25,15 +36,17 @@ const rolePermissions: Record<string, string[]> = {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // --- THE HARD BYPASS ---
-  // If the request is for any static asset, image, or system file,
-  // stop the middleware immediately and let it through.
+  // Skip static assets, images, and system files
   if (
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
     pathname.includes('/static/') ||
     pathname.includes('.') // Catches .js, .css, .ico, .png, etc.
   ) {
+    return NextResponse.next();
+  }
+
+  // API routes handle their own authentication
+  if (pathname.startsWith('/api')) {
     return NextResponse.next();
   }
 
