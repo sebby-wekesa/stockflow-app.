@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { cookies } from 'next/headers'
+import * as jwt from 'jsonwebtoken'
 
 export default function LoginPage({
   searchParams,
@@ -18,11 +21,37 @@ export default function LoginPage({
     }
 
     const supabase = createServerSupabase()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      redirect('/login?error=' + encodeURIComponent(error.message))
+    if (error || !data.user) {
+      redirect('/login?error=' + encodeURIComponent(error.message || 'Login failed'))
     }
+
+    // Get user from database to get role
+    const dbUser = await prisma.user.findUnique({
+      where: { id: data.user.id },
+      select: { role: true, department: true }
+    })
+
+    if (!dbUser) {
+      redirect('/login?error=' + encodeURIComponent('User not found in database'))
+    }
+
+    // Create JWT token
+    const token = jwt.sign(
+      { role: dbUser.role, department: dbUser.department },
+      process.env.JWT_SECRET!,
+      { expiresIn: '7d' }
+    )
+
+    // Set cookie
+    const cookieStore = await cookies()
+    cookieStore.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 7 days
+    })
 
     redirect('/dashboard')
   }
