@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS } from '@/lib/products'
 import { ProductSearch } from './_components/product-search'
-import type { ProductCategory } from '@prisma/client'
 
 const PAGE_SIZE = 50
 
@@ -11,7 +10,7 @@ export default async function ProductsPage({
 }: {
   searchParams: { category?: string; q?: string; page?: string }
 }) {
-  const category = searchParams.category as ProductCategory | undefined
+  const category = searchParams.category
   const q = searchParams.q?.trim() ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
 
@@ -20,8 +19,8 @@ export default async function ProductsPage({
   if (category) where.category = category
   if (q) {
     where.OR = [
-      { product_code: { contains: q, mode: 'insensitive' } },
-      { canonical_name: { contains: q, mode: 'insensitive' } },
+      { code: { contains: q, mode: 'insensitive' } },
+      { name: { contains: q, mode: 'insensitive' } },
     ]
   }
 
@@ -33,13 +32,10 @@ export default async function ProductsPage({
     }),
     prisma.product.findMany({
       where,
-      orderBy: { product_code: 'asc' },
+      orderBy: { code: 'asc' },
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
-      include: {
-        _count: { select: { aliases: true } },
-        stock_levels: { select: { qty: true } },
-      },
+      include: { branchStocks: { select: { qty: true } } },
     }),
     prisma.product.count({ where }),
   ])
@@ -144,7 +140,7 @@ export default async function ProductsPage({
                 </tr>
               ) : (
                 products.map((p) => {
-                  const totalStock = p.stock_levels.reduce((sum, s) => sum + s.qty, 0)
+                  const totalStock = p.branchStocks.reduce((sum, s) => sum + s.qty, 0)
                   return (
                     <tr key={p.id} className="border-b border-border hover:bg-surface2">
                       <td className="px-4 py-3">
@@ -152,12 +148,12 @@ export default async function ProductsPage({
                           href={`/products/${p.id}`}
                           className="font-mono text-sm text-accent hover:underline"
                         >
-                          {p.product_code}
+                          {p.code}
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <Link href={`/products/${p.id}`} className="hover:underline">
-                          {p.canonical_name}
+                          {p.name}
                         </Link>
                       </td>
                       <td className="px-4 py-3">
@@ -171,10 +167,10 @@ export default async function ProductsPage({
                       </td>
                       <td className="px-4 py-3 text-sm text-muted">{p.uom}</td>
                       <td className="px-4 py-3 text-sm text-muted">
-                        {p._count.aliases} {p._count.aliases === 1 ? 'alias' : 'aliases'}
+                        —
                       </td>
                       <td className="px-4 py-3 font-mono text-sm">
-                        {p.category === 'service' ? (
+                        {p.isService ? (
                           <span className="text-muted">—</span>
                         ) : (
                           <span className={totalStock > 0 ? 'text-teal' : 'text-muted'}>
@@ -183,7 +179,7 @@ export default async function ProductsPage({
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {p.is_active ? (
+                        {p.isActive ? (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-green/15 text-green">
                             Active
                           </span>

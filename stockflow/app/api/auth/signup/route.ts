@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
 import { scryptSync, randomBytes } from 'crypto'
 import { z } from 'zod'
 
@@ -77,9 +76,8 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         email: email.toLowerCase(),
         password: hashedPassword,
-        full_name: fullName,
-        role: isFirstUser ? 'admin' : 'user',
-        org_id: 'default-org', // Should be configurable
+        name: fullName,
+        role: isFirstUser ? 'ADMIN' : 'OPERATOR',
       }
     })
 
@@ -88,7 +86,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        full_name: user.full_name,
+        full_name: user.name,
         role: user.role,
       }
     })

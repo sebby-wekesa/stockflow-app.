@@ -8,7 +8,7 @@ import type { BranchEnum } from '@prisma/client'
 
 // AUTH
 async function requireUser() {
-  const supabase = createServerSupabase()
+  const supabase = await createServerSupabase()
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) throw new Error('Not authenticated')
 

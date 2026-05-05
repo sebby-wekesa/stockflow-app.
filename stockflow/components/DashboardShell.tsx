@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
 import { Role } from "@/lib/auth";
@@ -12,8 +13,13 @@ export function DashboardShell({
   user: any;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const role = user.role as Role;
   const [previewRole, setPreviewRole] = useState<Role>(role);
+
+  const handleNavigate = (screen: string) => {
+    router.push(`/${screen}`);
+  };
 
   // Handle role switching (for preview purposes)
   useEffect(() => {
@@ -23,7 +29,12 @@ export function DashboardShell({
   return (
     <ToastProvider>
       <div className="app">
-        <Sidebar user={{ role: previewRole, name: user.name || '' }} />
+        <Sidebar
+          user={{ role: previewRole.toLowerCase(), name: user.name || '' }}
+          currentRole={previewRole.toLowerCase()}
+          currentScreen={window.location.pathname.slice(1) || 'dashboard'}
+          onNavigate={handleNavigate}
+        />
         <div className="main">
           <div className="topbar">
             <span style={{fontSize:'11px', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'1px'}}>Preview role:</span>
@@ -74,6 +85,11 @@ export function DashboardShell({
           </div>
           <div className="content">{children}</div>
         </div>
+      </div>
+
+      {/* MODAL */}
+      <div className="modal-overlay" id="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); }}>
+        <div className="modal" id="modal-body"></div>
       </div>
     </ToastProvider>
   );

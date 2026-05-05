@@ -8,8 +8,8 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
 
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tkomvxmltdhzrfdhvunl.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrb212eG1sdGRoenJmZGh2dW5sIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NjM1MywiZXhwIjoyMDkzNDYyMzUzfQ.LTQ5VpKYuoMwa1v6-FkxAjPn75aY-ZOR3sc_vq5d5ss'
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 // Simple password hashing function matching auth system
@@ -20,6 +20,10 @@ function hashPassword(password: string): string {
 }
 
 async function main() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Missing required Supabase environment variables for seeding")
+  }
+
   console.log('🌱 Seeding StockFlow database...\n')
 
   // 0. Create organization
@@ -112,7 +116,7 @@ async function main() {
         id: authData.user.id,
         email: u.email,
         password: hashedPassword,
-        full_name: u.name,
+        name: u.name,
         role: u.role,
         branchId: branch?.id,
       },

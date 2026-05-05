@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
   try {
     const materials = await prisma.rawMaterial.findMany({
       where: {
-        org_id: auth.user.org_id,
         availableKg: {
           gt: 0, // Only show materials with available stock
         },

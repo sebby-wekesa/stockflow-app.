@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         scrapReason,
         stageName: currentStage.name,
         sequence: currentStage.sequence,
-        operatorId: user.id,
+        operatorId: auth.user.id,
         department: currentStage.department,
       }
     });

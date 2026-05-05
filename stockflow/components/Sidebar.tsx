@@ -74,7 +74,7 @@ const roleNavItems: Record<string, any[]> = {
 };
 
 interface SidebarProps {
-  user: { role: string; name: string };
+  user?: { role: string; name: string };
   currentRole: string;
   currentScreen: string;
   onNavigate: (screen: string) => void;
@@ -84,7 +84,7 @@ export function Sidebar({ user, currentRole, currentScreen, onNavigate }: Sideba
   const navItems = roleNavItems[currentRole];
   const roleColor = roleColors[currentRole];
   const roleName = roleNames[currentRole];
-  const userName = user.name;
+  const userName = user?.name || 'User';
 
   return (
     <div className="sidebar">

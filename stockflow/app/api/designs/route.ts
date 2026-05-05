@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
 
   try {
     const designs = await prisma.design.findMany({
-      where: { org_id: auth.user.org_id },
       select: {
         id: true,
         name: true,

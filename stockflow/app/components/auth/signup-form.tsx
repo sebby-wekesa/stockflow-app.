@@ -59,7 +59,7 @@ export function SignupForm() {
           type="text"
           required
           autoComplete="name"
-          className="input w-full"
+          className="form-input w-full"
           placeholder="John Doe"
         />
       </div>
@@ -74,7 +74,7 @@ export function SignupForm() {
           type="email"
           required
           autoComplete="email"
-          className="input w-full"
+          className="form-input w-full"
           placeholder="you@company.com"
         />
       </div>
@@ -89,7 +89,7 @@ export function SignupForm() {
           type="password"
           required
           autoComplete="new-password"
-          className="input w-full"
+          className="form-input w-full"
           placeholder="••••••••"
           minLength={8}
         />
@@ -98,7 +98,7 @@ export function SignupForm() {
         </p>
       </div>
 
-      <button type="submit" disabled={isPending} className="btn btn-primary w-full">
+      <button type="submit" disabled={isPending} className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed">
         {isPending ? 'Creating account...' : 'Create account'}
       </button>
     </form>
