@@ -39,6 +39,12 @@ enum Priority {
   URGENT
 }
 
+enum BranchEnum {
+  mombasa
+  nairobi
+  bonje
+}
+
 model User {
   id              String     @id @default(cuid())
   email           String     @unique
@@ -46,12 +52,16 @@ model User {
   name            String?
   role            Role       @default(OPERATOR)
   department      String?    // e.g., "Cutting", "Forging" (for Operators)
+  branchId        String?    // Branch assignment for stock access
+  branch          Branch?    @relation(fields: [branchId], references: [id])
   organizationId  String?
   organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   stageLogs       StageLog[]
   saleOrders      SaleOrder[]
+  stockMovements  StockMovement[]
+  stockAdjustments StockAdjustment[]
 }
 
 model Design {
@@ -68,7 +78,7 @@ model Design {
   updatedAt        DateTime          @updatedAt
   stages           Stage[]
   productionOrders ProductionOrder[]
-  saleOrders       SaleOrder[]
+
   finishedGoods    FinishedGood[]
 }
 
@@ -145,11 +155,33 @@ model Organization {
 
 model Branch {
   id             String       @id @default(cuid())
+  branch         BranchEnum   @unique
   name           String
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  users          User[]
+  stockMovements StockMovement[]
+  stockAdjustments StockAdjustment[]
+}
+
+model Product {
+  id               String         @id @default(cuid())
+  code             String         @unique
+  name             String
+  category         String         // e.g., 'manufactured', 'imported', 'local'
+  reorderPoint     Int            @default(0)
+  sellingPrice     Float          @default(0)
+  isService        Boolean        @default(false) // Excludes from stock operations
+  isActive         Boolean        @default(true)
+  uom              String?        // Unit of measure
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  branchStocks     BranchStock[]
+  stockMovements   StockMovement[]
+  stockAdjustments StockAdjustment[]
+  saleOrderLines   SaleOrderLine[]
 }
 
 model Supplier {
@@ -216,26 +248,40 @@ model FinishedGood {
 }
 
 enum SaleStatus {
-  PENDING     // Waiting for packaging
-  PACKAGING   // Being prepared
-  PACKAGED    // Ready for pickup/shipping
-  SHIPPED     // Sent to customer
+  DRAFT       // Saved but not invoiced
+  INVOICED    // Invoiced with stock deduction
+  FULFILLED   // Completed
   CANCELLED
 }
 
 model SaleOrder {
   id             String     @id @default(cuid())
-  designId       String
-  design         Design     @relation(fields: [designId], references: [id])
-  quantity       Int        // Units requested
+  orderNumber    String?    @unique // e.g., INV-MOM-0001
+  branch         BranchEnum
   customerId     String?
   customer       Customer?  @relation(fields: [customerId], references: [id])
-  status         SaleStatus @default(PENDING)
+  status         SaleStatus @default(DRAFT)
+  orderDate      DateTime   @default(now())
   salesRepId     String     // User who created the order
   salesRep       User       @relation(fields: [salesRepId], references: [id])
   notes          String?
+  totalAmount    Float      @default(0)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+  lines          SaleOrderLine[]
+
+}
+
+model SaleOrderLine {
+  id          String    @id @default(cuid())
+  saleOrderId String
+  saleOrder   SaleOrder @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  createdAt   DateTime  @default(now())
 }
 
 model StockTransaction {
@@ -247,4 +293,49 @@ model StockTransaction {
   reason         String?
   performedBy    String   // userId
   createdAt      DateTime @default(now())
+}
+
+model BranchStock {
+  id        String     @id @default(cuid())
+  productId String
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branch    BranchEnum
+  qty       Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([productId, branch])
+}
+
+model StockMovement {
+  id           String    @id @default(cuid())
+  productId    String
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId     String
+  branch       Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  qty          Int       // Positive for in, negative for out
+  type         String    // e.g., 'purchase_in', 'sale_out', 'adjustment_in', 'branch_transfer_in'
+  reference    String?   // e.g., PO number, import batch
+  notes        String?
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  batchId      String?   // For import batches
+  sourceBranch BranchEnum? // For transfers
+  destBranch   BranchEnum? // For transfers
+  createdAt    DateTime  @default(now())
+}
+
+model StockAdjustment {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  oldQty    Int
+  newQty    Int
+  delta     Int
+  reason    String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }
