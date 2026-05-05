@@ -48,9 +48,13 @@ export async function POST(request: NextRequest) {
     const userCount = await prisma.user.count()
     const isFirstUser = userCount === 0
 
-    // Create user in Supabase Auth
-    const supabase = createServerSupabase()
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Create user in Supabase Auth using service role
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email.toLowerCase(),
       password,
       email_confirm: true, // Auto-confirm for development
