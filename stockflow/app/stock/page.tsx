@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { BRANCH_LABELS, BRANCH_ACCENT_CLASS, BRANCH_TEXT_CLASS, formatKES } from '@/lib/branches'
 import { TransferButton } from '@/components/transfer-button'
-import { StockSearch } from '@/components/stock-search' // Assumed component
+
+export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 50
 
@@ -72,10 +73,7 @@ export default async function StockPage({
         ))}
       </div>
 
-      {/* Category filters and search */}
-      <div className="flex gap-4 mb-8">
-        <StockSearch />
-      </div>
+      {/* Category filters can be added here */}
 
       <div className="card">
         <table>
