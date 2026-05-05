@@ -2,9 +2,15 @@ import "dotenv/config";
 import { PrismaClient, Role } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg'
 import { scryptSync, randomBytes } from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tkomvxmltdhzrfdhvunl.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrb212eG1sdGRoenJmZGh2dW5sIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NjM1MywiZXhwIjoyMDkzNDYyMzUzfQ.LTQ5VpKYuoMwa1v6-FkxAjPn75aY-ZOR3sc_vq5d5ss'
+)
 
 // Simple password hashing function matching auth system
 function hashPassword(password: string): string {
@@ -16,58 +22,7 @@ function hashPassword(password: string): string {
 async function main() {
   console.log('🌱 Seeding StockFlow database...\n')
 
-  // 1. Hash a default password (change this immediately after first login!)
-  const hashedPassword = hashPassword('StockFlow2026!');
-
-  const users = [
-    {
-      email: 'admin@stockflow.com',
-      name: 'Super Admin',
-      role: Role.ADMIN,
-      department: 'Management',
-    },
-    {
-      email: 'manager@stockflow.com',
-      name: 'Production Manager',
-      role: Role.MANAGER,
-      department: 'Production',
-    },
-    {
-      email: 'warehouse@stockflow.com',
-      name: 'Inventory Lead',
-      role: Role.WAREHOUSE,
-      department: 'Warehouse',
-    },
-    {
-      email: 'operator@stockflow.com',
-      name: 'Cutting Operator',
-      role: Role.OPERATOR,
-      department: 'Cutting',
-    },
-    {
-      email: 'sales@stockflow.com',
-      name: 'Sales Rep',
-      role: Role.SALES,
-      department: 'Sales',
-    },
-  ];
-
-  for (const u of users) {
-    const user = await prisma.user.upsert({
-      where: { email: u.email },
-      update: {}, // Don't change anything if they already exist
-      create: {
-        email: u.email,
-        name: u.name,
-        role: u.role,
-        department: u.department,
-        password: hashedPassword,
-      },
-    });
-    console.log(`✅ Created/Verified user: ${user.email} as ${user.role}`);
-  }
-
-  // 2. Ensure organization exists
+  // 0. Create organization
   let org = await prisma.organization.findFirst()
   if (!org) {
     org = await prisma.organization.create({
@@ -77,6 +32,95 @@ async function main() {
   } else {
     console.log(`✓ Using existing organization: ${org.name}`)
   }
+
+  // 1. Create branches
+  const branches = ['mombasa', 'nairobi', 'bonje']
+  for (const branch of branches) {
+    await prisma.branch.upsert({
+      where: { branch: branch as any },
+      update: {},
+      create: {
+        branch: branch as any,
+        name: branch.charAt(0).toUpperCase() + branch.slice(1),
+        organizationId: org.id
+      },
+    })
+  }
+  console.log('✅ Branches created')
+
+  // 1. Hash a default password (change this immediately after first login!)
+  const defaultPassword = 'StockFlow2026!'
+  const hashedPassword = hashPassword(defaultPassword);
+
+  const users = [
+    {
+      email: 'admin@stockflow.com',
+      name: 'Super Admin',
+      role: 'ADMIN' as Role,
+      branch: 'mombasa' as const,
+    },
+    {
+      email: 'manager@stockflow.com',
+      name: 'Production Manager',
+      role: 'MANAGER' as Role,
+      branch: 'mombasa' as const,
+    },
+    {
+      email: 'warehouse@stockflow.com',
+      name: 'Inventory Lead',
+      role: 'WAREHOUSE' as Role,
+      branch: 'mombasa' as const,
+    },
+    {
+      email: 'operator@stockflow.com',
+      name: 'Cutting Operator',
+      role: 'OPERATOR' as Role,
+      branch: 'mombasa' as const,
+    },
+    {
+      email: 'sales@stockflow.com',
+      name: 'Sales Rep',
+      role: 'SALES' as Role,
+      branch: 'nairobi' as const,
+    },
+  ];
+
+  for (const u of users) {
+    // Create in Supabase Auth
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: u.email,
+      password: defaultPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: u.name,
+      }
+    })
+
+    if (authError || !authData.user) {
+      console.error(`Failed to create Supabase user for ${u.email}:`, authError)
+      continue
+    }
+
+    // Get branch
+    const branch = await prisma.branch.findUnique({ where: { branch: u.branch } })
+
+    // Create in Prisma
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {}, // Don't change anything if they already exist
+      create: {
+        id: authData.user.id,
+        email: u.email,
+        password: hashedPassword,
+        full_name: u.name,
+        role: u.role,
+        branchId: branch?.id,
+      },
+    });
+    console.log(`✅ Created/Verified user: ${user.email} as ${user.role}`);
+  }
+
+
 
   // 3. Seed suppliers
   const suppliers = [
