@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "db:seed": "npx ts-node seed.ts"
+    "db:seed": "npx ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -29,6 +29,7 @@
     "react-hook-form": "^7.72.1",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { prisma } from "@/lib/prisma";
 import { YieldDashboard } from "@/components/YieldDashboard";
 import { ExportButtons } from "@/components/admin/ExportButtons";

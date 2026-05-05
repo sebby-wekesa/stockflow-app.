@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { orderNumber, designId, initialWeight, priority } = validation.data
+
+    if (priority && !['LOW', 'MEDIUM', 'HIGH'].includes(priority)) {
       return NextResponse.json(
         { error: 'Invalid priority value' },
         { status: 400 }

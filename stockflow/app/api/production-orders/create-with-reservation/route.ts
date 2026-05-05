@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { designId, materialId, quantity, customerRef } = validation.data
+
+    if (quantity <= 0) {
       return NextResponse.json(
         { error: 'Quantity must be greater than 0' },
         { status: 400 }
