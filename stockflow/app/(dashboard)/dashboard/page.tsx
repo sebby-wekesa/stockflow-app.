@@ -5,8 +5,62 @@ import { Role } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Modal } from "@/components/Modal";
 
+interface DashboardData {
+  rawMaterialStock: number;
+  activeOrders: number;
+  finishedGoods: number;
+  scrapThisWeek: number;
+  pendingApprovals: number;
+  recentOrders: any[];
+  departmentScrap: any[];
+  throughput: any[];
+}
+
 // Screen components will be implemented below
 function DashboardScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // Mock data for now - in production, fetch from API
+      const mockData: DashboardData = {
+        rawMaterialStock: 4820,
+        activeOrders: 12,
+        finishedGoods: 1340,
+        scrapThisWeek: 82,
+        pendingApprovals: 3,
+        recentOrders: [
+          { id: "PO-0041", design: "Hex bolt M12", kg: 120, status: "PENDING", dept: null },
+          { id: "PO-0040", design: "Stud rod 8mm", kg: 85, status: "IN_PRODUCTION", dept: "Threading" },
+          { id: "PO-0039", design: "Anchor bolt", kg: 200, status: "IN_PRODUCTION", dept: "Electroplate" },
+          { id: "PO-0038", design: "Hex bolt M10", kg: 60, status: "COMPLETED", dept: "Done" },
+        ],
+        departmentScrap: [
+          { dept: "Cutting", kg: 8, pct: 4 },
+          { dept: "Forging", kg: 22, pct: 11 },
+          { dept: "Threading", kg: 5, pct: 2 },
+          { dept: "Electroplating", kg: 31, pct: 15 },
+          { dept: "Drilling", kg: 16, pct: 8 },
+        ],
+        throughput: [
+          { dept: "Cutting", jobs: 3, kg: 340, scrap: 14, yield: 95.9, ops: 2 },
+          { dept: "Forging / chamfer", jobs: 2, kg: 180, scrap: 22, yield: 87.8, ops: 2 },
+          { dept: "Threading / locking", jobs: 4, kg: 210, scrap: 5, yield: 97.6, ops: 3 },
+          { dept: "Electroplating", jobs: 1, kg: 95, scrap: 31, yield: 67.4, ops: 1 },
+          { dept: "Drilling / grinding", jobs: 2, kg: 120, scrap: 10, yield: 91.7, ops: 2 },
+        ]
+      };
+      setData(mockData);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
+
+  if (loading || !data) {
+    return <div className="card"><p>Loading...</p></div>;
+  }
+
   return (
     <div>
       <div className="section-header mb-16">
@@ -20,22 +74,22 @@ function DashboardScreen({ navigate, setModalContent, setModalOpen }: { navigate
       <div className="stats-grid">
         <div className="stat-card amber">
           <div className="stat-label">Raw material stock</div>
-          <div className="stat-value">4,820<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
+          <div className="stat-value">{data.rawMaterialStock.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
           <div className="stat-sub">3 materials · <span>+200 kg today</span></div>
         </div>
         <div className="stat-card teal">
           <div className="stat-label">Active production orders</div>
-          <div className="stat-value">12</div>
-          <div className="stat-sub">4 pending approval · <span>8 in production</span></div>
+          <div className="stat-value">{data.activeOrders}</div>
+          <div className="stat-sub">{data.pendingApprovals} pending approval · <span>{data.activeOrders - data.pendingApprovals} in production</span></div>
         </div>
         <div className="stat-card purple">
           <div className="stat-label">Finished goods ready</div>
-          <div className="stat-value">1,340<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
+          <div className="stat-value">{data.finishedGoods.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
           <div className="stat-sub"><span>247 units</span> across 6 designs</div>
         </div>
         <div className="stat-card red">
           <div className="stat-label">Scrap this week</div>
-          <div className="stat-value">82<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
+          <div className="stat-value">{data.scrapThisWeek}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
           <div className="stat-sub"><span className="down">↑ 12 kg</span> vs last week</div>
         </div>
       </div>
@@ -47,21 +101,25 @@ function DashboardScreen({ navigate, setModalContent, setModalOpen }: { navigate
             <table>
               <thead><tr><th>Order</th><th>Design</th><th>Kg reserved</th><th>Status</th><th>Dept</th></tr></thead>
               <tbody>
-                <tr><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>PO-0041</span></td><td>Hex bolt M12</td><td><span className="job-kg">120 kg</span></td><td><span className="badge badge-amber">Pending approval</span></td><td>—</td></tr>
-                <tr><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>PO-0040</span></td><td>Stud rod 8mm</td><td><span className="job-kg">85 kg</span></td><td><span className="badge badge-purple">In production</span></td><td>Threading</td></tr>
-                <tr><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>PO-0039</span></td><td>Anchor bolt</td><td><span className="job-kg">200 kg</span></td><td><span className="badge badge-purple">In production</span></td><td>Electroplate</td></tr>
-                <tr><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>PO-0038</span></td><td>Hex bolt M10</td><td><span className="job-kg">60 kg</span></td><td><span className="badge badge-green">Complete</span></td><td>Done</td></tr>
+                {data.recentOrders.map(order => (
+                  <tr key={order.id}>
+                    <td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.id}</span></td>
+                    <td>{order.design}</td>
+                    <td><span className="job-kg">{order.kg} kg</span></td>
+                    <td><span className={`badge ${order.status === 'PENDING' ? 'badge-amber' : order.status === 'IN_PRODUCTION' ? 'badge-purple' : 'badge-green'}`}>{order.status === 'PENDING' ? 'Pending approval' : order.status === 'IN_PRODUCTION' ? 'In production' : 'Complete'}</span></td>
+                    <td>{order.dept || '—'}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
+
         <div className="card">
           <div className="section-header mb-16"><div className="section-title">Scrap by department</div><div style={{fontSize:'11px',color:'var(--muted)'}}>This week</div></div>
-          {[
-            ['Cutting',8,4],['Forging',22,11],['Threading',5,2],['Electroplating',31,15],['Drilling',16,8]
-          ].map(([d,k,p]) => {
-            const cls = p > 10 ? 'bad' : p > 5 ? 'warn' : 'good';
-            return <div className="scrap-bar-wrap"><div className="scrap-bar-label"><span>{d}</span><span>{k} kg · {p}%</span></div><div className="scrap-bar"><div className={`scrap-bar-fill ${cls}`} style={{width:`${p*4}%`}}></div></div></div>;
+          {data.departmentScrap.map(item => {
+            const cls = item.pct > 10 ? 'bad' : item.pct > 5 ? 'warn' : 'good';
+            return <div key={item.dept} className="scrap-bar-wrap"><div className="scrap-bar-label"><span>{item.dept}</span><span>{item.kg} kg · {item.pct}%</span></div><div className="scrap-bar"><div className={`scrap-bar-fill ${cls}`} style={{width:`${item.pct*4}%`}}></div></div></div>;
           })}
         </div>
       </div>
@@ -72,11 +130,16 @@ function DashboardScreen({ navigate, setModalContent, setModalOpen }: { navigate
           <table>
             <thead><tr><th>Department</th><th>Jobs active</th><th>Kg processed</th><th>Kg scrap</th><th>Yield</th><th>Operators</th></tr></thead>
             <tbody>
-              <tr><td>Cutting</td><td>3</td><td><span className="job-kg">340 kg</span></td><td>14 kg</td><td><span className="badge badge-green">95.9%</span></td><td>2</td></tr>
-              <tr><td>Forging / chamfer</td><td>2</td><td><span className="job-kg">180 kg</span></td><td>22 kg</td><td><span className="badge badge-amber">87.8%</span></td><td>2</td></tr>
-              <tr><td>Threading / locking</td><td>4</td><td><span className="job-kg">210 kg</span></td><td>5 kg</td><td><span className="badge badge-green">97.6%</span></td><td>3</td></tr>
-              <tr><td>Electroplating</td><td>1</td><td><span className="job-kg">95 kg</span></td><td>31 kg</td><td><span className="badge badge-red">67.4%</span></td><td>1</td></tr>
-              <tr><td>Drilling / grinding</td><td>2</td><td><span className="job-kg">120 kg</span></td><td>10 kg</td><td><span className="badge badge-green">91.7%</span></td><td>2</td></tr>
+              {data.throughput.map(dept => (
+                <tr key={dept.dept}>
+                  <td>{dept.dept}</td>
+                  <td>{dept.jobs}</td>
+                  <td><span className="job-kg">{dept.kg} kg</span></td>
+                  <td>{dept.scrap} kg</td>
+                  <td><span className={`badge ${dept.yield < 70 ? 'badge-red' : dept.yield < 90 ? 'badge-amber' : 'badge-green'}`}>{dept.yield}%</span></td>
+                  <td>{dept.ops}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -204,7 +267,7 @@ function OperatorQueueScreen({ navigate, setModalContent, setModalOpen }: { navi
   );
 }
 
-function OperatorLogScreen() {
+function OperatorLogScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   const [kgOut, setKgOut] = useState('');
   const [kgScrap, setKgScrap] = useState('');
   const kgIn = 85;
@@ -264,7 +327,7 @@ function OperatorLogScreen() {
   );
 }
 
-function CatalogueScreen() {
+function CatalogueScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   return (
     <div>
       <div className="section-header mb-16">
@@ -293,7 +356,7 @@ function CatalogueScreen() {
   );
 }
 
-function PackQueueScreen() {
+function PackQueueScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   return (
     <div>
       <div className="section-header mb-16">
@@ -323,7 +386,7 @@ function PackQueueScreen() {
   );
 }
 
-function RawMaterialsScreen() {
+function RawMaterialsScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   return (
     <div>
       <div className="section-header mb-16">
@@ -358,7 +421,7 @@ function RawMaterialsScreen() {
   );
 }
 
-function ReceiveScreen() {
+function ReceiveScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   return (
     <div>
       <div className="section-header mb-16">
@@ -380,7 +443,7 @@ function ReceiveScreen() {
   );
 }
 
-function FinishedGoodsScreen() {
+function FinishedGoodsScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   return (
     <div>
       <div className="section-header mb-16">
@@ -402,7 +465,7 @@ function FinishedGoodsScreen() {
   );
 }
 
-function UsersScreen() {
+function UsersScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
   return (
     <div>
       <div className="section-header mb-16">
@@ -448,9 +511,52 @@ export default function DashboardPage() {
   const [currentScreen, setCurrentScreen] = useState('dashboard');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState('');
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   const navigate = (screen: string) => {
     setCurrentScreen(screen);
+  };
+
+  useEffect(() => {
+    if (currentScreen === 'dashboard' && !dashboardData) {
+      fetchDashboardData();
+    }
+  }, [currentScreen]);
+
+  const fetchDashboardData = async () => {
+    try {
+      // For now, use mock data. In a real implementation, fetch from APIs
+      const mockData = {
+        rawMaterialStock: 4820,
+        activeOrders: 12,
+        finishedGoods: 1340,
+        scrapThisWeek: 82,
+        pendingApprovals: 3,
+        recentOrders: [
+          { id: "PO-0041", design: "Hex bolt M12", kg: 120, status: "PENDING", dept: null },
+          { id: "PO-0040", design: "Stud rod 8mm", kg: 85, status: "IN_PRODUCTION", dept: "Threading" },
+          { id: "PO-0039", design: "Anchor bolt", kg: 200, status: "IN_PRODUCTION", dept: "Electroplate" },
+          { id: "PO-0038", design: "Hex bolt M10", kg: 60, status: "COMPLETED", dept: "Done" },
+        ],
+        departmentScrap: [
+          { dept: "Cutting", kg: 8, pct: 4 },
+          { dept: "Forging", kg: 22, pct: 11 },
+          { dept: "Threading", kg: 5, pct: 2 },
+          { dept: "Electroplating", kg: 31, pct: 15 },
+          { dept: "Drilling", kg: 16, pct: 8 },
+        ],
+        throughput: [
+          { dept: "Cutting", jobs: 3, kg: 340, scrap: 14, yield: 95.9, ops: 2 },
+          { dept: "Forging / chamfer", jobs: 2, kg: 180, scrap: 22, yield: 87.8, ops: 2 },
+          { dept: "Threading / locking", jobs: 4, kg: 210, scrap: 5, yield: 97.6, ops: 3 },
+          { dept: "Electroplating", jobs: 1, kg: 95, scrap: 31, yield: 67.4, ops: 1 },
+          { dept: "Drilling / grinding", jobs: 2, kg: 120, scrap: 10, yield: 91.7, ops: 2 },
+        ]
+      };
+      setDashboardData(mockData);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    }
   };
 
   const ScreenComponent = screens[currentScreen] || (() => <div className="card"><p style={{color:'var(--muted)'}}>Screen: {currentScreen}</p></div>);
@@ -480,7 +586,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="content">
-          <ScreenComponent />
+          <ScreenComponent navigate={navigate} setModalContent={setModalContent} setModalOpen={setModalOpen} />
         </div>
       </div>
 

@@ -74,15 +74,17 @@ const roleNavItems: Record<string, any[]> = {
 };
 
 interface SidebarProps {
+  user: { role: string; name: string };
   currentRole: string;
   currentScreen: string;
   onNavigate: (screen: string) => void;
 }
 
-export function Sidebar({ currentRole, currentScreen, onNavigate }: SidebarProps) {
+export function Sidebar({ user, currentRole, currentScreen, onNavigate }: SidebarProps) {
   const navItems = roleNavItems[currentRole];
   const roleColor = roleColors[currentRole];
   const roleName = roleNames[currentRole];
+  const userName = user.name;
 
   return (
     <div className="sidebar">
