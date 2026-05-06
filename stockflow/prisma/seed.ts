@@ -1,171 +1,322 @@
-import "dotenv/config";
-import { PrismaClient, Role } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg'
-import { scryptSync, randomBytes } from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+/**
+ * Seed script for Springtech StockFlow
+ *
+ * Loads a representative sample of products across all 5 categories,
+ * including realistic aliases derived from the QuickBooks sales data
+ * naming patterns.
+ *
+ * Run with:  npm run db:seed
+ *
+ * For the full 4,712 spring catalogue, use the Import Centre once
+ * Phase 3 is built.
+ */
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
-const prisma = new PrismaClient({ adapter })
+import { PrismaClient } from '@prisma/client'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const prisma = new PrismaClient()
 
-// Simple password hashing function matching auth system
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex')
-  const hash = scryptSync(password, salt, 64).toString('hex')
-  return `${salt}:${hash}`
+type SeedProduct = {
+  product_code: string
+  canonical_name: string
+  category:
+    | 'manufactured_spring'
+    | 'manufactured_ubolt'
+    | 'imported'
+    | 'local_purchase'
+    | 'service'
+  product_type: string
+  uom?: 'pcs' | 'set' | 'kg' | 'litres' | 'metres' | 'box'
+  vehicle_make?: string
+  vehicle_model?: string
+  spring_position?: string
+  leaf_position?: string
+  shaft_size_mm?: number
+  leg_length_inch?: string
+  cost_price?: number
+  selling_price?: number
+  reorder_point?: number
+  aliases?: string[]
 }
 
+const PRODUCTS: SeedProduct[] = [
+  // ── Manufactured springs (5 samples)
+  {
+    product_code: 'FH215/FSML',
+    canonical_name: 'Mitsubishi FH215 Front Spring Main Leaf',
+    category: 'manufactured_spring',
+    product_type: 'leaf_spring',
+    vehicle_make: 'Mitsubishi FH 215',
+    vehicle_model: 'FH215',
+    spring_position: 'Front',
+    leaf_position: 'Main Leaf',
+    cost_price: 3200,
+    selling_price: 4500,
+    reorder_point: 10,
+    aliases: ['FH 215 F.M.L', 'FH215 FRONT MAIN LEAF', 'FH215 F.M.L'],
+  },
+  {
+    product_code: 'FH215/RSML',
+    canonical_name: 'Mitsubishi FH215 Rear Spring Main Leaf',
+    category: 'manufactured_spring',
+    product_type: 'leaf_spring',
+    vehicle_make: 'Mitsubishi FH 215',
+    vehicle_model: 'FH215',
+    spring_position: 'Rear',
+    leaf_position: 'Main Leaf',
+    cost_price: 3500,
+    selling_price: 4800,
+    reorder_point: 10,
+    aliases: ['FH 215 R.M.L', 'FH215 R.M.L'],
+  },
+  {
+    product_code: 'DOLLTRLR/RSML',
+    canonical_name: 'Doll Trailer Rear Spring Main Leaf',
+    category: 'manufactured_spring',
+    product_type: 'leaf_spring',
+    vehicle_make: 'Doll Trailer',
+    vehicle_model: 'DOLLTRLR',
+    spring_position: 'Rear',
+    leaf_position: 'Main Leaf',
+    cost_price: 4400,
+    selling_price: 6200,
+    reorder_point: 15,
+    aliases: ['DOLL R.M.L DOLL', 'DOLL R.M.L', 'DOLL RML', 'DOLL TRAILER R.M.L'],
+  },
+  {
+    product_code: 'ISZFRR/HSML',
+    canonical_name: 'Isuzu FRR Helper Spring Main Leaf',
+    category: 'manufactured_spring',
+    product_type: 'helper_spring',
+    vehicle_make: 'Isuzu FRR',
+    vehicle_model: 'FRR',
+    spring_position: 'Helper',
+    leaf_position: 'Main Leaf',
+    cost_price: 2800,
+    selling_price: 3900,
+    reorder_point: 8,
+    aliases: ['ISUZU FRR H.M.L', 'FRR HELPER MAIN LEAF', 'ISZ FRR HML'],
+  },
+  {
+    product_code: 'HIACEN/RSML',
+    canonical_name: 'Toyota HiAce N/M Rear Spring Main Leaf',
+    category: 'manufactured_spring',
+    product_type: 'leaf_spring',
+    vehicle_make: 'Toyota HiAce',
+    vehicle_model: 'HIACEN/M',
+    spring_position: 'Rear',
+    leaf_position: 'Main Leaf',
+    cost_price: 1800,
+    selling_price: 2600,
+    reorder_point: 12,
+    aliases: ['HIACE N/M R.M.L', 'HIACE N/M RML', 'HIACE NEW MODEL R.M.L'],
+  },
+
+  // ── Manufactured U-bolts (3 samples)
+  {
+    product_code: 'UB-FH215-F8',
+    canonical_name: 'Front U-bolt FH 215 — 8"',
+    category: 'manufactured_ubolt',
+    product_type: 'u_bolt',
+    vehicle_make: 'Mitsubishi FH 215',
+    vehicle_model: 'FH215',
+    spring_position: 'Front',
+    shaft_size_mm: 24,
+    leg_length_inch: '8"',
+    cost_price: 850,
+    selling_price: 1200,
+    reorder_point: 30,
+    aliases: ['UBOLT FH215 8"', 'U-BOLT FH 215 FRONT'],
+  },
+  {
+    product_code: 'UB-DOLLTRLR-R17',
+    canonical_name: 'Rear U-bolt Doll Trailer — 17"',
+    category: 'manufactured_ubolt',
+    product_type: 'u_bolt',
+    vehicle_make: 'Doll Trailer',
+    vehicle_model: 'DOLLTRLR',
+    spring_position: 'Rear',
+    shaft_size_mm: 28,
+    leg_length_inch: '17"',
+    cost_price: 1400,
+    selling_price: 1900,
+    reorder_point: 20,
+  },
+  {
+    product_code: 'UB-ISZFRR-F10',
+    canonical_name: 'Front U-bolt Isuzu FRR — 10"',
+    category: 'manufactured_ubolt',
+    product_type: 'u_bolt',
+    vehicle_make: 'Isuzu FRR',
+    spring_position: 'Front',
+    shaft_size_mm: 22,
+    leg_length_inch: '10"',
+    cost_price: 950,
+    selling_price: 1350,
+    reorder_point: 25,
+  },
+
+  // ── Imported (3 samples)
+  {
+    product_code: 'IMP-BRG-804358',
+    canonical_name: 'Bearing 804358',
+    category: 'imported',
+    product_type: 'bearing',
+    cost_price: 1800,
+    selling_price: 2500,
+    reorder_point: 15,
+    aliases: ['BEARING 804358', 'BRG 804358'],
+  },
+  {
+    product_code: 'IMP-BRG-572630',
+    canonical_name: 'Bearing 572630',
+    category: 'imported',
+    product_type: 'bearing',
+    cost_price: 2100,
+    selling_price: 2900,
+    reorder_point: 10,
+    aliases: ['BEARING 572630'],
+  },
+  {
+    product_code: 'IMP-SEAL-OM',
+    canonical_name: 'Oil seal — original mark',
+    category: 'imported',
+    product_type: 'seal',
+    cost_price: 350,
+    selling_price: 550,
+    reorder_point: 50,
+    aliases: ['OIL SEAL OM', 'OIL SEAL O/M'],
+  },
+
+  // ── Local purchase (4 samples — most alias variation)
+  {
+    product_code: 'BL-BC37-XTRAKE',
+    canonical_name: 'Brake Lining BC37 Xtrake',
+    category: 'local_purchase',
+    product_type: 'brake_lining',
+    uom: 'set',
+    cost_price: 1700,
+    selling_price: 2500,
+    reorder_point: 20,
+    aliases: [
+      'BRAKELINING BC37 XTRAKE',
+      'BRAKE LINING BC 37 XTRAKE',
+      'BRAKE LINING XTRAKE BC 37',
+      'BRAKE LINING BC37 XTRAKE',
+      'BRAKELINING BC37 XTRAKE NM',
+    ],
+  },
+  {
+    product_code: 'BL-BC36-LONAFLEX',
+    canonical_name: 'Brake Lining BC36 Lonaflex',
+    category: 'local_purchase',
+    product_type: 'brake_lining',
+    uom: 'set',
+    cost_price: 1500,
+    selling_price: 2200,
+    reorder_point: 20,
+    aliases: ['BRAKE LINING BC36 LONAFLEX', 'BRAKELINING BC36 LONAFLEX'],
+  },
+  {
+    product_code: 'BL-FH-REAR',
+    canonical_name: 'Brake Lining FH Rear',
+    category: 'local_purchase',
+    product_type: 'brake_lining',
+    uom: 'set',
+    cost_price: 2100,
+    selling_price: 3200,
+    reorder_point: 15,
+  },
+  {
+    product_code: 'IMP-CABUSH-METALLION',
+    canonical_name: 'Control Arm Bush — Metallion',
+    category: 'local_purchase',
+    product_type: 'bush',
+    cost_price: 800,
+    selling_price: 1200,
+    reorder_point: 25,
+    aliases: ['CONTROL ARM MTLION BUSH MENCI', 'CONTROL ARM METALLION BUSH'],
+  },
+
+  // ── Services (3 samples)
+  {
+    product_code: 'SVC-RETENTION',
+    canonical_name: 'Spring Assembly Retention',
+    category: 'service',
+    product_type: 'retention',
+    selling_price: 1500,
+    aliases: ['RETENTION', 'SPRING RETENTION'],
+  },
+  {
+    product_code: 'SVC-REPAIR',
+    canonical_name: 'Repair Done',
+    category: 'service',
+    product_type: 'repair',
+    selling_price: 2000,
+    aliases: ['REPAIR DONE', 'REPAIR'],
+  },
+  {
+    product_code: 'SVC-RIVETING',
+    canonical_name: 'Riveting Service',
+    category: 'service',
+    product_type: 'riveting',
+    selling_price: 800,
+    aliases: ['RIVETING'],
+  },
+]
+
 async function main() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Missing required Supabase environment variables for seeding")
-  }
+  console.log('🌱 Seeding Springtech StockFlow database...\n')
 
-  console.log('🌱 Seeding StockFlow database...\n')
-
-  // 0. Create organization
+  // 1. Ensure organization exists
   let org = await prisma.organization.findFirst()
   if (!org) {
     org = await prisma.organization.create({
-      data: { name: 'StockFlow Ltd' },
+      data: { name: 'Springtech (K) Ltd' },
     })
     console.log(`✓ Created organization: ${org.name}`)
   } else {
     console.log(`✓ Using existing organization: ${org.name}`)
   }
 
-  // 1. Create branches
-  const branches = ['mombasa', 'nairobi', 'bonje']
-  for (const branch of branches) {
-    await prisma.branch.upsert({
-      where: { branch: branch as any },
-      update: {},
-      create: {
-        branch: branch as any,
-        name: branch.charAt(0).toUpperCase() + branch.slice(1),
-        organizationId: org.id
-      },
+  // 2. Seed products + aliases
+  let createdCount = 0
+  let skippedCount = 0
+
+  for (const seed of PRODUCTS) {
+    const existing = await prisma.product.findUnique({
+      where: { product_code: seed.product_code },
     })
-  }
-  console.log('✅ Branches created')
-
-  // 1. Hash a default password (change this immediately after first login!)
-  const defaultPassword = 'StockFlow2026!'
-  const hashedPassword = hashPassword(defaultPassword);
-
-  const users = [
-    {
-      email: 'admin@stockflow.com',
-      name: 'Super Admin',
-      role: 'ADMIN' as Role,
-      branch: 'mombasa' as const,
-    },
-    {
-      email: 'manager@stockflow.com',
-      name: 'Production Manager',
-      role: 'MANAGER' as Role,
-      branch: 'mombasa' as const,
-    },
-    {
-      email: 'warehouse@stockflow.com',
-      name: 'Inventory Lead',
-      role: 'WAREHOUSE' as Role,
-      branch: 'mombasa' as const,
-    },
-    {
-      email: 'operator@stockflow.com',
-      name: 'Cutting Operator',
-      role: 'OPERATOR' as Role,
-      branch: 'mombasa' as const,
-    },
-    {
-      email: 'sales@stockflow.com',
-      name: 'Sales Rep',
-      role: 'SALES' as Role,
-      branch: 'nairobi' as const,
-    },
-  ];
-
-  for (const u of users) {
-    // Create in Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: u.email,
-      password: defaultPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: u.name,
-      }
-    })
-
-    if (authError || !authData.user) {
-      console.error(`Failed to create Supabase user for ${u.email}:`, authError)
+    if (existing) {
+      skippedCount++
       continue
     }
 
-    // Get branch
-    const branch = await prisma.branch.findUnique({ where: { branch: u.branch } })
-
-    // Create in Prisma
-    const user = await prisma.user.upsert({
-      where: { email: u.email },
-      update: {}, // Don't change anything if they already exist
-      create: {
-        id: authData.user.id,
-        email: u.email,
-        password: hashedPassword,
-        name: u.name,
-        role: u.role,
-        branchId: branch?.id,
+    const product = await prisma.product.create({
+      data: {
+        code: seed.product_code,
+        name: seed.canonical_name,
+        category: seed.category,
+        uom: seed.uom ?? 'pcs',
+        sellingPrice: seed.selling_price ?? 0,
+        reorderPoint: seed.reorder_point ?? 0,
+        isService: seed.category === 'service',
       },
-    });
-    console.log(`✅ Created/Verified user: ${user.email} as ${user.role}`);
+    })
+
+    createdCount++
   }
 
+  console.log(`\n✓ Seeded ${createdCount} products (${skippedCount} already existed)`)
 
+  // Summary
+  const counts = await prisma.product.groupBy({
+    by: ['category'],
+    _count: { _all: true },
+  })
 
-  // 3. Seed suppliers
-  const suppliers = [
-    { name: 'SteelCorp', contactInfo: 'steelcorp@example.com' },
-    { name: 'Fasteners Inc', contactInfo: 'fasteners@example.com' },
-  ];
-
-  for (const s of suppliers) {
-    let supplier = await prisma.supplier.findFirst({ where: { name: s.name } });
-    if (!supplier) {
-      supplier = await prisma.supplier.create({
-        data: s,
-      });
-    }
-    console.log(`✅ Created/Found supplier: ${supplier.name}`);
-  }
-
-  // 4. Seed raw materials
-  const rawMaterials = [
-    { materialName: 'High-Tensile Steel', diameter: 'M12', availableKg: 1000, supplierName: 'SteelCorp' },
-    { materialName: 'Mild Steel', diameter: 'M10', availableKg: 500, supplierName: 'SteelCorp' },
-  ];
-
-  for (const rm of rawMaterials) {
-    const supplier = await prisma.supplier.findFirst({ where: { name: rm.supplierName } });
-    if (supplier) {
-      let rawMaterial = await prisma.rawMaterial.findFirst({
-        where: { materialName: rm.materialName, diameter: rm.diameter },
-      });
-      if (!rawMaterial) {
-        rawMaterial = await prisma.rawMaterial.create({
-          data: {
-            materialName: rm.materialName,
-            diameter: rm.diameter,
-            availableKg: rm.availableKg,
-            supplierId: supplier.id,
-          },
-        });
-      }
-      console.log(`✅ Created/Found raw material: ${rm.materialName} ${rm.diameter}`);
-    }
+  console.log('\nProduct counts by category:')
+  for (const c of counts) {
+    console.log(`  · ${c.category.padEnd(22)} ${c._count._all}`)
   }
 
   console.log('\n✓ Seed complete\n')
@@ -173,9 +324,9 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e);
-    process.exit(1);
+    console.error('Seed failed:', e)
+    process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect();
-  });
+    await prisma.$disconnect()
+  })

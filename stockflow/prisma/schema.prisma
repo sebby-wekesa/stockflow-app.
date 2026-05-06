@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -8,28 +8,28 @@ datasource db {
 }
 
 enum Role {
-  ADMIN      // Can see reports, manage BOM, and release orders
-  MANAGER    // Can approve and manage production orders
-  OPERATOR   // Can only see their department queue and log weights
-  SALES      // Can view sales-related data
-  PACKAGING  // Can handle packaging operations
-  WAREHOUSE  // Can only log raw material intake
+  ADMIN // Can see reports, manage BOM, and release orders
+  MANAGER // Can approve and manage production orders
+  OPERATOR // Can only see their department queue and log weights
+  SALES // Can view sales-related data
+  PACKAGING // Can handle packaging operations
+  WAREHOUSE // Can only log raw material intake
 }
 
 enum ProductionStatus {
-  PENDING       // Waiting for Manager Review
-  APPROVED      // Released to production [cite: 46]
+  PENDING // Waiting for Manager Review
+  APPROVED // Released to production [cite: 46]
   IN_PRODUCTION // Moving through departments [cite: 47]
-  COMPLETED     // Finished goods added to stock [cite: 48]
-  REJECTED      // Sent back by Manager [cite: 51]
+  COMPLETED // Finished goods added to stock [cite: 48]
+  REJECTED // Sent back by Manager [cite: 51]
   CANCELLED
 }
 
 enum ScrapReason {
-  MACHINE_FAULT    // Tool breakage, equipment issues
-  MATERIAL_DEFECT  // Cracked rod, poor quality material
-  HUMAN_ERROR      // Incorrect settings, operator mistakes
-  PROCESS_LOSS     // Standard swarf, off-cuts, normal waste
+  MACHINE_FAULT // Tool breakage, equipment issues
+  MATERIAL_DEFECT // Cracked rod, poor quality material
+  HUMAN_ERROR // Incorrect settings, operator mistakes
+  PROCESS_LOSS // Standard swarf, off-cuts, normal waste
 }
 
 enum Priority {
@@ -46,75 +46,77 @@ enum BranchEnum {
 }
 
 model User {
-  id              String     @id @default(cuid())
-  email           String     @unique
-  password        String
-  name            String?
-  role            Role       @default(OPERATOR)
-  department      String?    // e.g., "Cutting", "Forging" (for Operators)
-  branchId        String?    // Branch assignment for stock access
-  branch          Branch?    @relation(fields: [branchId], references: [id])
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id])
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  stageLogs       StageLog[]
-  saleOrders      SaleOrder[]
-  stockMovements  StockMovement[]
-  stockAdjustments StockAdjustment[]
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  password             String
+  name                 String?
+  role                 Role                  @default(OPERATOR)
+  department           String? // e.g., "Cutting", "Forging" (for Operators)
+  branchId             String? // Branch assignment for stock access
+  branch               Branch?               @relation(fields: [branchId], references: [id])
+  org_id               String?
+  organization         Organization?         @relation(fields: [org_id], references: [id])
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  stageLogs            StageLog[]
+  saleOrders           SaleOrder[]
+  stockMovements       StockMovement[]
+  stockAdjustments     StockAdjustment[]
+  rawMaterialMovements RawMaterialMovement[]
+  jobCardsCreated      JobCard[]
 }
 
 model Design {
   id               String            @id @default(cuid())
-  name             String            // e.g., Hex Bolt M12 [cite: 67]
+  name             String // e.g., Hex Bolt M12 [cite: 67]
   code             String            @unique // e.g., HB-M12 [cite: 74]
   description      String?
-  targetDimensions String?           // Stores specs like 12mm x 70mm [cite: 71]
-  targetWeight     Float?            // Estimated yield kg per unit [cite: 135]
+  targetDimensions String? // Stores specs like 12mm x 70mm [cite: 71]
+  targetWeight     Float? // Estimated yield kg per unit [cite: 135]
   // New Phase 2 Fields
-  rawMaterialId    String?           // Links to the specific rod needed (e.g., M12 High Tensile)
+  rawMaterialId    String? // Links to the specific rod needed (e.g., M12 High Tensile)
   kgPerUnit        Float             @default(0.0) // The BOM consumption rate
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   stages           Stage[]
   productionOrders ProductionOrder[]
 
-  finishedGoods    FinishedGood[]
+  finishedGoods FinishedGood[]
 }
 
 model Stage {
-  id          String     @id @default(cuid())
-  name        String     // e.g., Cutting, Forging, Threading [cite: 65]
-  department  String     // The department responsible for this stage [cite: 65]
-  sequence    Int        // Order of operations [cite: 68]
-  designId    String
-  design      Design     @relation(fields: [designId], references: [id], onDelete: Cascade)
-  stageLogs   StageLog[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String     @id @default(cuid())
+  name       String // e.g., Cutting, Forging, Threading [cite: 65]
+  department String // The department responsible for this stage [cite: 65]
+  sequence   Int // Order of operations [cite: 68]
+  designId   String
+  design     Design     @relation(fields: [designId], references: [id], onDelete: Cascade)
+  stageLogs  StageLog[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   @@unique([designId, sequence])
 }
 
 model ProductionOrder {
-  id            String           @id @default(cuid())
-  orderNumber   String           @unique // e.g., PO-0040 [cite: 93]
-  designId      String
-  design        Design           @relation(fields: [designId], references: [id])
-  quantity      Int              @default(1)
-  targetKg      Float            // Total initial weight (In) [cite: 55]
-  status        ProductionStatus @default(PENDING)
-  priority      Priority         @default(MEDIUM)
+  id          String           @id @default(cuid())
+  orderNumber String           @unique // e.g., PO-0040 [cite: 93]
+  designId    String
+  design      Design           @relation(fields: [designId], references: [id])
+  quantity    Int              @default(1)
+  targetKg    Float // Total initial weight (In) [cite: 55]
+  status      ProductionStatus @default(PENDING)
+  priority    Priority         @default(MEDIUM)
 
   // Handoff Tracking
-  currentStage  Int              @default(1) // Current sequence number
-  currentDept   String?          // Current department queue (e.g., "Cutting") [cite: 99]
+  currentStage Int     @default(1) // Current sequence number
+  currentDept  String? // Current department queue (e.g., "Cutting") [cite: 99]
 
   assignedTo    String?
   approvedBy    String?
   approvedAt    DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   logs          StageLog[]
   finishedGoods FinishedGood[]
 
@@ -123,153 +125,229 @@ model ProductionOrder {
 }
 
 model StageLog {
-  id          String          @id @default(cuid())
-  orderId     String
-  order       ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  stageId     String?
-  stage       Stage?          @relation(fields: [stageId], references: [id])
-  stageName   String
-  sequence    Int
+  id        String          @id @default(cuid())
+  orderId   String
+  order     ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stageId   String?
+  stage     Stage?          @relation(fields: [stageId], references: [id])
+  stageName String
+  sequence  Int
 
   // KG Traceability: Enforces In = Out + Scrap [cite: 55, 78]
-  kgIn        Float           // Weight received from previous stage [cite: 77]
-  kgOut       Float           // Weight passed forward [cite: 77]
-  kgScrap     Float           // Weight lost [cite: 77]
-  scrapReason ScrapReason?    // Categorized reason for scrap [cite: 65, 153]
-  department  String?         // Department responsible for this stage log [new field]
+  kgIn        Float // Weight received from previous stage [cite: 77]
+  kgOut       Float // Weight passed forward [cite: 77]
+  kgScrap     Float // Weight lost [cite: 77]
+  scrapReason ScrapReason? // Categorized reason for scrap [cite: 65, 153]
+  department  String? // Department responsible for this stage log [new field]
 
   operatorId  String
-  operator    User            @relation(fields: [operatorId], references: [id])
+  operator    User     @relation(fields: [operatorId], references: [id])
   notes       String?
-  completedAt DateTime        @default(now())
+  completedAt DateTime @default(now())
 }
 
 model Organization {
-  id        String     @id @default(cuid())
-  name      String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  users     User[]
-  branches  Branch[]
+  id           String        @id @default(cuid())
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  users        User[]
+  branches     Branch[]
+  rawMaterials RawMaterial[]
 }
 
 model Branch {
-  id             String       @id @default(cuid())
-  branch         BranchEnum   @unique
-  name           String
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  users          User[]
-  stockMovements StockMovement[]
+  id               String            @id @default(cuid())
+  branch           BranchEnum        @unique
+  name             String
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            User[]
+  stockMovements   StockMovement[]
   stockAdjustments StockAdjustment[]
 }
 
 model Product {
-  id               String         @id @default(cuid())
-  code             String         @unique
+  id               String            @id @default(cuid())
+  code             String            @unique
   name             String
-  category         String         // e.g., 'manufactured', 'imported', 'local'
-  reorderPoint     Int            @default(0)
-  sellingPrice     Float          @default(0)
-  isService        Boolean        @default(false) // Excludes from stock operations
-  isActive         Boolean        @default(true)
-  uom              String?        // Unit of measure
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  category         String // e.g., 'manufactured', 'imported', 'local'
+  reorderPoint     Int               @default(0)
+  sellingPrice     Float             @default(0)
+  isService        Boolean           @default(false) // Excludes from stock operations
+  isActive         Boolean           @default(true)
+  uom              String? // Unit of measure
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   branchStocks     BranchStock[]
   stockMovements   StockMovement[]
   stockAdjustments StockAdjustment[]
   saleOrderLines   SaleOrderLine[]
+  jobCards         JobCard[]
+}
+
+model JobCard {
+  id             String               @id @default(cuid())
+  job_number     String               @unique
+  product_id     String
+  product        Product              @relation(fields: [product_id], references: [id])
+  order_quantity Int
+  status         String // 'open', 'in_progress', 'complete', 'cancelled'
+  created_by     String
+  creator        User                 @relation(fields: [created_by], references: [id])
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @updatedAt
+  stages         JobCardStage[]
+  rawMaterials   JobCardRawMaterial[]
+}
+
+model JobCardStage {
+  id           String    @id @default(cuid())
+  job_card_id  String
+  jobCard      JobCard   @relation(fields: [job_card_id], references: [id], onDelete: Cascade)
+  sequence     Int
+  name         String
+  department   String?
+  input_qty    Float
+  output_qty   Float
+  rejected_qty Float     @default(0)
+  started_at   DateTime?
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+}
+
+model JobCardRawMaterial {
+  id              String      @id @default(cuid())
+  job_card_id     String
+  jobCard         JobCard     @relation(fields: [job_card_id], references: [id], onDelete: Cascade)
+  raw_material_id String
+  rawMaterial     RawMaterial @relation(fields: [raw_material_id], references: [id])
+  qty_bars        Int
+  qty_kg          Float
+  created_at      DateTime    @default(now())
 }
 
 model Supplier {
-  id             String                @id @default(cuid())
-  name           String
-  contactInfo    String?
-  rawMaterials   RawMaterial[]
-  receipts       RawMaterialReceipt[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id           String               @id @default(cuid())
+  name         String
+  contactInfo  String?
+  rawMaterials RawMaterial[]
+  receipts     RawMaterialReceipt[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 }
 
 model Customer {
-  id        String     @id @default(cuid())
-  name      String
+  id          String      @id @default(cuid())
+  name        String
   contactInfo String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  saleOrders SaleOrder[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  saleOrders  SaleOrder[]
 }
 
 model Item {
   id          String   @id @default(cuid())
   name        String
   description String?
-  category    String?  // e.g., "Raw Material", "Finished Good"
+  category    String? // e.g., "Raw Material", "Finished Good"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model RawMaterial {
-  id            String                @id @default(cuid())
-  materialName  String                // e.g., "High-Tensile Steel"
-  diameter      String                // e.g., "M12"
-  availableKg   Float                 @default(0) // Available for reservation
-  reservedKg    Float                 @default(0) // Reserved for production
-  supplierId    String?
-  supplier      Supplier?             @relation(fields: [supplierId], references: [id])
-  receipts      RawMaterialReceipt[]
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  id                  String                @id @default(cuid())
+  org_id              String
+  organization        Organization          @relation(fields: [org_id], references: [id])
+  supplierId          String?
+  supplier            Supplier?             @relation(fields: [supplierId], references: [id])
+  material_type       String // 'flat_bar' or 'round_bar'
+  code                String                @unique
+  label               String
+  width_mm            Int?
+  thickness_mm        Int?
+  diameter_mm         Int?
+  length_inches       Int
+  is_active           Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  movements           RawMaterialMovement[]
+  receipts            RawMaterialReceipt[]
+  balance             RawMaterialBalance?
+  jobCardRawMaterials JobCardRawMaterial[]
 }
 
 model RawMaterialReceipt {
-  id            String       @id @default(cuid())
+  id            String      @id @default(cuid())
   rawMaterialId String
-  rawMaterial   RawMaterial  @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
-  quantity      Float        // kg received
+  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+  quantity      Float // kg received
   supplierId    String?
-  supplier      Supplier?    @relation(fields: [supplierId], references: [id])
-  receivedAt    DateTime     @default(now())
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id])
+  receivedAt    DateTime    @default(now())
+}
+
+model RawMaterialMovement {
+  id              String      @id @default(cuid())
+  raw_material_id String
+  rawMaterial     RawMaterial @relation(fields: [raw_material_id], references: [id], onDelete: Cascade)
+  movement_type   String // 'purchase_receipt', 'job_issue', 'adjustment_in'
+  qty_bars        Int
+  qty_kg          Float
+  reference       String?
+  supplier_name   String?
+  notes           String?
+  movement_date   DateTime    @default(now())
+  created_by      String
+  user            User        @relation(fields: [created_by], references: [id])
+  createdAt       DateTime    @default(now())
+}
+
+model RawMaterialBalance {
+  raw_material_id String      @id
+  rawMaterial     RawMaterial @relation(fields: [raw_material_id], references: [id], onDelete: Cascade)
+  qty_bars        Int         @default(0)
+  qty_kg          Float       @default(0)
+  updatedAt       DateTime    @updatedAt
 }
 
 model FinishedGood {
-  id                String          @id @default(cuid())
+  id                String           @id @default(cuid())
   designId          String
-  design            Design          @relation(fields: [designId], references: [id])
+  design            Design           @relation(fields: [designId], references: [id])
   productionOrderId String?
   productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id])
   quantity          Int
-  location          String?         // branch or warehouse
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  location          String? // branch or warehouse
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
 enum SaleStatus {
-  DRAFT       // Saved but not invoiced
-  INVOICED    // Invoiced with stock deduction
-  FULFILLED   // Completed
+  DRAFT // Saved but not invoiced
+  INVOICED // Invoiced with stock deduction
+  FULFILLED // Completed
   CANCELLED
 }
 
 model SaleOrder {
-  id             String     @id @default(cuid())
-  orderNumber    String?    @unique // e.g., INV-MOM-0001
-  branch         BranchEnum
-  customerId     String?
-  customer       Customer?  @relation(fields: [customerId], references: [id])
-  status         SaleStatus @default(DRAFT)
-  orderDate      DateTime   @default(now())
-  salesRepId     String     // User who created the order
-  salesRep       User       @relation(fields: [salesRepId], references: [id])
-  notes          String?
-  totalAmount    Float      @default(0)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  lines          SaleOrderLine[]
-
+  id          String          @id @default(cuid())
+  orderNumber String?         @unique // e.g., INV-MOM-0001
+  branch      BranchEnum
+  customerId  String?
+  customer    Customer?       @relation(fields: [customerId], references: [id])
+  status      SaleStatus      @default(DRAFT)
+  orderDate   DateTime        @default(now())
+  salesRepId  String // User who created the order
+  salesRep    User            @relation(fields: [salesRepId], references: [id])
+  notes       String?
+  totalAmount Float           @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  lines       SaleOrderLine[]
 }
 
 model SaleOrderLine {
@@ -285,14 +363,14 @@ model SaleOrderLine {
 }
 
 model StockTransaction {
-  id             String   @id @default(cuid())
-  itemType       String   // 'raw' or 'finished'
-  itemId         String   // rawMaterialId or finishedGoodId
-  transactionType String  // 'receipt', 'consumption', 'sale', etc.
-  quantity       Float
-  reason         String?
-  performedBy    String   // userId
-  createdAt      DateTime @default(now())
+  id              String   @id @default(cuid())
+  itemType        String // 'raw' or 'finished'
+  itemId          String // rawMaterialId or finishedGoodId
+  transactionType String // 'receipt', 'consumption', 'sale', etc.
+  quantity        Float
+  reason          String?
+  performedBy     String // userId
+  createdAt       DateTime @default(now())
 }
 
 model BranchStock {
@@ -308,21 +386,21 @@ model BranchStock {
 }
 
 model StockMovement {
-  id           String    @id @default(cuid())
+  id           String      @id @default(cuid())
   productId    String
-  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   branchId     String
-  branch       Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  qty          Int       // Positive for in, negative for out
-  type         String    // e.g., 'purchase_in', 'sale_out', 'adjustment_in', 'branch_transfer_in'
-  reference    String?   // e.g., PO number, import batch
+  branch       Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  qty          Int // Positive for in, negative for out
+  type         String // e.g., 'purchase_in', 'sale_out', 'adjustment_in', 'branch_transfer_in'
+  reference    String? // e.g., PO number, import batch
   notes        String?
   userId       String
-  user         User      @relation(fields: [userId], references: [id])
-  batchId      String?   // For import batches
+  user         User        @relation(fields: [userId], references: [id])
+  batchId      String? // For import batches
   sourceBranch BranchEnum? // For transfers
   destBranch   BranchEnum? // For transfers
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime    @default(now())
 }
 
 model StockAdjustment {

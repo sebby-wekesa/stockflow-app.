@@ -23,7 +23,6 @@
     "jsonwebtoken": "^9.0.0",
     "lucide-react": "^1.8.0",
     "next": "16.2.3",
-    "prisma": "^7.7.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.1",
@@ -33,6 +32,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@prisma/config": "^7.8.0",
     "@tailwindcss/postcss": "^4",
     "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20",
@@ -42,6 +42,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "prisma": "^7.7.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",

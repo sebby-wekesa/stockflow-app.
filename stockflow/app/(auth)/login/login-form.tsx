@@ -27,20 +27,20 @@ export function LoginForm({ action, error, message }: LoginFormProps) {
   return (
     <>
       {error && (
-        <div className="p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm mb-5">
           {error}
         </div>
       )}
 
       {message && (
-        <div className="p-3 rounded-md bg-teal-500/10 border border-teal-500/30 text-teal-400 text-sm">
+        <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/30 text-teal-400 text-sm mb-5">
           {message}
         </div>
       )}
 
-      <form action={action} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-xs uppercase tracking-wider text-muted mb-2">
+      <form action={action} className="space-y-5">
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-xs uppercase tracking-wider text-muted font-medium">
             Email
           </label>
           <input
@@ -49,13 +49,13 @@ export function LoginForm({ action, error, message }: LoginFormProps) {
             type="email"
             required
             autoComplete="email"
-            className="input w-full"
+            className="input w-full py-2.5"
             placeholder="you@springtech.co.ke"
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-xs uppercase tracking-wider text-muted mb-2">
+        <div className="space-y-1.5">
+          <label htmlFor="password" className="block text-xs uppercase tracking-wider text-muted font-medium">
             Password
           </label>
           <input
@@ -64,24 +64,28 @@ export function LoginForm({ action, error, message }: LoginFormProps) {
             type="password"
             required
             autoComplete="current-password"
-            className="input w-full"
+            className="input w-full py-2.5"
             placeholder="••••••••"
           />
         </div>
 
-        <SubmitButton />
+        <div className="pt-1">
+          <SubmitButton />
+        </div>
       </form>
 
-      <div className="mt-6 pt-6 border-t border-border text-center text-sm text-muted">
-        <div className="mb-2">
+      <div className="mt-7 pt-6 border-t border-border text-center text-sm text-muted space-y-2">
+        <div>
           <Link href="/forgot-password" className="text-accent hover:underline">
             Forgot your password?
           </Link>
         </div>
-        Need an account?{' '}
-        <Link href="/signup" className="text-accent hover:underline">
-          Sign up
-        </Link>
+        <div>
+          Need an account?{' '}
+          <Link href="/signup" className="text-accent hover:underline">
+            Sign up
+          </Link>
+        </div>
       </div>
     </>
   )

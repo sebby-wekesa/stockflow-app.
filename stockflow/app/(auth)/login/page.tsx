@@ -59,17 +59,17 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-gray-50 px-4 dark:bg-zinc-950">
-      <div className="w-full mx-auto max-w-md space-y-6">
-        <div className="flex flex-col items-center space-y-2 text-center">
-          {/* Logo Placeholder */}
-          <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">
+    <div className="flex min-h-screen w-full items-center justify-center bg-gray-50 px-4 py-16 dark:bg-zinc-950">
+      <div className="w-full mx-auto max-w-sm">
+        {/* Header */}
+        <div className="flex flex-col items-center gap-3 text-center mb-8">
+          <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl shadow-md">
             S
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight mt-1">
             Welcome back to StockFlow
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Enter your work email and password to continue.
           </p>
         </div>
