@@ -7,15 +7,20 @@ import { RunwayAlerts } from "@/components/admin/RunwayAlerts";
 export const dynamic = 'force-dynamic';
 
 async function getAdminStats() {
-  const totalOrders = await prisma.productionOrder.count();
-  const pendingOrders = await prisma.productionOrder.count({ where: { status: "PENDING" } });
-  const inProduction = await prisma.productionOrder.count({ where: { status: "IN_PRODUCTION" } });
-  const completed = await prisma.productionOrder.count({ where: { status: "COMPLETED" } });
-  const designs = await prisma.design.count();
-  const users = await prisma.user.count();
-  const inventory = await prisma.rawMaterial.findMany();
+  try {
+    const totalOrders = await prisma.productionOrder.count();
+    const pendingOrders = await prisma.productionOrder.count({ where: { status: "PENDING" } });
+    const inProduction = await prisma.productionOrder.count({ where: { status: "IN_PRODUCTION" } });
+    const completed = await prisma.productionOrder.count({ where: { status: "COMPLETED" } });
+    const designs = await prisma.design.count();
+    const users = await prisma.user.count();
+    const inventory = await prisma.rawMaterial.findMany();
 
-  return { totalOrders, pendingOrders, inProduction, completed, designs, users, inventory };
+    return { totalOrders, pendingOrders, inProduction, completed, designs, users, inventory };
+  } catch (error) {
+    console.error("Failed to load admin stats from database", error);
+    return { totalOrders: 0, pendingOrders: 0, inProduction: 0, completed: 0, designs: 0, users: 0, inventory: [] };
+  }
 }
 
 export default async function AdminDashboardPage() {

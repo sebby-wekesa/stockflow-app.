@@ -8,19 +8,30 @@ export default async function OperatorHistoryPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const dbUser = await prisma.user.findUnique({
-    where: { email: user.email! },
-  });
+  let dbUser;
+  try {
+    dbUser = await prisma.user.findUnique({
+      where: { email: user.email! },
+    });
+  } catch (error) {
+    console.error("Failed to load user from database", error);
+    redirect("/login");
+  }
 
   if (!dbUser) redirect("/login");
 
   // Get completed orders or logs for the user
-  const completedOrders = await prisma.productionOrder.findMany({
-    where: { status: "COMPLETED" },
-    include: { design: true },
-    orderBy: { updatedAt: "desc" },
-    take: 20,
-  });
+  let completedOrders = [];
+  try {
+    completedOrders = await prisma.productionOrder.findMany({
+      where: { status: "COMPLETED" },
+      include: { design: true },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+    });
+  } catch (error) {
+    console.error("Failed to load completed orders from database", error);
+  }
 
   return (
     <div>

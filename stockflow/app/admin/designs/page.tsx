@@ -4,10 +4,16 @@ import Link from "next/link";
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDesignsPage() {
-  const designs = await prisma.design.findMany({
-    include: { stages: { orderBy: { sequence: "asc" } } },
-    orderBy: { createdAt: "desc" },
-  });
+  let designs = [];
+  try {
+    designs = await prisma.design.findMany({
+      include: { stages: { orderBy: { sequence: "asc" } } },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Failed to load designs from database", error);
+    // Return empty array, page will show "No designs yet"
+  }
 
   return (
     <div className="space-y-6">

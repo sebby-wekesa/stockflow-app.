@@ -8,25 +8,36 @@ export const dynamic = 'force-dynamic';
 async function getOperatorStats(department: string | null) {
   if (!department) return null;
 
-  const pendingJobs = await prisma.productionOrder.findMany({
-    where: { status: "IN_PRODUCTION" },
-    include: {
-      design: { include: { stages: true } },
-      logs: { orderBy: { sequence: "desc" }, take: 1 },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+  try {
+    const pendingJobs = await prisma.productionOrder.findMany({
+      where: { status: "IN_PRODUCTION" },
+      include: {
+        design: { include: { stages: true } },
+        logs: { orderBy: { sequence: "desc" }, take: 1 },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
 
-  return { pendingJobs, department };
+    return { pendingJobs, department };
+  } catch (error) {
+    console.error("Failed to load operator stats from database", error);
+    return { pendingJobs: [], department };
+  }
 }
 
 export default async function OperatorQueuePage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const dbUser = await prisma.user.findUnique({
-    where: { email: user.email! },
-  });
+  let dbUser;
+  try {
+    dbUser = await prisma.user.findUnique({
+      where: { email: user.email! },
+    });
+  } catch (error) {
+    console.error("Failed to load user from database", error);
+    redirect("/login");
+  }
 
   if (!dbUser) redirect("/login");
 
