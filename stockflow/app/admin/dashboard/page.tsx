@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { RunwayAlerts } from "@/components/admin/RunwayAlerts";
 
+export const dynamic = 'force-dynamic';
+
 async function getAdminStats() {
   const totalOrders = await prisma.productionOrder.count();
   const pendingOrders = await prisma.productionOrder.count({ where: { status: "PENDING" } });

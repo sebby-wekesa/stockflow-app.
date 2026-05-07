@@ -2,6 +2,8 @@ import { Metadata } from 'next'
 import { StageLoggingForm } from '@/components/StageLoggingForm'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Stage Logger | StockFlow',
   description: 'Log material weights and track production stages',

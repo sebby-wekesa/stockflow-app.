@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDesignsPage() {
   const designs = await prisma.design.findMany({
     include: { stages: { orderBy: { sequence: "asc" } } },
