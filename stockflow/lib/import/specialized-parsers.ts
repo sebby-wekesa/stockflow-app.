@@ -422,21 +422,83 @@ export function parseConsumablesStock(
   sheetName: string,
   branch: BranchCode
 ): ParsedStockRow[] {
-  const { rows } = readSheetAsRows(buffer, sheetName)
+  const { rows, wb } = readSheetAsRows(buffer, sheetName)
   const out: ParsedStockRow[] = []
 
-  // Start from row 5 (index 4)
-  for (let i = 4; i < rows.length; i++) {
-    const row = rows[i]
+  // Find header row by looking for duplicate "PRODUCT DESCRIPTION" + "QTY"
+  let headerRowIndex = -1
+  let colInItem = -1, colInQty = -1
+  let colOutItem = -1, colOutQty = -1
 
-    // Left side: stock IN (cols A-B)
-    const inProduct = toStr(getCell(row, 0))
-    const inQty = toNumber(getCell(row, 1))
-    if (inProduct && inQty && inQty > 0) {
+  for (let i = 0; i < rows.length; i++) {
+    const rowNorm = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
+
+    if (rowNorm.includes('PRODUCT DESCRIPTION') && rowNorm.includes('QTY')) {
+      headerRowIndex = i
+
+      // Map columns by position (first occurrence = IN, second = OUT)
+      rowNorm.forEach((cell, idx) => {
+        if (cell === 'PRODUCT DESCRIPTION') {
+          if (colInItem === -1) colInItem = idx
+          else if (colOutItem === -1) colOutItem = idx
+        }
+        if (cell === 'QTY') {
+          if (colInQty === -1) colInQty = idx
+          else if (colOutQty === -1) colOutQty = idx
+        }
+      })
+      break
+    }
+  }
+
+  if (headerRowIndex === -1 || colInItem === -1 || colOutItem === -1) {
+    // Fallback: try old fixed layout (row 5, cols 0-3)
+    for (let i = 4; i < rows.length; i++) {
+      const row = rows[i]
+      const inProduct = toStr(getCell(row, 0))
+      const inQty = toNumber(getCell(row, 1))
+      if (inProduct && inQty && inQty > 0) {
+        out.push({
+          source_row: i + 1,
+          movement_date: null,
+          raw_product_name: inProduct,
+          branch,
+          qty: inQty,
+          direction: 'in',
+          reference: `${sheetName} import`,
+          notes: `Stock in from ${sheetName}`,
+        })
+      }
+      const outProduct = toStr(getCell(row, 2))
+      const outQty = toNumber(getCell(row, 3))
+      if (outProduct && outQty && outQty > 0) {
+        out.push({
+          source_row: i + 1,
+          movement_date: null,
+          raw_product_name: outProduct,
+          branch,
+          qty: outQty,
+          direction: 'out',
+          reference: `${sheetName} import`,
+          notes: `Stock out from ${sheetName}`,
+        })
+      }
+    }
+    return out
+  }
+
+  // Main parsing using detected columns
+  for (let i = headerRowIndex + 1; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || row.length === 0) continue
+
+    const inItem = toStr(row[colInItem])
+    const inQty = toNumber(row[colInQty])
+    if (inItem && inQty && inQty > 0) {
       out.push({
         source_row: i + 1,
-        movement_date: null, // consumables imports don't have dates
-        raw_product_name: inProduct,
+        movement_date: null,
+        raw_product_name: inItem,
         branch,
         qty: inQty,
         direction: 'in',
@@ -445,14 +507,13 @@ export function parseConsumablesStock(
       })
     }
 
-    // Right side: stock OUT (cols C-D)
-    const outProduct = toStr(getCell(row, 2))
-    const outQty = toNumber(getCell(row, 3))
-    if (outProduct && outQty && outQty > 0) {
+    const outItem = toStr(row[colOutItem])
+    const outQty = toNumber(row[colOutQty])
+    if (outItem && outQty && outQty > 0) {
       out.push({
         source_row: i + 1,
         movement_date: null,
-        raw_product_name: outProduct,
+        raw_product_name: outItem,
         branch,
         qty: outQty,
         direction: 'out',

@@ -257,27 +257,18 @@ export async function commitSalesImport(
     return result
   }
 
-  // Write each order group transactionally
-  for (const group of Array.from(orderGroups.values())) {
+  // Process each order in a transaction
+  for (const group of orderGroups.values()) {
     try {
-      const branchId = await resolveBranchId(group.branch_code)
-
-      // Skip if this order already exists (idempotency on order_number used as id)
-      const existing = await prisma.saleOrder.findUnique({
-        where: { id: group.order_number },
-      })
-      if (existing) {
-        result.skipped += group.lines.length
-        continue
-      }
-
-      const totalAmount = group.lines.reduce(
-        (sum, l) => sum + l.qty * l.unit_price,
-        0
-      )
-
       await prisma.$transaction(
         async (tx) => {
+          // Resolve branch ID
+          const branchId = await resolveBranchId(group.branch_code)
+
+          // Calculate total amount
+          const totalAmount = group.lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0)
+
+          // Create SaleOrder
           const order = await tx.saleOrder.create({
             data: {
               id: group.order_number,
@@ -313,6 +304,7 @@ export async function commitSalesImport(
               })
             }
 
+            // Create SaleItem
             await tx.saleItem.create({
               data: {
                 saleOrderId: order.id,
@@ -323,6 +315,7 @@ export async function commitSalesImport(
               },
             })
 
+            // Record stock movement (sale is a stock_out)
             await tx.stockMovement.create({
               data: {
                 productId: line.product_id,
@@ -334,16 +327,17 @@ export async function commitSalesImport(
               },
             })
 
+            // Decrement stock
             await tx.product.update({
               where: { id: line.product_id },
               data: { currentStock: { decrement: line.qty } },
             })
           }
+
+          result.written += group.lines.length
         },
         { maxWait: 10000, timeout: 30000 }
       )
-
-      result.written += group.lines.length
     } catch (err) {
       result.errors.push({
         row: group.lines[0]?.source_row ?? 0,

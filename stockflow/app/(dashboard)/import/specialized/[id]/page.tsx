@@ -13,11 +13,12 @@ const SHEET_TYPE_LABELS: Record<string, string> = {
 export default async function SpecializedBatchPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   const batch = await prisma.importBatch.findUnique({
-    where: { id: params.id },
-    include: { created_by_user: { select: { full_name: true } } },
+    where: { id },
+    include: { User: { select: { name: true } } },
   })
   if (!batch) notFound()
 
@@ -87,7 +88,7 @@ export default async function SpecializedBatchPage({
         <div className="card p-4">
           <div className="text-xs uppercase tracking-wider text-muted mb-1">Uploaded by</div>
           <div className="font-head text-sm font-bold mt-1">
-            {batch.created_by_user.full_name}
+            {batch.User?.name || 'Unknown'}
           </div>
         </div>
       </div>

@@ -22,7 +22,7 @@ export async function matchProductName(rawName: string): Promise<{ product: any;
     aliasCache = new Map()
 
     const products = await prisma.product.findMany({
-      include: { aliases: true },
+      include: { ProductAlias: true },
     })
 
     for (const product of products) {
@@ -31,7 +31,7 @@ export async function matchProductName(rawName: string): Promise<{ product: any;
       aliasCache.set(canonicalKey, { product, confidence: 1.0 })
 
       // Add aliases
-      for (const alias of product.aliases) {
+      for (const alias of product.ProductAlias) {
         const aliasKey = normaliseForMatching(alias.alias)
         aliasCache.set(aliasKey, { product, confidence: 0.9 })
       }
