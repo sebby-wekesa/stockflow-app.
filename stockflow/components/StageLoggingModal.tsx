@@ -15,6 +15,7 @@ interface ProductionOrder {
   targetKg: number
   currentDept?: string
   currentStage?: {
+    id: string
     name: string
     sequence: number
   }

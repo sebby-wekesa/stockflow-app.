@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useState, useEffect } from 'react'
 import { Loader2, Package, AlertCircle } from 'lucide-react'
 import { useToast } from './Toast'
+import { Design } from '@/types'
 
 const createOrderSchema = z.object({
   designId: z.string().min(1, 'Design is required'),
@@ -20,13 +21,6 @@ const createOrderSchema = z.object({
 })
 
 type OrderFormData = z.infer<typeof createOrderSchema>
-
-interface Design {
-  id: string
-  name: string
-  targetWeight: number | null
-  kgPerUnit: number
-}
 
 interface CreateOrderFormProps {
   designs: Design[]
@@ -104,7 +98,7 @@ export function CreateOrderForm({ designs }: CreateOrderFormProps) {
     LOW: { label: 'Low', color: 'text-emerald-400', bg: 'bg-emerald-900/20' },
     MEDIUM: { label: 'Medium', color: 'text-amber-400', bg: 'bg-amber-900/20' },
     HIGH: { label: 'High', color: 'text-red-400', bg: 'bg-red-900/20' },
-  }
+  } as const
 
   return (
     <div className="w-full">
@@ -183,7 +177,7 @@ export function CreateOrderForm({ designs }: CreateOrderFormProps) {
               Priority Level *
             </label>
             <div className="grid grid-cols-3 gap-3">
-              {(Object.keys(priorityConfig) as const).map((level) => {
+              {(Object.keys(priorityConfig) as (keyof typeof priorityConfig)[]).map((level) => {
                 const config = priorityConfig[level]
                 const isSelected = priority === level
                 return (

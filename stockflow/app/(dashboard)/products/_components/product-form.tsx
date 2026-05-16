@@ -311,13 +311,13 @@ export function ProductForm({
                 Reorder point
               </label>
               <input
-                name="reorder_point"
-                type="number"
-                min="0"
-                defaultValue={initial?.reorder_point ?? ''}
-                className="input font-mono"
-                placeholder="Alert when stock < this"
-              />
+                  name="reorder_point"
+                  type="number"
+                  min="0"
+                  defaultValue={initial?.reorder_point ?? ''}
+                  className="input font-mono"
+                  placeholder="Alert when stock < this"
+                />
             </div>
           )}
         </div>

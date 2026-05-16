@@ -1,11 +1,40 @@
 // components/admin/RunwayAlerts.tsx
-import { AlertTriangle, TrendingDown, PackageCheck } from "lucide-react";
+import { AlertTriangle, TrendingDown } from "lucide-react";
 
-export function RunwayAlerts({ inventory }: { inventory: any[] }) {
+type NumericLike = number | string | { toNumber(): number } | null | undefined;
+
+type InventoryItem = {
+  availableKg?: NumericLike;
+  reservedKg?: NumericLike;
+};
+
+function toNumber(value: NumericLike) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return Number(value) || 0;
+  }
+
+  if (value && typeof value === "object" && "toNumber" in value) {
+    return value.toNumber();
+  }
+
+  return 0;
+}
+
+export function RunwayAlerts({ inventory }: { inventory: InventoryItem[] }) {
   // Logic: Filter materials where reserved weight is approaching total weight
-  const criticalStock = inventory.filter(item => 
-    (item.availableKg / (item.availableKg + item.reservedKg)) < 0.2
-  );
+  const criticalStock = inventory.filter(item => {
+    const available = toNumber(item.availableKg);
+    const reserved = toNumber(item.reservedKg);
+    const total = available + reserved;
+
+    if (total === 0) return false;
+
+    return available / total < 0.2;
+  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">

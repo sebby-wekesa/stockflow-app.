@@ -2,12 +2,7 @@
 
 import { ClipboardList, PlayCircle, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
-
-interface Design {
-  id: string;
-  name: string;
-  targetWeight: number;
-}
+import { Design } from "@/types";
 
 interface RawMaterial {
   id: string;
@@ -25,7 +20,7 @@ export function CreateOrderForm({ designs }: { designs: Design[] }) {
   const [quantity, setQuantity] = useState(0);
   const [customerRef, setCustomerRef] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [stockValidationError, setStockValidationError] = useState<string | null>(null);
+
 
   useEffect(() => {
     async function fetchMaterials() {
@@ -43,24 +38,15 @@ export function CreateOrderForm({ designs }: { designs: Design[] }) {
   }, []);
 
   // Logic: Calculate required KG based on Design Template
-  const requiredKg = selectedDesign && quantity > 0 ? (selectedDesign.targetWeight * quantity) : 0;
+  const requiredKg = selectedDesign && quantity > 0 ? (selectedDesign.kgPerUnit * quantity) : 0;
 
   // Real-time stock validation
-  const remainingKg = selectedMaterial && requiredKg > 0 ? (selectedMaterial.availableKg - requiredKg).toFixed(2) : null;
-  const hasInsufficientStock = selectedMaterial && requiredKg > 0 && requiredKg > selectedMaterial.availableKg;
+  const remainingKg = selectedMaterial && requiredKg > 0 ? ((selectedMaterial.availableKg ?? 0) - requiredKg).toFixed(2) : null;
+  const hasInsufficientStock: boolean = !!(selectedMaterial && requiredKg > 0 && requiredKg > (selectedMaterial.availableKg ?? 0));
 
-  // Update validation error when dependencies change
-  useEffect(() => {
-    if (selectedMaterial && requiredKg > 0) {
-      if (hasInsufficientStock) {
-        setStockValidationError(`Insufficient stock: Need ${requiredKg.toFixed(2)}kg, only ${selectedMaterial.availableKg}kg available`);
-      } else {
-        setStockValidationError(null);
-      }
-    } else {
-      setStockValidationError(null);
-    }
-  }, [selectedMaterial, requiredKg, hasInsufficientStock]);
+  const stockValidationError = selectedMaterial && requiredKg > 0 && hasInsufficientStock
+    ? `Insufficient stock: Need ${requiredKg.toFixed(2)}kg, only ${(selectedMaterial.availableKg ?? 0)}kg available`
+    : null;
 
   const handleSubmit = async () => {
     if (!selectedDesign || !selectedMaterial || quantity <= 0) {
@@ -120,7 +106,7 @@ export function CreateOrderForm({ designs }: { designs: Design[] }) {
           <div className="space-y-2">
             <label className="text-xs font-bold text-[#7a8090] uppercase">Select Product Design</label>
             <select
-              onChange={(e) => setSelectedDesign(designs.find(d => d.id === e.target.value))}
+              onChange={(e) => setSelectedDesign(designs.find(d => d.id === e.target.value) || null)}
               className="w-full bg-[#1e2023] border border-[#2c2d33] rounded-xl p-3 text-white outline-none focus:border-[#4caf7d]"
             >
               <option value="">-- Choose Blueprint --</option>

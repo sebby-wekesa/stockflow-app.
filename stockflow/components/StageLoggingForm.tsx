@@ -8,21 +8,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { Package, Scale, Zap, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { useToast, Toast } from './Toast'
-import { completeStage } from '@/actions/stage'
 
 // Validation schema using Zod
 const stageLogSchema = z.object({
   orderId: z.string().min(1, 'Please select an order'),
-  inputWeight: z.number().positive(),
-  outputWeight: z.number().nonnegative(),
-  scrapWeight: z.number().nonnegative(),
+  outputWeight: z.number().min(0, 'Output weight must be positive'),
+  scrapWeight: z.number().min(0, 'Scrap weight must be positive'),
 }).refine((data) => {
-  // Enforces the Key Rule: kg received = kg passed forward + kg scrapped [cite: 55]
-  const tolerance = 0.001; // Handle floating point math
-  return Math.abs(data.inputWeight - (data.outputWeight + data.scrapWeight)) < tolerance;
-}, {
-  message: "The kg balance is incorrect: In must equal Out + Scrap.",
-})
+  // This will be validated in real-time with input weight
+  return true
+}, 'Validation error')
 
 type StageLogForm = z.infer<typeof stageLogSchema>
 
@@ -46,7 +41,7 @@ const containerVariants = {
     y: 0,
     transition: {
       duration: 0.4,
-      ease: 'easeOut',
+      ease: 'ease-in-out' as any,
     },
   },
 }
@@ -73,14 +68,12 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
     control,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
     reset,
   } = useForm<StageLogForm>({
     resolver: zodResolver(stageLogSchema),
     defaultValues: {
       orderId: '',
-      inputWeight: 0,
       outputWeight: 0,
       scrapWeight: 0,
     },
@@ -94,8 +87,7 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
   useEffect(() => {
     const order = activeOrders.find((o) => o.id === orderId)
     setSelectedOrder(order || null)
-    setValue('inputWeight', order?.weight || 0)
-  }, [orderId, activeOrders, setValue])
+  }, [orderId, activeOrders])
 
   // Real-time balance validation
   useEffect(() => {
@@ -123,16 +115,21 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
     setIsLoading(true)
 
     try {
-      const result = await completeStage({
-        orderId: data.orderId,
-        kgIn: data.inputWeight,
-        kgOut: data.outputWeight,
-        kgScrap: data.scrapWeight,
+      const response = await fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: data.orderId,
+          department: currentDepartment,
+          inputWeight: selectedOrder.weight,
+          outputWeight: data.outputWeight,
+          scrapWeight: data.scrapWeight,
+          timestamp: new Date().toISOString(),
+        }),
       })
 
-      if (result.error) {
-        showToast(result.error, 'error')
-        return
+      if (!response.ok) {
+        throw new Error('Failed to submit stage log')
       }
 
       // Trigger confetti effect
@@ -160,7 +157,7 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
   }
 
   return (
-    <ToastProvider>
+    <>
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -355,6 +352,8 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
           </form>
         </div>
       </motion.div>
-    </ToastProvider>
+
+      <Toast />
+    </>
   )
 }

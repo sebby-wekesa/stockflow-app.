@@ -11,7 +11,7 @@ export async function PATCH(
   const params = await props.params;
   try {
     // Verify user has manager or admin role
-    const user = await requireRole('ADMIN')
+    const user = await requireRole('ADMIN', 'MANAGER')
 
     const body = await request.json()
     const { status, rejectionReason } = body
@@ -46,30 +46,102 @@ export async function PATCH(
 
     // Update the order status
     const statusMap: any = {
-      RELEASED: 'IN_PRODUCTION',
-      REJECTED: 'CANCELLED',
+      RELEASED: 'APPROVED',
+      REJECTED: 'REJECTED',
     }
 
     const newStatus = statusMap[status]
 
-    const updatedOrder = await prisma.productionOrder.update({
-      where: { id: params.id },
-      data: {
-        status: newStatus,
-        approvedBy: user.id,
-        approvedAt: new Date(),
-        // Store rejection reason in notes if rejecting
-        ...(status === 'REJECTED' && {
-          // Note: Adjust this if your schema has a rejectionReason field
-          // For now, we'll use notes
-        }),
-      },
-      include: {
-        design: {
-          select: { name: true },
+    // If approving, perform inventory deduction
+    let updatedOrder;
+    if (status === 'RELEASED') {
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        // 1. Get the Design to see which raw materials are needed
+        const design = await tx.design.findUnique({
+          where: { id: order.designId },
+          include: {
+            Stage: {
+              orderBy: { sequence: 'asc' }
+            },
+            BillOfMaterials: {
+              include: { RawMaterial: true }
+            }
+          }
+        });
+
+        if (!design) {
+          throw new Error('Design not found');
+        }
+
+        if (!design.BillOfMaterials || design.BillOfMaterials.length === 0) {
+          throw new Error('Design does not have any BOM items');
+        }
+
+        const firstStage = design.Stage[0];
+        if (!firstStage) {
+          throw new Error('Design has no production stages configured');
+        }
+
+        // For now, assume single raw material per design (take first BOM item)
+        const primaryBomItem = design.BillOfMaterials[0];
+
+        // 2. Calculate the required quantity for this BOM item
+        const plannedUnits =
+          design.targetWeight && design.targetWeight.gt(0)
+            ? order.targetKg.toNumber() / design.targetWeight.toNumber()
+            : order.quantity;
+        const requiredQuantity = plannedUnits * primaryBomItem.quantity.toNumber();
+
+        if (primaryBomItem.rawMaterial.availableKg.toNumber() < requiredQuantity) {
+          throw new Error('Insufficient stock to release this order');
+        }
+
+        // 3. Deduct from Available and add to Reserved
+        await tx.rawMaterial.update({
+          where: { id: primaryBomItem.rawMaterialId },
+          data: {
+            availableKg: { decrement: requiredQuantity },
+            reservedKg: { increment: requiredQuantity }
+          }
+        });
+
+        // 4. Update the Order Status
+        return await tx.productionOrder.update({
+          where: { id: params.id },
+          data: {
+            status: newStatus,
+            approvedBy: user.id,
+            approvedAt: new Date(),
+            currentStage: firstStage.sequence,
+            currentDept: firstStage.department,
+          },
+          include: {
+            Design: {
+              select: { name: true },
+            },
+          },
+        });
+      });
+    } else {
+      updatedOrder = await prisma.productionOrder.update({
+        where: { id: params.id },
+        data: {
+          status: newStatus,
+          approvedBy: user.id,
+          approvedAt: new Date(),
+          // Store rejection reason in notes if rejecting
+          ...(status === 'REJECTED' && {
+            // Note: Adjust this if your schema has a rejectionReason field
+            // For now, we'll use notes
+          }),
         },
-      },
-    })
+        include: {
+          Design: {
+            select: { name: true },
+          },
+        },
+      });
+    }
 
     // Create an audit log entry
     try {
@@ -89,7 +161,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         success: true,
-        message: `Order ${status === 'RELEASED' ? 'approved and released' : 'rejected'} successfully`,
+        message: `Order ${status === 'RELEASED' ? 'approved' : 'rejected'} successfully`,
         data: updatedOrder,
       },
       { status: 200 }
@@ -104,8 +176,15 @@ export async function PATCH(
       )
     }
 
+    if (error.message?.startsWith('Forbidden')) {
+      return NextResponse.json(
+        { error: 'Forbidden. Only Managers and Admins can update order status.' },
+        { status: 403 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to update order status' },
+      { error: error.message || 'Failed to update order status' },
       { status: 500 }
     )
   }
@@ -121,7 +200,7 @@ export async function GET(
     const order = await prisma.productionOrder.findUnique({
       where: { id: params.id },
       include: {
-        design: true,
+        Design: true,
       },
     })
 

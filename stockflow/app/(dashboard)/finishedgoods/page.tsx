@@ -1,11 +1,14 @@
-export default function FinishedgoodsPage() {
-  const goods = [
-    {design:'Hex bolt M12',code:'HB-M12',units:120,totalKg:'340 kg',kgUnit:'2.83 kg',order:'PO-0038',status:'Available'},
-    {design:'Stud rod 8mm',code:'SR-08',units:65,totalKg:'180 kg',kgUnit:'2.77 kg',order:'PO-0036',status:'Available'},
-    {design:'Anchor bolt',code:'AB-16',units:62,totalKg:'520 kg',kgUnit:'8.39 kg',order:'PO-0035',status:'Available'},
-    {design:'Hex bolt M10',code:'HB-M10',units:45,totalKg:'95 kg',kgUnit:'2.11 kg',order:'PO-0034',status:'Available'},
-    {design:'Foundation bolt',code:'FB-20',units:30,totalKg:'205 kg',kgUnit:'6.83 kg',order:'PO-0033',status:'Partial reserve'},
-  ];
+import { prisma } from "@/lib/prisma"
+
+export const dynamic = 'force-dynamic';
+
+export default async function FinishedgoodsPage() {
+  const goods = await prisma.finishedGoods.findMany({
+    include: {
+      Design: true,
+    },
+    orderBy: { createdAt: 'desc' }
+  });
 
   return (
     <div>
@@ -14,19 +17,32 @@ export default function FinishedgoodsPage() {
       </div>
       <div className="card">
         <table>
-          <thead><tr><th>Design</th><th>Code</th><th>Units</th><th>Total kg</th><th>Kg/unit</th><th>Production order</th><th>Status</th></tr></thead>
+          <thead><tr><th>Design</th><th>Code</th><th>Branch</th><th>Units</th><th>Total kg</th><th>Kg/unit</th><th>Status</th></tr></thead>
           <tbody>
-            {goods.map(g => (
-              <tr key={g.code}>
-                <td>{g.design}</td>
-                <td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{g.code}</span></td>
-                <td>{g.units}</td>
-                <td><span className="job-kg">{g.totalKg}</span></td>
-                <td>{g.kgUnit}</td>
-                <td>{g.order}</td>
-                <td><span className={`badge ${g.status === 'Available' ? 'badge-teal' : 'badge-amber'}`}>{g.status}</span></td>
+            {goods.map(g => {
+              const kgProducedNum = g.kgProduced.toNumber();
+              const kgUnit = g.quantity > 0 ? (kgProducedNum / g.quantity).toFixed(2) : '0.00';
+              return (
+                <tr key={g.id}>
+                  <td>{g.Design.name}</td>
+                  <td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{g.Design.code}</span></td>
+                   <td>
+                     <span className="badge badge-blue">
+                       N/A
+                     </span>
+                   </td>
+                  <td>{g.quantity}</td>
+                  <td><span className="job-kg">{kgProducedNum.toFixed(2)} kg</span></td>
+                  <td>{kgUnit} kg</td>
+                  <td><span className={`badge ${g.quantity > 0 ? 'badge-teal' : 'badge-amber'}`}>{g.quantity > 0 ? 'Available' : 'Empty'}</span></td>
+                </tr>
+              )
+            })}
+            {goods.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{padding: '20px', textAlign: 'center', color: 'var(--muted)'}}>No finished goods stock available.</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

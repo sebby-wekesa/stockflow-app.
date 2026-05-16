@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { prisma } from '@/lib/prisma'
 import { CreateProductionOrderForm } from '@/components/CreateProductionOrderForm'
 import { ToastProvider } from '@/components/Toast'
 import { Package, TrendingUp } from 'lucide-react'
@@ -58,17 +57,17 @@ export default function OrdersPage() {
   }
 
   return (
-    <ToastProvider>
-      <div className="space-y-6">
-        <div className="section-header mb-16">
+    <div className="dashboard-content">
+      <ToastProvider>
+        <div className="section-header">
           <div>
-            <div className="section-title">Production Orders</div>
+            <h1>Production Orders</h1>
             <div className="section-sub">Manage and create new manufacturing orders</div>
           </div>
         </div>
 
         {/* Create Order Form */}
-        <div className="mb-12">
+        <div className="mb-6">
           <CreateProductionOrderForm
             designs={designs}
             onSuccess={() => {
@@ -81,88 +80,153 @@ export default function OrdersPage() {
         </div>
 
         {/* Orders List */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="h-5 w-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-zinc-100">
-              Recent Orders
-            </h3>
-            <span className="ml-auto text-sm text-zinc-400">
+        <div className="card">
+          <div className="section-header">
+            <div>
+              <div className="section-title">Recent Orders</div>
+              <div className="section-sub">Latest production orders in the system</div>
+            </div>
+            <span style={{
+              fontSize: '12px',
+              color: 'var(--muted)',
+              background: 'var(--surface2)',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border2)'
+            }}>
               {orders.length} orders
             </span>
           </div>
 
           {isLoading ? (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center">
-              <p className="text-zinc-400">Loading orders...</p>
+            <div style={{
+              textAlign: 'center',
+              padding: '40px 20px',
+              color: 'var(--muted)'
+            }}>
+              <div style={{
+                display: 'inline-block',
+                marginBottom: '12px'
+              }}>
+                <div style={{
+                  padding: '16px',
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border2)',
+                  borderRadius: 'var(--radius)',
+                  display: 'inline-block'
+                }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    border: '2px solid var(--border2)',
+                    borderTop: '2px solid var(--accent)',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}></div>
+                </div>
+              </div>
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--muted)'
+              }}>
+                Loading orders...
+              </p>
             </div>
           ) : orders.length === 0 ? (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center">
-              <Package className="h-12 w-12 text-zinc-700 mx-auto mb-3 opacity-50" />
-              <p className="text-zinc-400">No production orders yet</p>
+            <div style={{
+              textAlign: 'center',
+              padding: '40px 20px',
+              color: 'var(--muted)'
+            }}>
+              <div style={{
+                display: 'inline-block',
+                marginBottom: '12px'
+              }}>
+                <div style={{
+                  padding: '16px',
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border2)',
+                  borderRadius: 'var(--radius)',
+                  display: 'inline-block'
+                }}>
+                  <Package size={24} style={{ color: 'var(--muted)' }} />
+                </div>
+              </div>
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--muted)',
+                marginBottom: '4px'
+              }}>
+                No production orders yet
+              </p>
+              <p style={{
+                fontSize: '12px',
+                color: 'var(--muted)'
+              }}>
+                Create your first order to get started
+              </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-zinc-800">
-              <table className="w-full text-sm">
+            <div className="table-wrap">
+              <table>
                 <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                    <th className="px-6 py-3 text-left font-semibold text-zinc-300">
-                      Order
-                    </th>
-                    <th className="px-6 py-3 text-left font-semibold text-zinc-300">
-                      Design
-                    </th>
-                    <th className="px-6 py-3 text-left font-semibold text-zinc-300">
-                      Weight (kg)
-                    </th>
-                    <th className="px-6 py-3 text-left font-semibold text-zinc-300">
-                      Priority
-                    </th>
-                    <th className="px-6 py-3 text-left font-semibold text-zinc-300">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left font-semibold text-zinc-300">
-                      Date
-                    </th>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Design</th>
+                    <th>Weight (kg)</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <code className="text-xs font-mono text-blue-400 bg-blue-900/20 px-2 py-1 rounded">
+                    <tr key={order.id}>
+                      <td>
+                        <code style={{
+                          fontSize: '11px',
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--blue)',
+                          background: 'rgba(74,158,255,0.1)',
+                          padding: '2px 6px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid rgba(74,158,255,0.2)'
+                        }}>
                           {order.id.slice(0, 8)}...
                         </code>
                       </td>
-                      <td className="px-6 py-4 text-zinc-300">
+                      <td style={{ fontWeight: 500, color: 'var(--text)' }}>
                         {order.design?.name || 'Unknown'}
                       </td>
-                      <td className="px-6 py-4 text-emerald-400 font-medium">
+                      <td style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 500,
+                        color: 'var(--green)'
+                      }}>
                         {order.targetKg} kg
                       </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`text-xs font-semibold ${
-                            priorityColors[order.priority] || 'text-zinc-400'
-                          }`}
-                        >
+                      <td>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: priorityColors[order.priority] === 'text-emerald-400' ? 'var(--green)' :
+                                 priorityColors[order.priority] === 'text-amber-400' ? 'var(--accent)' :
+                                 priorityColors[order.priority] === 'text-red-400' ? 'var(--red)' : 'var(--muted)'
+                        }}>
                           {order.priority || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`text-xs font-semibold px-2.5 py-1.5 rounded-md border ${
-                            statusColors[order.status] ||
-                            'bg-zinc-900/20 border-zinc-700/30 text-zinc-300'
-                          }`}
-                        >
+                      <td>
+                        <span className={`badge ${
+                          order.status === 'COMPLETED' ? 'badge-green' :
+                          order.status === 'IN_PRODUCTION' ? 'badge-teal' :
+                          order.status === 'APPROVED' ? 'badge-blue' :
+                          'badge-amber'
+                        }`}>
                           {order.status || 'PENDING'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-zinc-500 text-xs">
+                      <td style={{ fontSize: '12px', color: 'var(--muted)' }}>
                         {order.createdAt
                           ? new Date(order.createdAt).toLocaleDateString(
                               'en-US',
@@ -177,7 +241,7 @@ export default function OrdersPage() {
             </div>
           )}
         </div>
-      </div>
-    </ToastProvider>
+      </ToastProvider>
+    </div>
   )
 }

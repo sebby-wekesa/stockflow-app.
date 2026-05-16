@@ -1,8 +1,21 @@
+export const dynamic = 'force-dynamic';
+
 import { prisma } from "@/lib/prisma";
 import YieldCharts from "@/components/analytics/YieldCharts";
 import StatCards from "@/components/analytics/StatCards";
+import BranchSwitcher from "@/components/admin/BranchSwitcher";
+import { Suspense } from "react";
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage(props: { searchParams: Promise<{ branchId?: string }> }) {
+  const { branchId } = await props.searchParams;
+  
+  // Note: Branch filtering disabled until ProductionOrder.branchId is uncommented in schema
+  // const whereFilter = branchId ? {
+  //   order: {
+  //     is: { branchId }
+  //   }
+  // } : {};
+
   // 1. Fetch total stats (kgIn, kgOut, kgScrap)
   const logs = await prisma.stageLog.aggregate({
     _sum: {
@@ -16,7 +29,9 @@ export default async function AnalyticsPage() {
   const scrapData = await prisma.stageLog.groupBy({
     by: ['scrapReason'],
     _sum: { kgScrap: true },
-    where: { kgScrap: { gt: 0 } }
+    where: {
+      kgScrap: { gt: 0 }
+    }
   });
 
   // 3. Fetch yield by Stage/Department for performance visualization
@@ -28,17 +43,17 @@ export default async function AnalyticsPage() {
   // 4. Format data for the charts
   const formattedDeptData = deptData.map(d => ({
     name: d.stageName,
-    input: d._sum.kgIn || 0,
-    output: d._sum.kgOut || 0,
+    input: d._sum.kgIn?.toNumber() || 0,
+    output: d._sum.kgOut?.toNumber() || 0,
     // Calculate efficiency as (Output / Input) * 100
-    efficiency: d._sum.kgIn && d._sum.kgIn > 0 
-      ? parseFloat(((d._sum.kgOut || 0) / d._sum.kgIn * 100).toFixed(1)) 
+    efficiency: d._sum.kgIn && d._sum.kgIn.toNumber() > 0
+      ? parseFloat(((d._sum.kgOut?.toNumber() || 0) / d._sum.kgIn.toNumber() * 100).toFixed(1))
       : 0
   }));
 
   const formattedScrapData = scrapData.map(s => ({
     reason: s.scrapReason || 'Unspecified',
-    value: s._sum.kgScrap || 0
+    value: s._sum.kgScrap?.toNumber() || 0
   }));
 
   return (
@@ -50,17 +65,22 @@ export default async function AnalyticsPage() {
           <h1 className="text-3xl font-bold text-[#e8eaed] tracking-tight">Yield Intelligence</h1>
           <p className="text-[#7a8090]">Real-time material efficiency and waste tracking across the factory floor.</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#161719] border border-[#2a2d32] rounded-xl">
-          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-          <span className="text-xs font-bold text-[#7a8090] uppercase tracking-widest">Live Integration</span>
+        <div className="flex items-center gap-4">
+          <Suspense fallback={<div className="h-10 w-48 bg-[#161719] animate-pulse rounded-xl" />}>
+            <BranchSwitcher />
+          </Suspense>
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#161719] border border-[#2a2d32] rounded-xl">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xs font-bold text-[#7a8090] uppercase tracking-widest">Live Integration</span>
+          </div>
         </div>
       </div>
 
       {/* ── KPI Stat Cards ── */}
-      <StatCards 
-        totalIn={logs._sum.kgIn || 0} 
-        totalOut={logs._sum.kgOut || 0} 
-        totalScrap={logs._sum.kgScrap || 0} 
+      <StatCards
+        totalIn={logs._sum.kgIn?.toNumber() || 0}
+        totalOut={logs._sum.kgOut?.toNumber() || 0}
+        totalScrap={logs._sum.kgScrap?.toNumber() || 0}
       />
 
       {/* ── Visual Analytics Grid ── */}

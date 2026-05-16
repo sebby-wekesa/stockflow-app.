@@ -3,12 +3,12 @@
 import { useState, useTransition } from 'react'
 import { uploadImport } from '../actions'
 import { SHEET_TYPE_LABELS, type SheetType } from '@/lib/import/parsers'
+import { ALL_BRANCHES } from '@/lib/branches'
 
 export function UploadForm() {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [sheetType, setSheetType] = useState<SheetType>('sales_quickbooks')
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -17,13 +17,14 @@ export function UploadForm() {
       setError('Please choose a file')
       return
     }
-    const formData = new FormData(e.currentTarget)
-    formData.set('file', file)
+
     startTransition(async () => {
       try {
+        const formData = new FormData(e.target as HTMLFormElement)
+        formData.set('file', file)
         await uploadImport(formData)
       } catch (err) {
-        setError((err as Error).message)
+        setError(err instanceof Error ? err.message : 'Upload failed')
       }
     })
   }
@@ -41,14 +42,10 @@ export function UploadForm() {
           <label className="block text-xs uppercase tracking-wider text-muted mb-2">
             File type
           </label>
-          <select
-            name="sheet_type"
-            value={sheetType}
-            onChange={(e) => setSheetType(e.target.value as SheetType)}
-            className="input"
-          >
-            {Object.entries(SHEET_TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
+          <select name="sheet_type" defaultValue="auto" className="input" disabled={isPending}>
+            <option value="auto">Auto-detect</option>
+            {(Object.entries(SHEET_TYPE_LABELS) as [SheetType, string][]).map(([value, label]) => (
+              <option key={value} value={value}>
                 {label}
               </option>
             ))}
@@ -59,9 +56,8 @@ export function UploadForm() {
           <label className="block text-xs uppercase tracking-wider text-muted mb-2">
             Import mode
           </label>
-          <select name="import_mode" defaultValue="update" className="input">
-            <option value="update">Update — add to existing (recommended)</option>
-            <option value="replace">Replace — overwrite existing balances</option>
+          <select name="import_mode" defaultValue="update" className="input" disabled={isPending}>
+            <option value="update">Update — update existing records</option>
             <option value="ignore">Ignore — only import new products</option>
           </select>
         </div>
@@ -70,11 +66,13 @@ export function UploadForm() {
           <label className="block text-xs uppercase tracking-wider text-muted mb-2">
             Target branch
           </label>
-          <select name="branch" defaultValue="auto" className="input">
-            <option value="auto">Auto — read from each row's branch column</option>
-            <option value="mombasa">Mombasa only</option>
-            <option value="nairobi">Nairobi only</option>
-            <option value="bonje">Bonje only</option>
+          <select name="target_branch" defaultValue="" className="input" disabled={isPending}>
+            <option value="">All branches</option>
+            {ALL_BRANCHES.map((branch) => (
+              <option key={branch} value={branch}>
+                {branch.charAt(0).toUpperCase() + branch.slice(1)}
+              </option>
+            ))}
           </select>
           <p className="text-xs text-muted mt-1">
             For sales exports, choose Auto — the Class column tells us each transaction's branch.
@@ -108,12 +106,13 @@ export function UploadForm() {
             <div className="text-sm font-medium mb-1">
               Click to choose Excel file
             </div>
-            <div className="text-xs text-muted">.xlsx, .xls, or .csv</div>
+            <div className="text-xs text-muted">.xlsx, .xls</div>
             <input
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="hidden"
+              disabled={isPending}
             />
           </label>
         )}

@@ -1,27 +1,39 @@
 import { redirect } from 'next/navigation'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { getUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { SalesForm } from '../_components/sales-form'
-import type { BranchEnum } from '@prisma/client'
+import { SalesForm } from '@/components/sales/SalesForm'
+import type { BranchCode as Branch } from '@/lib/branches'
 
-export default async function NewSalesOrderPage() {
-  const supabase = await createServerSupabase()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  if (!authUser) redirect('/login')
+export const dynamic = 'force-dynamic';
 
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
+export default async function NewSalesPage() {
+  const user = await getUser()
   if (!user) redirect('/login')
 
-  const allowedBranches: BranchEnum[] = user.role === 'ADMIN'
-    ? ['mombasa', 'nairobi', 'bonje']
-    : user.branchId
-      ? [(await prisma.branch.findUnique({ where: { id: user.branchId }, select: { branch: true } }))?.branch ?? 'mombasa']
-      : ['mombasa']
+  // For now, assume user has branch
+  const userWithBranches = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { Branch: true }
+  })
+
+  if (!userWithBranches) redirect('/login')
+
+  const allowedBranches = user.role === 'admin'
+    ? (['mombasa', 'nairobi', 'bonje'] as Branch[])
+    : (userWithBranches.Branch ? [userWithBranches.Branch.id as Branch] : [])
+
+  const defaultBranch = allowedBranches[0]
 
   return (
-    <div className="max-w-5xl">
-      <h1 className="font-head text-2xl font-bold mb-6">New sale</h1>
-      <SalesForm allowedBranches={allowedBranches} defaultBranch={allowedBranches[0]} />
+    <div>
+      <div className="mb-6">
+        <h1 className="font-head text-2xl font-bold">New sales order</h1>
+        <p className="text-muted text-sm mt-1">
+          Create a new sales order and optionally invoice immediately
+        </p>
+      </div>
+
+      <SalesForm allowedBranches={allowedBranches} defaultBranch={defaultBranch} />
     </div>
   )
 }

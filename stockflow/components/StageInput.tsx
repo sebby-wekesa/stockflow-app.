@@ -25,20 +25,20 @@ export function StageInput({
     <div className="space-y-3" id="stages-container">
       {stages.map((stage, i) => (
         <div key={i} className="flex items-center gap-3">
-          <span className="w-8 text-sm font-medium text-zinc-500">{i + 1}</span>
+          <span className="w-8 text-sm font-medium text-[#7a8090]">{i + 1}</span>
           <input
             type="text"
             name={`stages[${i}].name`}
             value={stage}
             onChange={(e) => updateStage(i, e.target.value)}
-            className="flex-1 px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            className="flex-1 bg-[#1e2023] border border-[#2a2d32] rounded-lg p-3 text-[#e8eaed] outline-none focus:border-[#f0c040] transition-all"
             placeholder="Stage name"
           />
           {stages.length > 1 && (
             <button
               type="button"
               onClick={() => removeStage(i)}
-              className="text-zinc-400 hover:text-red-600"
+              className="text-[#7a8090] hover:text-[#e05555] text-lg font-bold w-6 h-6 flex items-center justify-center"
             >
               ×
             </button>
@@ -48,9 +48,9 @@ export function StageInput({
       <button
         type="button"
         onClick={addStage}
-        className="text-sm text-blue-600 hover:underline"
+        className="text-[#f0c040] hover:text-[#f5d060] transition-all font-medium"
       >
-        + Add Stage
+        + Add stage
       </button>
     </div>
   );

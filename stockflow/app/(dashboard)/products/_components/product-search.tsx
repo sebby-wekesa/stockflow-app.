@@ -1,40 +1,40 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { ProductCategory } from '@prisma/client'
 
-interface ProductSearchProps {
+export function ProductSearch({
+  initialQuery,
+  category,
+}: {
   initialQuery: string
   category?: ProductCategory
-}
-
-export function ProductSearch({ initialQuery, category }: ProductSearchProps) {
-  const [query, setQuery] = useState(initialQuery)
+}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const params = new URLSearchParams()
-    if (query) params.set('q', query)
-    if (category) params.set('category', category)
+    const formData = new FormData(e.currentTarget)
+    const q = String(formData.get('q') || '').trim()
+    const params = new URLSearchParams(searchParams)
+    if (q) {
+      params.set('q', q)
+    } else {
+      params.delete('q')
+    }
+    params.delete('page') // Reset to first page
     router.push(`/products?${params}`)
   }
 
   return (
     <form onSubmit={handleSubmit} className="mb-4">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search products by code or name..."
-          className="input flex-1"
-        />
-        <button type="submit" className="btn btn-primary">
-          Search
-        </button>
-      </div>
+      <input
+        name="q"
+        defaultValue={initialQuery}
+        placeholder="Search by product code or name..."
+        className="input max-w-md"
+      />
     </form>
   )
 }

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Get the order to find current stage
     const order = await prisma.productionOrder.findFirst({
       where: { id: orderId },
-      include: { design: true },
+      include: { Design: true },
     })
 
     if (!order) {
@@ -60,50 +60,11 @@ export async function POST(request: NextRequest) {
         completedAt: new Date(timestamp),
       },
       include: {
-        operator: {
+        User: {
           select: { name: true, email: true },
         },
       },
     })
-
-    // Handoff Logic: Determine next stage or complete order
-    const nextStage = await prisma.stage.findFirst({
-      where: {
-        designId: order.designId,
-        sequence: { gt: order.currentStage }
-      },
-      orderBy: { sequence: 'asc' }
-    });
-
-    if (nextStage) {
-      // Update order to next stage
-      await prisma.productionOrder.update({
-        where: { id: orderId },
-        data: {
-          currentStage: nextStage.sequence,
-          currentDept: nextStage.department
-        }
-      });
-    } else {
-      // No more stages: Complete the order and create finished good
-      await prisma.productionOrder.update({
-        where: { id: orderId },
-        data: { status: 'COMPLETED' }
-      });
-
-      // Calculate finished good quantity based on output weight and BOM
-      const quantity = Math.floor(outputWeight / order.design.kgPerUnit);
-      if (quantity > 0) {
-        await prisma.finishedGood.create({
-          data: {
-            designId: order.designId,
-            productionOrderId: orderId,
-            quantity,
-            location: department // Store in current department's location
-          }
-        });
-      }
-    }
 
     return NextResponse.json(
       {
@@ -146,14 +107,14 @@ export async function GET(request: NextRequest) {
     const logs = await prisma.stageLog.findMany({
       where: query,
       include: {
-        operator: {
+        User: {
           select: { name: true, email: true, department: true },
         },
-        order: {
-          select: { 
-            id: true, 
+        ProductionOrder: {
+          select: {
+            id: true,
             quantity: true,
-            design: { select: { name: true } }
+            Design: { select: { name: true } }
           },
         },
       },

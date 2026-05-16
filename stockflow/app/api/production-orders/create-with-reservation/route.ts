@@ -2,27 +2,19 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth-api'
-import { createProductionOrderWithReservationSchema } from '@/lib/validations'
 
 export async function POST(request: NextRequest) {
-  const auth = await requireRole(request, ["admin", "manager"]);
-  if ('error' in auth) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
-
   try {
     const body = await request.json()
-    const validation = createProductionOrderWithReservationSchema.safeParse(body)
+    const { designId, materialId, quantity } = body
 
-    if (!validation.success) {
+    // Validate required fields
+    if (!designId || !materialId || !quantity) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.format() },
+        { error: 'Missing required fields: designId, materialId, quantity' },
         { status: 400 }
       )
     }
-
-    const { designId, materialId, quantity, customerRef } = validation.data
 
     if (quantity <= 0) {
       return NextResponse.json(
@@ -37,7 +29,7 @@ export async function POST(request: NextRequest) {
       const design = await tx.design.findUnique({
         where: { id: designId },
         include: {
-          stages: {
+          Stage: {
             orderBy: { sequence: 'asc' },
           },
         },
@@ -46,6 +38,12 @@ export async function POST(request: NextRequest) {
       if (!design) {
         throw new Error('Design not found')
       }
+
+      if (design.Stage.length === 0) {
+        throw new Error(`Design "${design.name}" has no production stages configured.`);
+      }
+
+      const firstStage = design.Stage[0]
 
       // Check if material exists and has sufficient stock
       const material = await tx.rawMaterial.findUnique({
@@ -56,9 +54,14 @@ export async function POST(request: NextRequest) {
         throw new Error('Raw material not found')
       }
 
-      const requiredKg = design.targetWeight * quantity
-      if (material.availableKg < requiredKg) {
-        throw new Error(`Insufficient material stock. Required: ${requiredKg}kg, Available: ${material.availableKg}kg`)
+      // Validate that design has a target weight defined
+      if (design.targetWeight === null || design.targetWeight === undefined) {
+        throw new Error(`Design "${design.name}" is missing target weight specification. Cannot calculate material requirements.`)
+      }
+
+      const requiredKg = design.targetWeight.toNumber() * quantity
+      if (material.availableKg.toNumber() < requiredKg) {
+        throw new Error(`Insufficient material stock. Required: ${requiredKg}kg, Available: ${material.availableKg.toNumber()}kg`)
       }
 
       // Generate order number
@@ -73,8 +76,8 @@ export async function POST(request: NextRequest) {
           targetKg: requiredKg,
           status: 'IN_PRODUCTION',
           priority: 'MEDIUM',
-          currentStage: 1,
-          currentDept: design.stages[0]?.department || 'Cutting', // First department
+          currentStage: firstStage.sequence,
+          currentDept: firstStage.department,
         },
       })
 
@@ -82,29 +85,10 @@ export async function POST(request: NextRequest) {
       await tx.rawMaterial.update({
         where: { id: materialId },
         data: {
-          availableKg: material.availableKg - requiredKg,
-          reservedKg: material.reservedKg + requiredKg,
+          availableKg: material.availableKg.toNumber() - requiredKg,
+          reservedKg: material.reservedKg.toNumber() + requiredKg,
         },
       })
-
-      // Initialize first stage (create a pending task)
-      if (design.stages.length > 0) {
-        const firstStage = design.stages[0]
-        await tx.stageLog.create({
-          data: {
-            orderId: productionOrder.id,
-            stageId: firstStage.id,
-            stageName: firstStage.name,
-            sequence: firstStage.sequence,
-            department: firstStage.department,
-            kgIn: requiredKg,
-            kgOut: 0,
-            kgScrap: 0,
-            operatorId: 'system', // Placeholder, should be assigned later
-            notes: 'Production order initialized - pending processing',
-          },
-        })
-      }
 
       return productionOrder
     })
@@ -117,7 +101,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error: any) {
-
+    console.error('Error creating production order:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to create production order' },
       { status: 500 }

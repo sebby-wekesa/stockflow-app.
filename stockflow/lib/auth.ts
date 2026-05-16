@@ -1,37 +1,54 @@
-import { cookies } from "next/headers";
+import { supabaseServerComponent } from "./supabase-admin";
 import { prisma } from "./prisma";
-import * as jwt from "jsonwebtoken";
+import { type UserRole } from "./types";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
-
-export type Role = "ADMIN" | "MANAGER" | "OPERATOR" | "SALES" | "PACKAGING" | "WAREHOUSE";
+export type Role = UserRole;
 
 export type AuthUser = {
   id: string;
   email: string;
   name: string | null;
-  role: Role;
+  role: UserRole;
   department: string | null;
+  branches: { id: string; name: string }[];
 };
 
 export async function getUser() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("auth-token")?.value;
+  const supabase = await supabaseServerComponent();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
 
-  if (!token) return null;
+  if (!authUser) return null;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
+    // Check if User model exists and is accessible
+    if (!prisma.user) {
+      console.error("User model not available in Prisma client");
+      return null;
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: authUser.id },
+      include: {
+        Branch: true,
+        Organization: true,
+      },
     });
 
-    return user;
+    if (!user) {
+      console.log("User not found in database for ID:", authUser.id);
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name ?? "",
+      role: user.role,
+      department: user.department,
+      branches: user.Branch ? [{ id: user.Branch.id, name: user.Branch.name }] : [],
+    };
   } catch (error) {
+    console.error("Prisma lookup failed:", error);
     return null;
   }
 }
@@ -50,4 +67,9 @@ export async function requireRole(...roles: Role[]): Promise<AuthUser> {
     throw new Error("Forbidden: Insufficient permissions");
   }
   return user;
+}
+
+export async function checkRole(user: AuthUser | null, ...roles: Role[]): Promise<boolean> {
+  if (!user) return false;
+  return roles.includes(user.role);
 }

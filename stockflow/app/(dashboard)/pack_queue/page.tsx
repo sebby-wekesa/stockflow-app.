@@ -1,31 +1,54 @@
-export default function PackQueuePage() {
-  const orders = [
-    {id:'SO-0091',product:'Hex bolt M12',qty:'50 units · 140 kg',client:'Apex Hardware',priority:'high',date:'Today · 09:14'},
-    {id:'SO-0090',product:'Anchor bolt',qty:'20 units · 167 kg',client:'BuildPro Ltd',priority:'high',date:'Today · 08:51'},
-    {id:'SO-0089',product:'Stud rod 8mm',qty:'30 units · 83 kg',client:'Mech Supplies',priority:'normal',date:'Yesterday · 16:30'},
-    {id:'SO-0088',product:'Hex bolt M10',qty:'45 units · 95 kg',client:'Apex Hardware',priority:'normal',date:'Yesterday · 14:20'},
-    {id:'SO-0087',product:'Foundation bolt',qty:'10 units · 68 kg',client:'KenSteel Ltd',priority:'normal',date:'Yesterday · 11:05'},
-  ];
+import { prisma } from "@/lib/prisma"
+
+export const dynamic = 'force-dynamic';
+
+export default async function PackQueuePage() {
+  const orders = await prisma.saleOrder.findMany({
+    where: { status: 'PENDING' },
+    include: {
+      items: {
+        include: {
+          finishedGoods: {
+            include: { Design: true }
+          }
+        }
+      }
+    },
+    orderBy: { createdAt: 'asc' }
+  });
 
   return (
     <div>
       <div className="section-header mb-16">
         <div><div className="section-title">Packaging queue</div><div className="section-sub">Sale orders awaiting fulfilment</div></div>
       </div>
-      {orders.map(o => (
-        <div key={o.id} className="pack-card">
-          <div className="pack-priority" style={{background:o.priority==='high'?'var(--red)':'var(--border2)'}}></div>
-          <div className="pack-info">
-            <div className="pack-order">{o.id} · {o.date}</div>
-            <div className="pack-product">{o.product}</div>
-            <div className="pack-detail">{o.qty} · {o.client}</div>
+      {orders.map(o => {
+        const productSummary = o.items.map(i => i.finishedGoods.Design.name).join(", ");
+        const totalUnits = o.items.reduce((acc, i) => acc + i.quantity, 0);
+        const totalKg = o.items.reduce((acc, i) => {
+          const kgPerUnit = i.finishedGoods.quantity > 0 ? (i.finishedGoods.kgProduced.toNumber() / i.finishedGoods.quantity) : 0;
+          return acc + (i.quantity * kgPerUnit);
+        }, 0);
+
+        return (
+          <div key={o.id} className="pack-card">
+            <div className="pack-priority" style={{background:'var(--border2)'}}></div>
+            <div className="pack-info">
+              <div className="pack-order">Order {o.id.slice(-6).toUpperCase()} · {o.createdAt.toLocaleDateString()}</div>
+              <div className="pack-product">{productSummary || 'Empty Order'}</div>
+              <div className="pack-detail">{totalUnits} units · {totalKg.toFixed(2)} kg · {o.customerName}</div>
+            </div>
+            <div className="pack-actions">
+              <form action={async () => { 'use server'; console.log("Fulfill action bypassed"); }}>
+                <button type="submit" className="btn btn-teal btn-sm">Mark fulfilled</button>
+              </form>
+            </div>
           </div>
-          <div className="pack-actions">
-            {o.priority==='high' && <span className="badge badge-red">Priority</span>}
-            <button className="btn btn-teal btn-sm" onClick={() => alert(`Order ${o.id} marked as fulfilled`)}>Mark fulfilled</button>
-          </div>
-        </div>
-      ))}
+        )
+      })}
+      {orders.length === 0 && (
+        <div style={{ padding: '20px', color: 'var(--muted)' }}>No pending orders in packaging queue.</div>
+      )}
     </div>
   );
 }

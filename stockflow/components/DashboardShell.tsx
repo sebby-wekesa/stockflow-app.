@@ -1,80 +1,90 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
-import { Role } from "@/lib/auth";
+import type { UserRole as Role } from "@/lib/types";
+
+interface User {
+  name?: string;
+}
 
 export function DashboardShell({
   user,
+  role,
   children,
 }: {
-  user: any;
+  user: User;
+  role: Role;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const role = user.role as Role;
-  const [previewRole, setPreviewRole] = useState<Role>(role);
+  const searchParams = useSearchParams();
+  const previewRoleParam = searchParams.get('previewRole') as Role;
+  const previewRole = previewRoleParam || role;
 
-  const handleNavigate = (screen: string) => {
-    router.push(`/${screen}`);
+  const handleRoleSwitch = (newRole: Role) => {
+    // Update URL with preview role
+    const url = new URL(window.location.href);
+    url.searchParams.set('previewRole', newRole);
+    window.location.href = url.toString();
   };
-
-  // Handle role switching (for preview purposes)
-  useEffect(() => {
-    setPreviewRole(role);
-  }, [role]);
 
   return (
     <ToastProvider>
       <div className="app">
-        <Sidebar
-          user={{ role: previewRole.toLowerCase(), name: user.name || '' }}
-          currentRole={previewRole.toLowerCase()}
-          currentScreen={window.location.pathname.slice(1) || 'dashboard'}
-          onNavigate={handleNavigate}
-        />
+        <Sidebar role={previewRole} />
         <div className="main">
           <div className="topbar">
             <span style={{fontSize:'11px', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'1px'}}>Preview role:</span>
             <div className="topbar-role-switcher">
-              <button
-                className={`role-btn ${previewRole === "ADMIN" ? "active" : ""}`}
-                onClick={() => setPreviewRole("ADMIN")}
-              >
-                Admin
-              </button>
-              <button
-                className={`role-btn ${previewRole === "MANAGER" ? "active" : ""}`}
-                onClick={() => setPreviewRole("MANAGER")}
-              >
-                Manager
-              </button>
-              <button
-                className={`role-btn ${previewRole === "OPERATOR" ? "active" : ""}`}
-                onClick={() => setPreviewRole("OPERATOR")}
-              >
-                Operator
-              </button>
-              <button
-                className={`role-btn ${previewRole === "SALES" ? "active" : ""}`}
-                onClick={() => setPreviewRole("SALES")}
-              >
-                Sales
-              </button>
-              <button
-                className={`role-btn ${previewRole === "PACKAGING" ? "active" : ""}`}
-                onClick={() => setPreviewRole("PACKAGING")}
-              >
-                Packaging
-              </button>
-              <button
-                className={`role-btn ${previewRole === "WAREHOUSE" ? "active" : ""}`}
-                onClick={() => setPreviewRole("WAREHOUSE")}
-              >
-                Warehouse
-              </button>
+              {role === "ADMIN" && (
+                <button
+                  className={`role-btn ${previewRole === "ADMIN" ? "active" : ""}`}
+                  onClick={() => handleRoleSwitch("ADMIN")}
+                >
+                  Admin
+                </button>
+              )}
+              {role === "MANAGER" && (
+                <button
+                  className={`role-btn ${previewRole === "MANAGER" ? "active" : ""}`}
+                  onClick={() => handleRoleSwitch("MANAGER")}
+                >
+                  Manager
+                </button>
+              )}
+              {role === "OPERATOR" && (
+                <button
+                  className={`role-btn ${previewRole === "OPERATOR" ? "active" : ""}`}
+                  onClick={() => handleRoleSwitch("OPERATOR")}
+                >
+                  Operator
+                </button>
+              )}
+              {role === "SALES" && (
+                <button
+                  className={`role-btn ${previewRole === "SALES" ? "active" : ""}`}
+                  onClick={() => handleRoleSwitch("SALES")}
+                >
+                  Sales
+                </button>
+              )}
+              {role === "PACKAGING" && (
+                <button
+                  className={`role-btn ${previewRole === "PACKAGING" ? "active" : ""}`}
+                  onClick={() => handleRoleSwitch("PACKAGING")}
+                >
+                  Packaging
+                </button>
+              )}
+              {role === "WAREHOUSE" && (
+                <button
+                  className={`role-btn ${previewRole === "WAREHOUSE" ? "active" : ""}`}
+                  onClick={() => handleRoleSwitch("WAREHOUSE")}
+                >
+                  Warehouse
+                </button>
+              )}
             </div>
             <div className="topbar-right">
               <div className="notif-dot pulse"></div>
@@ -85,11 +95,6 @@ export function DashboardShell({
           </div>
           <div className="content">{children}</div>
         </div>
-      </div>
-
-      {/* MODAL */}
-      <div className="modal-overlay" id="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); }}>
-        <div className="modal" id="modal-body"></div>
       </div>
     </ToastProvider>
   );

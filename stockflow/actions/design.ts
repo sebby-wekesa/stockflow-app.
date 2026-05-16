@@ -1,50 +1,119 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
-import { designSchema } from "@/lib/validations";
+import { designSchema, DesignInput } from "@/lib/validations";
 
-export async function saveDesign(data: {
-  name: string;
-  code: string;
-  targetDimensions: string;
-  targetWeight: number;
-  kgPerUnit: number;
-  stages: { name: string; department: string; sequence: number }[];
-}) {
+export async function createDesign(formData: FormData) {
   await requireRole("ADMIN");
 
-  const validatedData = designSchema.parse(data);
+  const name = formData.get("name") as string;
+  const description = formData.get("description") as string;
+  const targetDimensions = formData.get("targetDimensions") as string;
+  const targetWeight = formData.get("targetWeight");
 
-  try {
-    const design = await prisma.$transaction(async (tx) => {
-      // 1. Create the Design header
-      const newDesign = await tx.design.create({
-        data: {
-          name: validatedData.name,
-          code: validatedData.code,
-          targetDimensions: validatedData.targetDimensions,
-          targetWeight: validatedData.targetWeight,
-          kgPerUnit: validatedData.kgPerUnit,
-          // 2. Create all stages linked to this design
-          stages: {
-            create: validatedData.stages.map((stage) => ({
-              name: stage.name,
-              department: stage.department,
-              sequence: stage.sequence,
-            })),
-          },
-        },
+  // Auto-generate code from name (first letters of words, uppercase)
+  const code = name
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase())
+    .join('')
+    .substring(0, 10); // Limit to 10 characters
+
+  const stagesData: { name: string; sequence: number; department: string }[] = [];
+  let i = 0;
+  while (formData.has(`stages[${i}].name`)) {
+    const stageName = formData.get(`stages[${i}].name`) as string;
+    if (stageName) {
+      stagesData.push({
+        name: stageName,
+        sequence: i + 1,
+        department: "Production" // Default department - should be configurable later
       });
-      return newDesign;
-    });
-
-    revalidatePath("/dashboard/admin/designs");
-    return { success: true, design };
-  } catch (error: any) {
-    console.error("Design Save Error:", error);
-    if (error.code === 'P2002') return { error: "Design Code already exists." };
-    return { error: "Failed to save design template." };
+    }
+    i++;
   }
+
+  const input: DesignInput = {
+    name,
+    code,
+    description: description || undefined,
+    targetDimensions: targetDimensions || undefined,
+    targetWeight: targetWeight ? parseFloat(targetWeight as string) : undefined,
+    stages: stagesData,
+  };
+
+  designSchema.parse(input);
+
+  const design = await prisma.design.create({
+    data: {
+      name: input.name,
+      code: input.code,
+      description: input.description,
+      targetDimensions: input.targetDimensions,
+      targetWeight: input.targetWeight,
+      stages: {
+        create: input.stages,
+      },
+    },
+  });
+
+  redirect(`/designs/${design.id}`);
+}
+
+export async function updateDesign(id: string, formData: FormData) {
+  await requireRole("ADMIN");
+
+  const name = formData.get("name") as string;
+  const description = formData.get("description") as string;
+  const targetDimensions = formData.get("targetDimensions") as string;
+  const targetWeight = formData.get("targetWeight");
+
+  // Auto-generate code from name (first letters of words, uppercase)
+  const code = name
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase())
+    .join('')
+    .substring(0, 10); // Limit to 10 characters
+
+  const stagesData: { name: string; sequence: number; department: string }[] = [];
+  let i = 0;
+  while (formData.has(`stages[${i}].name`)) {
+    const stageName = formData.get(`stages[${i}].name`) as string;
+    if (stageName) {
+      stagesData.push({
+        name: stageName,
+        sequence: i + 1,
+        department: "Production" // Default department - should be configurable later
+      });
+    }
+    i++;
+  }
+
+  const input: DesignInput = {
+    name,
+    code,
+    description: description || undefined,
+    targetDimensions: targetDimensions || undefined,
+    targetWeight: targetWeight ? parseFloat(targetWeight as string) : undefined,
+    stages: stagesData,
+  };
+
+  designSchema.parse(input);
+
+  await prisma.$transaction([
+    prisma.stage.deleteMany({ where: { designId: id } }),
+    prisma.design.update({
+      where: { id },
+      data: {
+        name: input.name,
+        description: input.description,
+        targetDimensions: input.targetDimensions,
+        targetWeight: input.targetWeight,
+        stages: { create: input.stages },
+      },
+    }),
+  ]);
+
+  redirect(`/designs/${id}`);
 }

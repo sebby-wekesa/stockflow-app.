@@ -10,6 +10,9 @@ export type SheetType =
   | 'rm_flatbar'          // Flat bar raw material sheet
   | 'rm_roundbar'         // Round bar raw material sheet
   | 'consumables'         // Mombasa/Nairobi consumable stock sheets
+  | 'inventory'           // Mombasa inventory sheets (BRAKE LININGS, CENTRE BOLTS, etc.)
+  | 'stock_movement'      // Stock in/out movement sheets
+  | 'sales'               // Sales data sheets
 
 export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   sales_quickbooks: 'Sales export (QuickBooks)',
@@ -17,6 +20,9 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   rm_flatbar: 'Raw material — flat bars',
   rm_roundbar: 'Raw material — round bars',
   consumables: 'Consumables stock',
+  inventory: 'Mombasa inventory sheets',
+  stock_movement: 'Stock movement sheets',
+  sales: 'Sales data sheets',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { materialName, diameter, kgReceived, supplier } = body
+    const { materialName, diameter, kgReceived, supplierId } = body
 
     // Validate required fields
     if (!materialName || !diameter || !kgReceived) {
@@ -39,18 +39,20 @@ export async function POST(request: NextRequest) {
         where: { id: existingMaterial.id },
         data: {
           availableKg: existingMaterial.availableKg + kgReceived,
-          supplier,
+          supplierId,
           updatedAt: new Date(),
         },
       })
     } else {
       // Create new material
+      const sku = `${materialName.replace(/\s+/g, '-').toUpperCase()}-${diameter.toUpperCase()}-${Date.now().toString().slice(-6)}`;
       material = await prisma.rawMaterial.create({
         data: {
+          sku,
           materialName,
           diameter,
           availableKg: kgReceived,
-          supplier,
+          supplierId,
         },
       })
     }

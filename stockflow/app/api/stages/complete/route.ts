@@ -54,9 +54,9 @@ export async function POST(req: Request) {
     const order = await prisma.productionOrder.findUnique({
       where: { id: orderId },
       include: {
-        design: {
+        Design: {
           include: {
-            stages: {
+            Stage: {
               orderBy: { sequence: "asc" }
             }
           }
@@ -69,11 +69,11 @@ export async function POST(req: Request) {
     }
 
     // Find the current stage index and next stage
-    const currentStageIndex = order.design.stages.findIndex(s => s.sequence === currentSequence);
-    const nextStage = order.design.stages[currentStageIndex + 1];
+    const currentStageIndex = order.Design.Stage.findIndex(s => s.sequence === currentSequence);
+    const nextStage = order.Design.Stage[currentStageIndex + 1];
 
     let nextDept = "Completed";
-    let finalStatus = "COMPLETED" as const;
+    let finalStatus: "COMPLETED" | "IN_PRODUCTION" = "COMPLETED";
     let nextSeq = currentSequence + 1;
 
     if (nextStage) {
@@ -90,7 +90,8 @@ export async function POST(req: Request) {
         currentDept: nextDept,
         status: finalStatus,
         // Update targetKg for the next stage based on what actually came out of this one
-        targetKg: kgOut 
+        targetKg: kgOut,
+        ...(finalStatus === "COMPLETED" && { completedAt: new Date() }),
       }
     });
 
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-
+    console.error("Factory Handoff Error:", error);
     return NextResponse.json({ error: "Failed to move order to next stage" }, { status: 500 });
   }
 }

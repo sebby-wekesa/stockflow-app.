@@ -17,7 +17,7 @@ export function StageLogForm({ order, onComplete }: { order: any, onComplete: ()
   // Enforce department-specific rules [cite: 55, 56]
   const isValid = useMemo(() => {
     if (department === 'Electroplating') {
-      return kgOut >= kgIn && kgScrap >= 0 && (kgScrap === 0 || scrapReason);
+      return (Number(kgOut) + Number(kgScrap)) >= kgIn && (kgScrap === 0 || scrapReason);
     } else {
       const totalAccounted = Number(kgOut) + Number(kgScrap);
       const difference = Math.abs(kgIn - totalAccounted);

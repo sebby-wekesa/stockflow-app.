@@ -2,8 +2,6 @@ import { Metadata } from 'next'
 import { StageLoggingForm } from '@/components/StageLoggingForm'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: 'Stage Logger | StockFlow',
   description: 'Log material weights and track production stages',
@@ -19,7 +17,7 @@ async function getActiveOrders() {
         },
       },
       include: {
-        design: {
+        Design: {
           select: {
             name: true,
           },
@@ -31,8 +29,8 @@ async function getActiveOrders() {
     return orders.map((order) => ({
       id: order.id,
       code: `ORD-${order.id.slice(0, 6).toUpperCase()}`,
-      weight: order.targetKg,
-      designName: order.design.name,
+      weight: order.targetKg.toNumber(),
+      designName: order.Design.name,
     }))
   } catch (error) {
     console.error('Error fetching orders:', error)

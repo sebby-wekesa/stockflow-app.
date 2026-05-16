@@ -1,28 +1,75 @@
 "use server";
 
 import { cookies } from "next/headers";
+import type { CookieOptions } from "@supabase/ssr";
 import { redirect } from "next/navigation";
+import { createServerClient } from '@supabase/ssr'
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { clearAuthCookies } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
-import { scryptSync } from "crypto";
-import * as jwt from "jsonwebtoken";
+import { ALL_BRANCHES } from "@/lib/branches";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const ROLE_PATHS = {
+  ADMIN: "/admin/dashboard",
+  MANAGER: "/dashboard",
+  WAREHOUSE: "/dashboard",
+  SALES: "/dashboard",
+  ACCOUNTANT: "/reports",
+  OPERATOR: "/dashboard",
+  PACKAGING: "/dashboard",
+  PENDING: "/dashboard/setup",
+};
 
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
+async function createSupabaseClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options });
+          } catch {
+            // Server Component called from a context where cookies are read-only
+          }
+        },
+        remove(name: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value: '', ...options });
+          } catch {}
+        },
+      },
+    }
+  );
 }
 
-function verifyPassword(password: string, storedHash: string): boolean {
-  const [salt, hash] = storedHash.split(":");
-  const testHash = scryptSync(password, salt, 64).toString("hex");
-  return hash === testHash;
+function readErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "";
+}
+
+function getAuthErrorMessage(error: unknown) {
+  const message = readErrorMessage(error);
+
+  if (message.includes('Invalid login credentials')) {
+    return "Invalid email or password. Please check your credentials and try again.";
+  }
+  if (message.includes('Email not confirmed')) {
+    return "Please check your email and click the confirmation link before signing in.";
+  }
+  if (message.includes('User not found') || message.includes('user_not_found')) {
+    return "No account found with this email address. Please sign up first.";
+  }
+  return "Authentication failed. Please try again.";
 }
 
 export async function signIn(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const remember = formData.get("remember") === "on";
 
   // Validate input
   const validation = loginSchema.safeParse({ email, password });
@@ -33,43 +80,169 @@ export async function signIn(formData: FormData) {
     return { error: firstError };
   }
 
-  // Find user in database
-  const user = await prisma.user.findUnique({
-    where: { email: validation.data.email },
+  // Create Supabase server client
+  const supabase = await createSupabaseClient();
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: validation.data.email,
+    password: validation.data.password,
   });
 
-  if (!user || !verifyPassword(validation.data.password, user.password)) {
-    return { error: "Invalid email or password. Please try again." };
+  if (error) {
+    console.error("Supabase auth error:", error);
+    return { error: getAuthErrorMessage(error) };
   }
 
-  // Create JWT token
-  const cookieStore = await cookies();
-  const sessionToken = jwt.sign(
-    {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      department: user.department
-    },
-    JWT_SECRET,
-    { expiresIn: "7d" }
-  );
+  if (!data.user) {
+    return { error: "Authentication failed. Please try again." };
+  }
 
-  cookieStore.set("auth-token", sessionToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7, // 30 days if remember, else 7 days
-  });
+  if (!data.session) {
+    return { error: "Authentication failed. Please try again." };
+  }
 
-  // Redirect based on role
-  const redirectPath = user.role === 'ADMIN' ? '/dashboard' : '/operator_queue';
-  redirect(redirectPath);
+  // Verify session is properly set in cookies
+  const { data: { session: verifySession } } = await supabase.auth.getSession();
+  if (!verifySession) {
+    console.error("Session not established properly");
+    return { error: "Authentication failed. Please try again." };
+  }
+
+  // Ensure user exists in database (public.User table)
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: data.user.id }
+    });
+
+    if (!existingUser) {
+      await prisma.user.create({
+        data: {
+          id: data.user.id,
+          email: data.user.email!,
+          name: data.user.user_metadata?.name || '',
+          role: (data.user.user_metadata?.role as any) || 'PENDING',
+          password: 'SUPABASE_AUTH',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+      console.log("Created new user record in database");
+    } else {
+      console.log("User record already exists in database");
+    }
+  } catch (dbError) {
+    console.error("Database user creation failed:", dbError);
+  }
+
+  console.log("Login successful, session and database records established");
+  return { success: true };
 }
 
 export async function signOut() {
+  try {
+    const supabase = await createSupabaseClient();
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.error("Supabase signout error:", error);
+  }
+
+  // Clear all cookies
   const cookieStore = await cookies();
-  cookieStore.delete("auth-token");
+  clearAuthCookies(cookieStore);
+
   redirect("/login");
+}
+
+export async function signUp(formData: FormData) {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const name = formData.get("name") as string;
+  const branch = formData.get("branch") as string;
+
+  if (!email || !password) {
+    return { error: "Email and password are required" };
+  }
+
+  if (!name || !branch) {
+    return { error: "Name and branch are required" };
+  }
+
+  if (!ALL_BRANCHES.includes(branch as any)) {
+    return { error: "Invalid branch selected" };
+  }
+
+  try {
+    // Create Supabase server client
+    const supabase = await createSupabaseClient();
+
+    // Create user with Supabase Auth
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name || '',
+          role: 'PENDING', // Default role for new signups
+          branch: branch,
+        }
+      }
+    });
+
+    if (error) {
+      console.error("Supabase signup error:", error);
+      // Check for various forms of "user already exists" error
+      if (error.message.includes('already registered') ||
+          error.message.includes('User already registered') ||
+          error.message.includes('user_already_exists') ||
+          (error as any).status === 422) {
+        return { error: "An account with this email already exists. Please sign in instead." };
+      }
+      return { error: getAuthErrorMessage(error) };
+    }
+
+    if (!data.user) {
+      return { error: "Failed to create account. Please try again." };
+    }
+
+    if (!data.session) {
+      return {
+        message: "Account created successfully. Please check your email and sign in to continue.",
+      };
+    }
+
+    // Create profile record in database if it doesn't exist
+    await prisma.profile.upsert({
+      where: { id: data.user.id },
+      update: {},
+      create: {
+        id: data.user.id,
+        email: data.user.email!,
+        full_name: data.user.user_metadata?.name || name || '',
+        role: 'PENDING', // Default role for new signups
+      },
+    });
+
+    // Create User record
+    await prisma.user.upsert({
+      where: { email: data.user.email! },
+      update: {},
+        create: {
+          id: data.user.id,
+          email: data.user.email!,
+          password: '', // Password handled by Supabase
+          name: data.user.user_metadata?.name || name || '',
+          role: 'PENDING', // Default role
+          branchId: branch,
+          organizationId: 'org-stockflow-001', // Default organization
+          updatedAt: new Date(),
+        },
+    });
+
+    // Middleware will handle cookie setting and redirects
+    return { success: true };
+
+  } catch (error) {
+    console.error("Sign up error:", error);
+    return { error: "An unexpected error occurred. Please try again." };
+  }
 }

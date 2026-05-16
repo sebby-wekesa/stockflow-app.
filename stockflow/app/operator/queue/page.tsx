@@ -1,47 +1,40 @@
+export const dynamic = 'force-dynamic';
+
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export const dynamic = 'force-dynamic';
-
 async function getOperatorStats(department: string | null) {
   if (!department) return null;
 
-  try {
-    const pendingJobs = await prisma.productionOrder.findMany({
-      where: { status: "IN_PRODUCTION" },
-      include: {
-        design: { include: { stages: true } },
-        logs: { orderBy: { sequence: "desc" }, take: 1 },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+  const pendingJobs = await prisma.productionOrder.findMany({
+    where: {
+      status: { in: ["APPROVED", "IN_PRODUCTION"] },
+      currentDept: department,
+    },
+    include: {
+      design: { include: { stages: true } },
+      StageLog: { orderBy: { sequence: "desc" }, take: 1 },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
 
-    return { pendingJobs, department };
-  } catch (error) {
-    console.error("Failed to load operator stats from database", error);
-    return { pendingJobs: [], department };
-  }
+  return { pendingJobs, department };
 }
+
+type OperatorStats = NonNullable<Awaited<ReturnType<typeof getOperatorStats>>>;
+type PendingJob = OperatorStats["pendingJobs"][number];
 
 export default async function OperatorQueuePage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  let dbUser;
-  try {
-    dbUser = await prisma.user.findUnique({
-      where: { email: user.email! },
-    });
-  } catch (error) {
-    console.error("Failed to load user from database", error);
-    redirect("/login");
+  if (user.role !== "OPERATOR" && user.role !== "ADMIN") {
+    redirect("/unauthorized");
   }
 
-  if (!dbUser) redirect("/login");
-
-  const department = dbUser.dept;
+  const department = user.department;
   const stats = department ? await getOperatorStats(department) : null;
 
   if (!stats) {
@@ -69,7 +62,7 @@ export default async function OperatorQueuePage() {
       ) : (
         <div>
           {stats.pendingJobs.map((order) => (
-            <JobCard key={order.id} order={order} department={department} />
+            <JobCard key={order.id} order={order} />
           ))}
         </div>
       )}
@@ -77,8 +70,8 @@ export default async function OperatorQueuePage() {
   );
 }
 
-function JobCard({ order, department }: { order: any; department: string }) {
-  const currentStage = order.design.stages.find((s: any) => s.sequence === order.currentStage);
+function JobCard({ order }: { order: PendingJob }) {
+  const currentStage = order.design.stages.find((stage) => stage.sequence === order.currentStage);
 
   return (
     <div className="job-card inprog" style={{ marginBottom: "10px" }}>
@@ -89,7 +82,7 @@ function JobCard({ order, department }: { order: any; department: string }) {
         </div>
         <div className="job-design">{order.design.name} — {currentStage?.name || "Unknown"}</div>
         <div className="job-meta" style={{ marginTop: "8px" }}>
-          <span>Target: <span className="job-kg">{order.targetKg} kg</span></span>
+          <span>Target: <span className="job-kg">{order.targetKg.toString()} kg</span></span>
           <span>Qty: {order.quantity} units</span>
         </div>
       </Link>

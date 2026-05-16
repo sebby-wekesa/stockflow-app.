@@ -21,7 +21,7 @@ interface ProductionOrder {
   targetKg: number
   quantity: number
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-  yieldEstimate: number
+  expectedUnits: number
   status: string
 }
 
@@ -201,14 +201,14 @@ const OrderCard: React.FC<{
           </div>
         </div>
 
-        {/* Middle: Yield Estimate */}
+        {/* Middle: Expected Units */}
         <div className="col-span-2 bg-slate-900 rounded-lg p-4 border border-slate-700 text-center">
           <div className="flex items-center justify-center gap-1 mb-2">
             <TrendingUp className="w-4 h-4 text-green-400" />
-            <span className="text-xs text-slate-400">Target Yield</span>
+            <span className="text-xs text-slate-400">Expected Units</span>
           </div>
-          <p className="text-2xl font-bold text-green-400">{order.yieldEstimate}%</p>
-          <p className="text-xs text-slate-500 mt-1">Expected output</p>
+          <p className="text-2xl font-bold text-green-400">{order.expectedUnits}</p>
+          <p className="text-xs text-slate-500 mt-1">Target quantity</p>
         </div>
 
         {/* Right: Actions */}
@@ -284,7 +284,7 @@ export const ManagerApprovalQueue: React.FC<ManagerApprovalQueueProps> = ({ user
         setOrders(data.data || [])
       } catch (error) {
         console.error('Fetch error:', error)
-        showToast('error', 'Failed to load orders')
+        showToast('Failed to load orders', 'error')
       } finally {
         setIsLoading(false)
       }
@@ -305,10 +305,10 @@ export const ManagerApprovalQueue: React.FC<ManagerApprovalQueueProps> = ({ user
       if (!res.ok) throw new Error('Failed to approve order')
 
       setOrders(orders.filter((o) => o.id !== orderId))
-      showToast('success', 'Order approved and released to production!')
+      showToast('Order approved and released to production!', 'success')
     } catch (error) {
       console.error('Approval error:', error)
-      showToast('error', 'Failed to approve order')
+      showToast('Failed to approve order', 'error')
     } finally {
       setLoadingId(null)
     }
@@ -335,10 +335,10 @@ export const ManagerApprovalQueue: React.FC<ManagerApprovalQueueProps> = ({ user
 
       setOrders(orders.filter((o) => o.id !== data.orderId))
       setShowRejectionModal(false)
-      showToast('success', 'Order rejected with reason noted')
+      showToast('Order rejected with reason noted', 'success')
     } catch (error) {
       console.error('Rejection error:', error)
-      showToast('error', 'Failed to reject order')
+      showToast('Failed to reject order', 'error')
     } finally {
       setLoadingId(null)
     }

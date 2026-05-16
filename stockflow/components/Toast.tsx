@@ -38,12 +38,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
       {children}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <Toast />
     </ToastContext.Provider>
   )
 }
 
-export { ToastContainer as Toast };
+export function Toast() {
+  const { toasts, removeToast } = useToast(); // Grab the data inside the component
+
+  return (
+    <div className="fixed bottom-4 right-4">
+      {toasts.map(t => (
+        <ToastItem key={t.id} toast={t} onClose={() => removeToast(t.id)} />
+      ))}
+    </div>
+  );
+}
 
 export function useToast() {
   const context = useContext(ToastContext)
@@ -53,17 +63,7 @@ export function useToast() {
   return context
 }
 
-function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: string) => void }) {
-  return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
-      {toasts.map((toast) => (
-        <Toast key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
-      ))}
-    </div>
-  )
-}
-
-function Toast({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const bgColor =
     toast.type === 'success'
       ? 'bg-emerald-900/10 border-emerald-500/30'

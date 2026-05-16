@@ -2,7 +2,7 @@
 
 import { FileText, Download, TrendingUp, Trash2, BarChart3 } from "lucide-react";
 import { useState } from "react";
-import { exportCompletedOrdersCSV } from "@/app/actions/reports";
+
 
 interface DepartmentBreakdown {
   department: string;
@@ -31,7 +31,11 @@ export function YieldReportView({ data }: { data: YieldReportData }) {
       startDate.setMonth(startDate.getMonth() - 1);
 
       const endDate = new Date();
-      const csv = await exportCompletedOrdersCSV(startDate, endDate);
+      const response = await fetch(`/api/reports/export-csv?startDate=${startDate.toISOString().split('T')[0]}&endDate=${endDate.toISOString().split('T')[0]}`);
+      if (!response.ok) {
+        throw new Error('Failed to download CSV');
+      }
+      const csv = await response.text();
 
       // Create and download the file
       const blob = new Blob([csv], { type: 'text/csv' });

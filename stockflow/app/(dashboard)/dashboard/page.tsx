@@ -1,143 +1,300 @@
-"use client";
+import { requireAuth } from '@/lib/auth'
+import { Role } from '@/lib/auth'
+import { RawMaterial } from '@prisma/client'
+import { TeamRole } from '@/lib/proxy'
 
-import { useState, useEffect } from "react";
-import { Role } from "@/lib/auth";
-import { Sidebar } from "@/components/Sidebar";
-import { Modal } from "@/components/Modal";
+export const dynamic = 'force-dynamic'
 
-interface DashboardData {
-  rawMaterialStock: number;
-  activeOrders: number;
-  finishedGoods: number;
-  scrapThisWeek: number;
-  pendingApprovals: number;
-  recentOrders: any[];
-  departmentScrap: any[];
-  throughput: any[];
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ previewRole?: string }>
+}) {
+  const params = await searchParams;
+  const user = await requireAuth();
+
+  // Use previewRole from URL if present, else user role
+  const effectiveRole = (params.previewRole || user.role).toUpperCase() as Role;
+  const role = effectiveRole.toLowerCase() as TeamRole;
+  return <TeamDashboard role={role} user={user} />;
 }
 
-// Screen components will be implemented below
-function DashboardScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+// Pending Dashboard - Shows pending approval message
+function PendingView({ user }: { user: any }) {
+  return (
+    <div className="space-y-8">
+      <div className="card">
+        <div className="text-center py-12">
+          <div className="mx-auto mb-6 w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-text mb-4">Account Pending Approval</h2>
+          <p className="text-muted mb-6 max-w-md mx-auto">
+            Your account has been created successfully and is waiting for administrator approval.
+            You will receive access to the system once your account is approved.
+          </p>
+          <div className="bg-surface2 border border-border rounded-lg p-4 max-w-sm mx-auto">
+            <div className="text-sm">
+              <div className="font-medium text-text">Welcome, {user.name || user.email}!</div>
+              <div className="text-muted mt-1">Role: Pending Approval</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Mock data for now - in production, fetch from API
-      const mockData: DashboardData = {
-        rawMaterialStock: 4820,
-        activeOrders: 12,
-        finishedGoods: 1340,
-        scrapThisWeek: 82,
-        pendingApprovals: 3,
-        recentOrders: [
-          { id: "PO-0041", design: "Hex bolt M12", kg: 120, status: "PENDING", dept: null },
-          { id: "PO-0040", design: "Stud rod 8mm", kg: 85, status: "IN_PRODUCTION", dept: "Threading" },
-          { id: "PO-0039", design: "Anchor bolt", kg: 200, status: "IN_PRODUCTION", dept: "Electroplate" },
-          { id: "PO-0038", design: "Hex bolt M10", kg: 60, status: "COMPLETED", dept: "Done" },
-        ],
-        departmentScrap: [
-          { dept: "Cutting", kg: 8, pct: 4 },
-          { dept: "Forging", kg: 22, pct: 11 },
-          { dept: "Threading", kg: 5, pct: 2 },
-          { dept: "Electroplating", kg: 31, pct: 15 },
-          { dept: "Drilling", kg: 16, pct: 8 },
-        ],
-        throughput: [
-          { dept: "Cutting", jobs: 3, kg: 340, scrap: 14, yield: 95.9, ops: 2 },
-          { dept: "Forging / chamfer", jobs: 2, kg: 180, scrap: 22, yield: 87.8, ops: 2 },
-          { dept: "Threading / locking", jobs: 4, kg: 210, scrap: 5, yield: 97.6, ops: 3 },
-          { dept: "Electroplating", jobs: 1, kg: 95, scrap: 31, yield: 67.4, ops: 1 },
-          { dept: "Drilling / grinding", jobs: 2, kg: 120, scrap: 10, yield: 91.7, ops: 2 },
-        ]
-      };
-      setData(mockData);
-      setLoading(false);
-    };
-    fetchData();
-  }, []);
+// Operator Dashboard - Shows "My jobs" and "History"
+async function OperatorQueue({ user, role }: { user: any; role: TeamRole }) {
+  // Import the existing operator components
+  const { getOperatorQueue } = await import('@/actions/production')
+  const orders = await getOperatorQueue(role.toUpperCase(), user.department)
 
-  if (loading || !data) {
-    return <div className="card"><p>Loading...</p></div>;
+  const { getOperatorHistory } = await import('@/actions/production')
+  const history = await getOperatorHistory()
+
+  return (
+    <div>
+      <div className="section-header mb-16">
+        <div>
+          <div className="section-title">My Jobs</div>
+          <div className="section-sub">Jobs assigned to your department</div>
+        </div>
+      </div>
+
+      {/* Active Jobs Section */}
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div className="section-title">Active Jobs</div>
+        </div>
+        {orders.length > 0 ? (
+          orders.map((order) => {
+            const isUrgent = order.priority === "URGENT" || order.priority === "HIGH"
+            return (
+              <div key={order.id} className={`job-card ${isUrgent ? 'urgent' : ''}`} style={{marginBottom: '16px'}}>
+                <div className="job-header">
+                  <span className="job-id">{order.orderNumber} · Stage {order.currentStage}/{order.totalStages}</span>
+                  <span className={`badge ${isUrgent ? 'badge-red' : 'badge-amber'}`}>
+                    {isUrgent ? 'Urgent' : 'In progress'}
+                  </span>
+                </div>
+                <div className="job-design">{order.designName} — {order.workDescription}</div>
+                <div className="job-meta" style={{marginTop:'8px', display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--muted)'}}>
+                  <span>Received: <span className="job-kg">{order.inheritedKg.toFixed(2)} kg</span></span>
+                  <span>Target init: {order.targetKg.toFixed(2)} kg</span>
+                </div>
+              </div>
+            )
+          })
+        ) : (
+          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
+            No jobs currently assigned to your department.
+          </div>
+        )}
+      </div>
+
+      {/* History Section */}
+      <div className="card">
+        <div className="section-header mb-16">
+          <div className="section-title">Job History</div>
+          <div className="section-sub">Recently completed jobs</div>
+        </div>
+        {history.length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Design</th>
+                  <th>Completed</th>
+                  <th>Output</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((item: any) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{item.orderNumber}</span>
+                    </td>
+                    <td>{item.designName}</td>
+                    <td>{new Date(item.completedAt).toLocaleDateString()}</td>
+                    <td>
+                      <span className="job-kg">{item.kgOut} kg</span>
+                    </td>
+                    <td>
+                      <span className="badge badge-green">Completed</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
+            No completed jobs yet.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Sales Dashboard - Shows "Catalogue" and "My Orders"
+async function SalesView({ user, role }: { user: any; role: TeamRole }) {
+  // Import sales-specific data
+  const { getCatalogue } = await import('@/actions/sales')
+  const { getSalesOrders } = await import('@/app/actions/sales-orders')
+
+  const products = await getCatalogue()
+  const orders = await getSalesOrders(role.toUpperCase())
+
+  return (
+    <div>
+      <div className="section-header mb-16">
+        <div>
+          <div className="section-title">Sales Dashboard</div>
+          <div className="section-sub">Manage orders and browse catalogue</div>
+        </div>
+        <a href="/catalogue" className="btn btn-primary">Place New Order</a>
+      </div>
+
+      {/* Catalogue Section */}
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div className="section-title">Available Catalogue</div>
+          <div className="section-sub">Products ready for ordering</div>
+        </div>
+        {products.length > 0 ? (
+          <div className="grid-3">
+            {products.map((product: any) => (
+              <div key={product.id} className="product-card">
+                <div className="product-name">{product.name}</div>
+                <div className="product-code">{product.code}</div>
+                <div className="product-stock">
+                  <span className="job-kg">{product.availableQty} units</span> available
+                </div>
+                <div className="product-price">${product.price}/unit</div>
+                <a href="/catalogue" className="btn btn-sm">Order Now</a>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
+            No products available in catalogue.
+          </div>
+        )}
+      </div>
+
+      {/* My Orders Section */}
+      <div className="card">
+        <div className="section-header mb-16">
+          <div className="section-title">My Orders</div>
+          <div className="section-sub">Track your order history</div>
+        </div>
+        {orders.length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Date</th>
+                  <th>Items</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order: any) => (
+                  <tr key={order.id}>
+                    <td>
+                      <span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.orderNumber}</span>
+                    </td>
+                    <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                    <td>{order.itemCount} items</td>
+                    <td>${order.amount.toFixed(2)}</td>
+                    <td>
+                      <span className={`badge ${
+                        order.status === 'PENDING' ? 'badge-amber' :
+                        order.status === 'CONFIRMED' ? 'badge-purple' :
+                        order.status === 'SHIPPED' ? 'badge-blue' : 'badge-green'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
+            No orders placed yet.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Warehouse Dashboard - Shows inventory and receiving
+async function WarehouseView({ user, role }: { user: any; role: TeamRole }) {
+  const { prisma } = await import('@/lib/prisma')
+
+  // Initialize with the specific Prisma type
+  let materials: RawMaterial[] = []
+
+  try {
+    materials = await prisma.rawMaterial.findMany({
+      orderBy: {
+        materialName: "asc",
+      },
+    })
+  } catch (error) {
+    console.warn('Failed to fetch raw materials:', error)
+    materials = []
   }
 
   return (
     <div>
       <div className="section-header mb-16">
         <div>
-          <div className="section-title">Overview</div>
-          <div className="section-sub">Today — Wednesday 25 Mar 2026</div>
+          <div className="section-title">Warehouse Dashboard</div>
+          <div className="section-sub">Manage raw materials and receiving</div>
         </div>
-        <button className="btn btn-primary" onClick={() => { setModalContent('new_order'); setModalOpen(true); }}>+ New production order</button>
+        <button className="btn btn-primary">Receive Stock</button>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card amber">
-          <div className="stat-label">Raw material stock</div>
-          <div className="stat-value">{data.rawMaterialStock.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-          <div className="stat-sub">3 materials · <span>+200 kg today</span></div>
-        </div>
-        <div className="stat-card teal">
-          <div className="stat-label">Active production orders</div>
-          <div className="stat-value">{data.activeOrders}</div>
-          <div className="stat-sub">{data.pendingApprovals} pending approval · <span>{data.activeOrders - data.pendingApprovals} in production</span></div>
-        </div>
-        <div className="stat-card purple">
-          <div className="stat-label">Finished goods ready</div>
-          <div className="stat-value">{data.finishedGoods.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-          <div className="stat-sub"><span>247 units</span> across 6 designs</div>
-        </div>
-        <div className="stat-card red">
-          <div className="stat-label">Scrap this week</div>
-          <div className="stat-value">{data.scrapThisWeek}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-          <div className="stat-sub"><span className="down">↑ 12 kg</span> vs last week</div>
-        </div>
-      </div>
-
-      <div className="grid-2 mb-16">
-        <div className="card">
-          <div className="section-header mb-16"><div className="section-title">Recent production orders</div><button className="btn btn-ghost btn-sm" onClick={() => navigate('orders')}>View all</button></div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Order</th><th>Design</th><th>Kg reserved</th><th>Status</th><th>Dept</th></tr></thead>
-              <tbody>
-                {data.recentOrders.map(order => (
-                  <tr key={order.id}>
-                    <td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.id}</span></td>
-                    <td>{order.design}</td>
-                    <td><span className="job-kg">{order.kg} kg</span></td>
-                    <td><span className={`badge ${order.status === 'PENDING' ? 'badge-amber' : order.status === 'IN_PRODUCTION' ? 'badge-purple' : 'badge-green'}`}>{order.status === 'PENDING' ? 'Pending approval' : order.status === 'IN_PRODUCTION' ? 'In production' : 'Complete'}</span></td>
-                    <td>{order.dept || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="section-header mb-16"><div className="section-title">Scrap by department</div><div style={{fontSize:'11px',color:'var(--muted)'}}>This week</div></div>
-          {data.departmentScrap.map(item => {
-            const cls = item.pct > 10 ? 'bad' : item.pct > 5 ? 'warn' : 'good';
-            return <div key={item.dept} className="scrap-bar-wrap"><div className="scrap-bar-label"><span>{item.dept}</span><span>{item.kg} kg · {item.pct}%</span></div><div className="scrap-bar"><div className={`scrap-bar-fill ${cls}`} style={{width:`${item.pct*4}%`}}></div></div></div>;
-          })}
-        </div>
-      </div>
-
+      {/* Raw Materials Inventory */}
       <div className="card">
-        <div className="section-header mb-16"><div className="section-title">Department throughput — today</div></div>
+        <div className="section-header mb-16">
+          <div className="section-title">Raw Materials Inventory</div>
+          <div className="section-sub">Current stock levels</div>
+        </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Department</th><th>Jobs active</th><th>Kg processed</th><th>Kg scrap</th><th>Yield</th><th>Operators</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Diameter</th>
+                <th>Available</th>
+                <th>Reserved</th>
+                <th>Supplier</th>
+              </tr>
+            </thead>
             <tbody>
-              {data.throughput.map(dept => (
-                <tr key={dept.dept}>
-                  <td>{dept.dept}</td>
-                  <td>{dept.jobs}</td>
-                  <td><span className="job-kg">{dept.kg} kg</span></td>
-                  <td>{dept.scrap} kg</td>
-                  <td><span className={`badge ${dept.yield < 70 ? 'badge-red' : dept.yield < 90 ? 'badge-amber' : 'badge-green'}`}>{dept.yield}%</span></td>
-                  <td>{dept.ops}</td>
+              {materials.map((material: any) => (
+                <tr key={material.id}>
+                  <td>{material.materialName}</td>
+                  <td>{material.diameter}</td>
+                  <td>
+                    <span className="job-kg">{material.availableKg} kg</span>
+                  </td>
+                  <td>{material.reservedKg} kg</td>
+                  <td>{material.supplier || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -145,530 +302,373 @@ function DashboardScreen({ navigate, setModalContent, setModalOpen }: { navigate
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-function DesignsScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
+// Manager Dashboard - Shows production management overview
+async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
+  const data = await import('@/app/actions/dashboard').then(m => m.getDashboardStats(user, role.toUpperCase() as Role))
+  const { stats, recentOrders, departmentScrap, throughput } = data
+
   return (
     <div>
       <div className="section-header mb-16">
-        <div><div className="section-title">Design templates</div><div className="section-sub">Standardised product designs with process stages and dimensions</div></div>
-        <button className="btn btn-primary" onClick={() => { setModalContent('new_design'); setModalOpen(true); }}>+ New design</button>
+        <div>
+          <div className="section-title">Production Management</div>
+          <div className="section-sub">Oversee production orders and department performance</div>
+        </div>
+        <div style={{display: 'flex', gap: '8px'}}>
+          <a href="/manager" className="btn btn-primary">View Approvals</a>
+          <button className="btn btn-ghost">+ New order</button>
+        </div>
       </div>
-      <div className="grid-3 mb-24">
-        {[
-          {name:'Hex bolt M12',code:'HB-M12',stages:['Cut','Forge','Thread','Plate'],dims:'M12 × 60mm',yield:'88%',mat:'Steel rod 16mm'},
-          {name:'Stud rod 8mm',code:'SR-08',stages:['Cut','Thread','Lock'],dims:'8mm × 120mm',yield:'93%',mat:'Steel rod 10mm'},
-          {name:'Anchor bolt',code:'AB-16',stages:['Cut','Forge','Chamfer','Thread','Drill','Plate'],dims:'M16 × 150mm',yield:'82%',mat:'Steel rod 20mm'},
-          {name:'Hex bolt M10',code:'HB-M10',stages:['Cut','Thread','Plate'],dims:'M10 × 50mm',yield:'91%',mat:'Steel rod 14mm'},
-          {name:'Foundation bolt',code:'FB-20',stages:['Cut','Forge','Thread','Lock','Plate'],dims:'M20 × 200mm',yield:'85%',mat:'Steel rod 25mm'},
-          {name:'Machine screw',code:'MS-06',stages:['Cut','Chamfer','Thread','Grind'],dims:'M6 × 30mm',yield:'95%',mat:'Steel rod 8mm'},
-        ].map(d => (
-          <div className="card" style={{cursor:'pointer'}} onClick={() => { setModalContent('view_design'); setModalOpen(true); }}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'10px'}}>
-              <div>
-                <div style={{fontFamily:'var(--font-head)',fontSize:'15px',fontWeight:'700'}}>{d.name}</div>
-                <div style={{fontFamily:'var(--font-mono)',fontSize:'11px',color:'var(--muted)',marginTop:'2px'}}>{d.code}</div>
-              </div>
-              <span className="badge badge-green">{d.yield} yield</span>
+
+      <div className="stats-grid">
+        {stats.map((stat: any, i: number) => (
+          <div key={i} className={`stat-card ${stat.color}`}>
+            <div className="stat-label">{stat.label}</div>
+            <div className="stat-value">
+              {stat.value}{stat.suffix && <span style={{fontSize:'14px',color:'var(--muted)'}}> {stat.suffix}</span>}
             </div>
-            <div style={{fontSize:'11px',color:'var(--muted)',marginBottom:'8px'}}>Material: {d.mat}</div>
-            <div style={{fontSize:'11px',color:'var(--muted)',marginBottom:'10px'}}>Dims: {d.dims}</div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:'4px'}}>
-              {d.stages.map((s,i) => <span style={{background:'rgba(139,124,248,0.12)',color:'var(--purple)',fontSize:'10px',padding:'2px 7px',borderRadius:'10px',fontWeight:'500'}}>{i+1}. {s}</span>)}
-            </div>
+            <div className="stat-sub">{stat.sub}</div>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
 
-function ApprovalsScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Order approvals</div><div className="section-sub">Review specifications and release to production</div></div>
-      </div>
-      {[
-        {id:'PO-0041',design:'Hex bolt M12',qty:'500 units',kg:'120 kg',mat:'Steel rod 16mm · 120 kg reserved',client:'Apex Hardware',specs:'M12 × 60mm, hot-dip galvanised'},
-        {id:'PO-0043',design:'Foundation bolt',qty:'200 units',kg:'240 kg',mat:'Steel rod 25mm · 240 kg reserved',client:'BuildPro Ltd',specs:'M20 × 200mm, zinc plated'},
-        {id:'PO-0044',design:'Machine screw',qty:'1000 units',kg:'45 kg',mat:'Steel rod 8mm · 45 kg reserved',client:'Mech Supplies',specs:'M6 × 30mm, plain'},
-      ].map(o => (
-        <div className="approval-card">
-          <div className="approval-header">
-            <div>
-              <span style={{fontFamily:'var(--font-mono)',fontSize:'11px',color:'var(--muted)'}}>{o.id}</span>
-              <div style={{fontFamily:'var(--font-head)',fontSize:'16px',fontWeight:'700',margin:'4px 0'}}>{o.design}</div>
-              <div style={{fontSize:'12px',color:'var(--muted)'}}>{o.client}</div>
+      <div className="grid-2 mb-16">
+        {recentOrders.length > 0 && (
+          <div className="card">
+            <div className="section-header mb-16">
+              <div className="section-title">Recent production orders</div>
+              <div style={{fontSize:'11px',color:'var(--muted)'}}>Orders requiring attention</div>
             </div>
-            <span className="badge badge-amber">Pending approval</span>
-          </div>
-          <div className="grid-2" style={{gap:'10px',marginBottom:'2px'}}>
-            <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Quantity</div><div style={{fontWeight:'600',marginTop:'3px'}}>{o.qty}</div></div>
-            <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Kg reserved</div><div style={{fontFamily:'var(--font-mono)',fontWeight:'600',marginTop:'3px',color:'var(--accent)'}}>{o.kg}</div></div>
-            <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Material</div><div style={{fontSize:'12px',marginTop:'3px'}}>{o.mat}</div></div>
-            <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Specifications</div><div style={{fontSize:'12px',marginTop:'3px'}}>{o.specs}</div></div>
-          </div>
-          <div className="approval-actions">
-            <button className="btn btn-teal" onClick={() => alert('Order approved — released to Cutting dept')}>Approve & release</button>
-            <button className="btn btn-ghost">Edit specs</button>
-            <button className="btn btn-red btn-sm" style={{marginLeft:'auto'}} onClick={() => alert('Order rejected')}>Reject</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OperatorQueueScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Cutting dept — job queue</div><div className="section-sub">Jobs ready for your department</div></div>
-      </div>
-      <div className="job-card urgent" onClick={() => navigate('operator_log')}>
-        <div className="job-header">
-          <span className="job-id">PO-0040 · Stage 1/3</span>
-          <span className="badge badge-red">Urgent</span>
-        </div>
-        <div className="job-design">Stud rod 8mm — Cut to 120mm</div>
-        <div className="job-meta" style={{marginTop:'8px'}}>
-          <span>Received: <span className="job-kg">85 kg</span></span>
-          <span>Target dims: 8mm × 120mm</span>
-          <span>Client: BuildPro Ltd</span>
-        </div>
-      </div>
-      <div className="job-card inprog" onClick={() => navigate('operator_log')}>
-        <div className="job-header">
-          <span className="job-id">PO-0039 · Stage 1/6</span>
-          <span className="badge badge-amber">In progress</span>
-        </div>
-        <div className="job-design">Anchor bolt — Cut to 170mm</div>
-        <div className="job-meta" style={{marginTop:'8px'}}>
-          <span>Received: <span className="job-kg">200 kg</span></span>
-          <span>Target dims: 16mm × 170mm</span>
-          <span>Client: Apex Hardware</span>
-        </div>
-      </div>
-      <div className="job-card">
-        <div className="job-header">
-          <span className="job-id">PO-0045 · Stage 1/4</span>
-          <span className="badge badge-muted">Queued</span>
-        </div>
-        <div className="job-design">Hex bolt M12 — Cut to 70mm</div>
-        <div className="job-meta" style={{marginTop:'8px'}}>
-          <span>Received: <span className="job-kg">120 kg</span></span>
-          <span>Target dims: 12mm × 70mm</span>
-          <span>Client: Mech Supplies</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function OperatorLogScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  const [kgOut, setKgOut] = useState('');
-  const [kgScrap, setKgScrap] = useState('');
-  const kgIn = 85;
-
-  const total = (parseFloat(kgOut) || 0) + (parseFloat(kgScrap) || 0);
-  const isValid = !kgOut && !kgScrap ? null : Math.abs(total - kgIn) < 0.01;
-
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Log stage output</div><div className="section-sub">PO-0040 · Stud rod 8mm · Cutting stage</div></div>
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('operator_queue')}>← Back to queue</button>
-      </div>
-      <div className="card mb-16">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'14px'}}>
-          <div>
-            <div style={{fontSize:'11px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Job details</div>
-            <div style={{fontFamily:'var(--font-head)',fontSize:'17px',fontWeight:'700',marginTop:'4px'}}>Stud rod 8mm — Cutting</div>
-          </div>
-          <span className="badge badge-amber">In progress</span>
-        </div>
-        <div className="grid-3" style={{gap:'10px',marginBottom:'14px'}}>
-          <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>KG RECEIVED</div><div style={{fontFamily:'var(--font-mono)',fontSize:'18px',color:'var(--accent)',marginTop:'4px'}}>{kgIn} kg</div></div>
-          <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>TARGET DIMS</div><div style={{fontSize:'13px',marginTop:'4px'}}>8mm × 120mm</div></div>
-          <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>NEXT DEPT</div><div style={{fontSize:'13px',marginTop:'4px',color:'var(--purple)'}}>Threading</div></div>
-        </div>
-        <div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'8px'}}>Stage progress</div>
-        <div className="kg-trail">
-          <div className="kg-stage done"><div className="kg-stage-name">Received</div><div className="kg-stage-val">{kgIn} kg</div></div>
-          <div className="kg-arrow">→</div>
-          <div className="kg-stage active"><div className="kg-stage-name">Cutting</div><div className="kg-stage-val">— kg</div></div>
-          <div className="kg-arrow">→</div>
-          <div className="kg-stage"><div className="kg-stage-name">Threading</div><div className="kg-stage-val">—</div></div>
-          <div className="kg-arrow">→</div>
-          <div className="kg-stage"><div className="kg-stage-name">Locking</div><div className="kg-stage-val">—</div></div>
-          <div className="kg-arrow">→</div>
-          <div className="kg-stage"><div className="kg-stage-name">Finished</div><div className="kg-stage-val">—</div></div>
-        </div>
-      </div>
-      <div className="log-form">
-        <div style={{fontSize:'13px',fontWeight:'600',marginBottom:'4px'}}>Record cutting output</div>
-        <div style={{fontSize:'12px',color:'var(--muted)',marginBottom:'14px'}}>Kg in must equal kg passed forward + kg scrap</div>
-        <div className="kg-inputs">
-          <div className="kg-input-group"><label>Kg in (received)</label><input type="number" value={kgIn} readOnly style={{opacity:'0.6'}}/></div>
-          <div className="kg-input-group output"><label>Kg out (to threading)</label><input type="number" value={kgOut} onChange={(e) => setKgOut(e.target.value)} placeholder="0"/></div>
-          <div className="kg-input-group scrap"><label>Kg scrap</label><input type="number" value={kgScrap} onChange={(e) => setKgScrap(e.target.value)} placeholder="0"/></div>
-        </div>
-        <div className={`kg-balance ${isValid === null ? '' : isValid ? 'valid' : 'invalid'}`}>
-          {isValid === null ? 'Enter kg out and scrap to verify balance' : isValid ? `✓ Balanced — ${kgOut} kg forward + ${kgScrap} kg scrap = ${kgIn} kg` : `✗ Mismatch — ${kgOut} + ${kgScrap} = ${total} kg (expected ${kgIn} kg)`}
-        </div>
-        <div style={{marginTop:'14px',display:'flex',gap:'10px'}}>
-          <button className="btn btn-primary" onClick={() => { if (isValid) { alert(`Stage complete!\n\n${kgOut} kg passed to Threading dept\n${kgScrap} kg logged as scrap\n\nThreading dept notified.`); navigate('operator_queue'); } else { alert('Please ensure kg out + kg scrap = ' + kgIn + ' kg before completing the stage.'); } }}>Mark stage complete → send to threading</button>
-          <button className="btn btn-ghost">Save draft</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CatalogueScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Available stock</div><div className="section-sub">Finished goods ready to order</div></div>
-      </div>
-      <div className="product-grid">
-        {[
-          {name:'Hex bolt M12',code:'HB-M12',kg:340,units:120,desc:'M12 × 60mm · Hot-dip galvanised'},
-          {name:'Stud rod 8mm',code:'SR-08',kg:180,units:65,desc:'8mm × 120mm · Plain finish'},
-          {name:'Anchor bolt',code:'AB-16',kg:520,units:62,desc:'M16 × 150mm · Zinc plated'},
-          {name:'Hex bolt M10',code:'HB-M10',kg:95,units:45,desc:'M10 × 50mm · Hot-dip galvanised'},
-          {name:'Foundation bolt',code:'FB-20',kg:205,units:30,desc:'M20 × 200mm · Zinc plated'},
-        ].map(p => (
-          <div className="product-card" onClick={() => { setModalContent('place_order_modal'); setModalOpen(true); }}>
-            <div className="product-name">{p.name}</div>
-            <div className="product-code">{p.code}</div>
-            <div style={{fontSize:'12px',color:'var(--muted)'}}>{p.desc}</div>
-            <div className="product-stock">
-              <div><div className="product-kg">{p.kg} kg</div><div className="product-unit">{p.units} units in stock</div></div>
-              <button className="btn btn-teal btn-sm">Order</button>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Design</th>
+                    <th>Kg target</th>
+                    <th>Status</th>
+                    <th>Department</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.slice(0, 5).map((order: any) => (
+                    <tr key={order.id}>
+                      <td>
+                        <span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.id}</span>
+                      </td>
+                      <td>{order.design}</td>
+                      <td>
+                        <span className="job-kg">{order.kg} kg</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${
+                          order.status === 'Pending approval' ? 'badge-amber' :
+                          order.status === 'In production' ? 'badge-purple' :
+                          'badge-green'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td>{order.dept || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+        )}
 
-function PackQueueScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Packaging queue</div><div className="section-sub">Sale orders awaiting fulfilment</div></div>
-      </div>
-      {[
-        {id:'SO-0091',product:'Hex bolt M12',qty:'50 units · 140 kg',client:'Apex Hardware',priority:'high',date:'Today · 09:14'},
-        {id:'SO-0090',product:'Anchor bolt',qty:'20 units · 167 kg',client:'BuildPro Ltd',priority:'high',date:'Today · 08:51'},
-        {id:'SO-0089',product:'Stud rod 8mm',qty:'30 units · 83 kg',client:'Mech Supplies',priority:'normal',date:'Yesterday · 16:30'},
-        {id:'SO-0088',product:'Hex bolt M10',qty:'45 units · 95 kg',client:'Apex Hardware',priority:'normal',date:'Yesterday · 14:20'},
-        {id:'SO-0087',product:'Foundation bolt',qty:'10 units · 68 kg',client:'KenSteel Ltd',priority:'normal',date:'Yesterday · 11:05'},
-      ].map(o => (
-        <div className="pack-card">
-          <div className="pack-priority" style={{background:o.priority==='high'?'var(--red)':'var(--border2)'}}></div>
-          <div className="pack-info">
-            <div className="pack-order">{o.id} · {o.date}</div>
-            <div className="pack-product">{o.product}</div>
-            <div className="pack-detail">{o.qty} · {o.client}</div>
+        {departmentScrap.length > 0 && (
+          <div className="card">
+            <div className="section-header mb-16">
+              <div className="section-title">Department performance</div>
+              <div style={{fontSize:'11px',color:'var(--muted)'}}>Scrap rates this week</div>
+            </div>
+            {departmentScrap.slice(0, 4).map((item: any) => {
+              const cls = item.pct > 10 ? 'bad' : item.pct > 5 ? 'warn' : 'good'
+              return (
+                <div key={item.dept} className="scrap-bar-wrap">
+                  <div className="scrap-bar-label">
+                    <span>{item.dept}</span>
+                    <span>{item.kg} kg · {item.pct}%</span>
+                  </div>
+                  <div className="scrap-bar">
+                    <div className={`scrap-bar-fill ${cls}`} style={{width:`${Math.min(item.pct*4, 100)}%`}} />
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          <div className="pack-actions">
-            {o.priority==='high'?<span className="badge badge-red">Priority</span>:''}
-            <button className="btn btn-teal btn-sm" onClick={() => alert('Order ' + o.id + ' marked as fulfilled')}>Mark fulfilled</button>
+        )}
+      </div>
+
+      {throughput.length > 0 && (
+        <div className="card">
+          <div className="section-header mb-16">
+            <div className="section-title">Department activity — today</div>
+            <div style={{fontSize:'11px',color:'var(--muted)'}}>Real-time production metrics</div>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Active jobs</th>
+                  <th>Kg processed</th>
+                  <th>Yield rate</th>
+                  <th>Operators</th>
+                </tr>
+              </thead>
+              <tbody>
+                {throughput.map((dept: any) => (
+                  <tr key={dept.dept}>
+                    <td>{dept.dept}</td>
+                    <td>{dept.jobs}</td>
+                    <td>
+                      <span className="job-kg">{dept.kg} kg</span>
+                    </td>
+                    <td>
+                      <span className={`badge ${
+                        dept.yield < 70 ? 'badge-red' :
+                        dept.yield < 90 ? 'badge-amber' : 'badge-green'
+                      }`}>
+                        {dept.yield}%
+                      </span>
+                    </td>
+                    <td>{dept.ops}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      ))}
+      )}
     </div>
-  );
+  )
 }
 
-function RawMaterialsScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Raw materials</div><div className="section-sub">Current stock levels in kg</div></div>
-        <button className="btn btn-primary" onClick={() => navigate('receive')}>+ Receive stock</button>
-      </div>
-      <div className="stats-grid mb-24" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
-        {[
-          {name:'Steel rod 16mm',kg:'1,840',reserved:'960',free:'880',trend:'teal'},
-          {name:'Steel rod 20mm',kg:'1,420',reserved:'640',free:'780',trend:'teal'},
-          {name:'Steel rod 25mm',kg:'1,560',reserved:'1,200',free:'360',trend:'amber'},
-        ].map(m => (
-          <div className={`stat-card ${m.trend}`}>
-            <div className="stat-label">{m.name}</div>
-            <div className="stat-value">{m.kg}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-            <div className="stat-sub"><span>{m.free} kg free</span> · {m.reserved} kg reserved</div>
-          </div>
-        ))}
-      </div>
-      <div className="card">
-        <div className="section-header mb-16"><div className="section-title">Receipt history</div></div>
-        <table>
-          <thead><tr><th>Date</th><th>Material</th><th>Kg received</th><th>Reference</th><th>Logged by</th></tr></thead>
-          <tbody>
-            <tr><td>25 Mar 2026</td><td>Steel rod 16mm</td><td><span className="job-kg">200 kg</span></td><td>GRN-2241</td><td>Warehouse</td></tr>
-            <tr><td>24 Mar 2026</td><td>Steel rod 25mm</td><td><span className="job-kg">500 kg</span></td><td>GRN-2240</td><td>Warehouse</td></tr>
-            <tr><td>23 Mar 2026</td><td>Steel rod 20mm</td><td><span className="job-kg">300 kg</span></td><td>GRN-2239</td><td>Warehouse</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function ReceiveScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Receive raw materials</div><div className="section-sub">Log incoming stock into warehouse</div></div>
-      </div>
-      <div className="card" style={{maxWidth:'560px'}}>
-        <div className="form-row">
-          <div className="form-group"><label className="form-label">Material type</label><select className="form-input"><option>Steel rod 16mm</option><option>Steel rod 20mm</option><option>Steel rod 25mm</option></select></div>
-          <div className="form-group"><label className="form-label">Quantity (kg)</label><input type="number" className="form-input" placeholder="e.g. 200"/></div>
-        </div>
-        <div className="form-row">
-          <div className="form-group"><label className="form-label">GRN / Reference</label><input type="text" className="form-input" placeholder="e.g. GRN-2242"/></div>
-          <div className="form-group"><label className="form-label">Supplier</label><select className="form-input"><option>Steel Masters Ltd</option><option>KenSteel Supply</option></select></div>
-        </div>
-        <div className="form-group mb-16"><label className="form-label">Notes</label><input type="text" className="form-input" placeholder="Optional"/></div>
-        <button className="btn btn-primary" onClick={() => alert('Stock received and logged')}>Confirm receipt</button>
-      </div>
-    </div>
-  );
-}
-
-function FinishedGoodsScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Finished goods</div><div className="section-sub">Stock ready for sale</div></div>
-      </div>
-      <div className="card">
-        <table>
-          <thead><tr><th>Design</th><th>Code</th><th>Units</th><th>Total kg</th><th>Kg/unit</th><th>Production order</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>Hex bolt M12</td><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>HB-M12</span></td><td>120</td><td><span className="job-kg">340 kg</span></td><td>2.83 kg</td><td>PO-0038</td><td><span className="badge badge-teal">Available</span></td></tr>
-            <tr><td>Stud rod 8mm</td><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>SR-08</span></td><td>65</td><td><span className="job-kg">180 kg</span></td><td>2.77 kg</td><td>PO-0036</td><td><span className="badge badge-teal">Available</span></td></tr>
-            <tr><td>Anchor bolt</td><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>AB-16</span></td><td>62</td><td><span className="job-kg">520 kg</span></td><td>8.39 kg</td><td>PO-0035</td><td><span className="badge badge-teal">Available</span></td></tr>
-            <tr><td>Hex bolt M10</td><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>HB-M10</span></td><td>45</td><td><span className="job-kg">95 kg</span></td><td>2.11 kg</td><td>PO-0034</td><td><span className="badge badge-teal">Available</span></td></tr>
-            <tr><td>Foundation bolt</td><td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>FB-20</span></td><td>30</td><td><span className="job-kg">205 kg</span></td><td>6.83 kg</td><td>PO-0033</td><td><span className="badge badge-amber">Partial reserve</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function UsersScreen({ navigate, setModalContent, setModalOpen }: { navigate: (screen: string) => void; setModalContent: (content: string) => void; setModalOpen: (open: boolean) => void }) {
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div><div className="section-title">Users & roles</div><div className="section-sub">Manage team access and department assignments</div></div>
-        <button className="btn btn-primary">+ Invite user</button>
-      </div>
-      <div className="card">
-        <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>James Mwangi</td><td style={{color:'var(--muted)'}}>james@co.ke</td><td><span className="badge badge-amber">Admin</span></td><td>All</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>Sarah Otieno</td><td style={{color:'var(--muted)'}}>sarah@co.ke</td><td><span className="badge badge-amber">Manager</span></td><td>All</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>Peter Njoroge</td><td style={{color:'var(--muted)'}}>peter@co.ke</td><td><span className="badge badge-purple">Operator</span></td><td>Cutting</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>Alice Kamau</td><td style={{color:'var(--muted)'}}>alice@co.ke</td><td><span className="badge badge-purple">Operator</span></td><td>Cutting, Threading</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>David Wekesa</td><td style={{color:'var(--muted)'}}>david@co.ke</td><td><span className="badge badge-purple">Operator</span></td><td>Electroplating</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>Grace Akinyi</td><td style={{color:'var(--muted)'}}>grace@co.ke</td><td><span className="badge badge-teal">Sales</span></td><td>—</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>Tom Ochieng</td><td style={{color:'var(--muted)'}}>tom@co.ke</td><td><span className="badge badge-green">Packaging</span></td><td>—</td><td><span className="badge badge-green">Active</span></td></tr>
-            <tr><td>Faith Muthoni</td><td style={{color:'var(--muted)'}}>faith@co.ke</td><td><span className="badge badge-muted">Warehouse</span></td><td>—</td><td><span className="badge badge-green">Active</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-const screens = {
-  dashboard: DashboardScreen,
-  designs: DesignsScreen,
-  approvals: ApprovalsScreen,
-  operator_queue: OperatorQueueScreen,
-  operator_log: OperatorLogScreen,
-  catalogue: CatalogueScreen,
-  pack_queue: PackQueueScreen,
-  rawmaterials: RawMaterialsScreen,
-  receive: ReceiveScreen,
-  finishedgoods: FinishedGoodsScreen,
-  users: UsersScreen,
-  // Add other screens as needed
+// TeamDashboard component - switches views based on role
+const TeamDashboard = ({ role, user }: { role: TeamRole; user: any }) => {
+  switch (role) {
+    case 'sales':
+      return <SalesView user={user} role={role} />;
+    case 'packaging':
+      return <PackagingView user={user} role={role} />;
+    case 'warehouse':
+      return <WarehouseView user={user} role={role} />;
+    case 'manager':
+      return <ManagerOverview user={user} role={role} />;
+    case 'operator':
+      return <OperatorQueue user={user} role={role} />;
+    case 'admin':
+      return <AdminView user={user} role={role} />;
+    default:
+      return <AdminView user={user} role={role} />;
+  }
 };
 
-export default function DashboardPage() {
-  const [currentRole, setCurrentRole] = useState<Role>('ADMIN');
-  const [currentScreen, setCurrentScreen] = useState('dashboard');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalContent, setModalContent] = useState('');
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-
-  const navigate = (screen: string) => {
-    setCurrentScreen(screen);
-  };
-
-  useEffect(() => {
-    if (currentScreen === 'dashboard' && !dashboardData) {
-      fetchDashboardData();
-    }
-  }, [currentScreen]);
-
-  const fetchDashboardData = async () => {
-    try {
-      // For now, use mock data. In a real implementation, fetch from APIs
-      const mockData = {
-        rawMaterialStock: 4820,
-        activeOrders: 12,
-        finishedGoods: 1340,
-        scrapThisWeek: 82,
-        pendingApprovals: 3,
-        recentOrders: [
-          { id: "PO-0041", design: "Hex bolt M12", kg: 120, status: "PENDING", dept: null },
-          { id: "PO-0040", design: "Stud rod 8mm", kg: 85, status: "IN_PRODUCTION", dept: "Threading" },
-          { id: "PO-0039", design: "Anchor bolt", kg: 200, status: "IN_PRODUCTION", dept: "Electroplate" },
-          { id: "PO-0038", design: "Hex bolt M10", kg: 60, status: "COMPLETED", dept: "Done" },
-        ],
-        departmentScrap: [
-          { dept: "Cutting", kg: 8, pct: 4 },
-          { dept: "Forging", kg: 22, pct: 11 },
-          { dept: "Threading", kg: 5, pct: 2 },
-          { dept: "Electroplating", kg: 31, pct: 15 },
-          { dept: "Drilling", kg: 16, pct: 8 },
-        ],
-        throughput: [
-          { dept: "Cutting", jobs: 3, kg: 340, scrap: 14, yield: 95.9, ops: 2 },
-          { dept: "Forging / chamfer", jobs: 2, kg: 180, scrap: 22, yield: 87.8, ops: 2 },
-          { dept: "Threading / locking", jobs: 4, kg: 210, scrap: 5, yield: 97.6, ops: 3 },
-          { dept: "Electroplating", jobs: 1, kg: 95, scrap: 31, yield: 67.4, ops: 1 },
-          { dept: "Drilling / grinding", jobs: 2, kg: 120, scrap: 10, yield: 91.7, ops: 2 },
-        ]
-      };
-      setDashboardData(mockData);
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
-    }
-  };
-
-  const ScreenComponent = screens[currentScreen] || (() => <div className="card"><p style={{color:'var(--muted)'}}>Screen: {currentScreen}</p></div>);
+// Packaging Dashboard - Shows packaging operations overview
+async function PackagingView({ user, role }: { user: any; role: TeamRole }) {
+  // For now, show basic packaging-focused stats
+  // TODO: Implement proper packaging dashboard data
+  const data = await import('@/app/actions/dashboard').then(m => m.getDashboardStats(user, role.toUpperCase() as Role))
+  const { stats } = data
 
   return (
-    <div className="app">
-      <Sidebar
-        user={{ role: currentRole, name: 'Test User' }}
-        currentRole={currentRole.toLowerCase()}
-        currentScreen={currentScreen}
-        onNavigate={navigate}
-      />
-      <div className="main">
-        <div className="topbar">
-          <span style={{fontSize:'11px', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'1px'}}>Preview role:</span>
-          <div className="topbar-role-switcher">
-            <button className={`role-btn ${currentRole === "ADMIN" ? "active" : ""}`} onClick={() => setCurrentRole("ADMIN")}>Admin</button>
-            <button className={`role-btn ${currentRole === "MANAGER" ? "active" : ""}`} onClick={() => setCurrentRole("MANAGER")}>Manager</button>
-            <button className={`role-btn ${currentRole === "OPERATOR" ? "active" : ""}`} onClick={() => setCurrentRole("OPERATOR")}>Operator</button>
-            <button className={`role-btn ${currentRole === "SALES" ? "active" : ""}`} onClick={() => setCurrentRole("SALES")}>Sales</button>
-            <button className={`role-btn ${currentRole === "PACKAGING" ? "active" : ""}`} onClick={() => setCurrentRole("PACKAGING")}>Packaging</button>
-            <button className={`role-btn ${currentRole === "WAREHOUSE" ? "active" : ""}`} onClick={() => setCurrentRole("WAREHOUSE")}>Warehouse</button>
-          </div>
-          <div className="topbar-right">
-            <div className="notif-dot pulse"></div>
-            <div className="avatar">TU</div>
-          </div>
+    <div>
+      <div className="section-header mb-16">
+        <div>
+          <div className="section-title">Packaging Operations</div>
+          <div className="section-sub">Manage order fulfillment and shipping</div>
         </div>
-        <div className="content">
-          <ScreenComponent navigate={navigate} setModalContent={setModalContent} setModalOpen={setModalOpen} />
+        <div style={{display: 'flex', gap: '8px'}}>
+          <a href="/packaging" className="btn btn-primary">View Packaging Queue</a>
+          <button className="btn btn-ghost">+ New shipment</button>
         </div>
       </div>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
-        {modalContent === 'new_order' && (
-          <div>
-            <div className="modal-title">New production order</div>
-            <div className="modal-sub">Select a design to auto-fill the process stages</div>
-            <div className="form-group mb-16"><label className="form-label">Design template</label><select className="form-input"><option>Hex bolt M12</option><option>Stud rod 8mm</option><option>Anchor bolt</option></select></div>
-            <div className="form-row">
-              <div className="form-group"><label className="form-label">Quantity (units)</label><input className="form-input" type="number" placeholder="e.g. 500"/></div>
-              <div className="form-group"><label className="form-label">Kg to reserve</label><input className="form-input" type="number" placeholder="Auto-calculated"/></div>
+      <div className="stats-grid">
+        {stats.map((stat: any, i: number) => (
+          <div key={i} className={`stat-card ${stat.color}`}>
+            <div className="stat-label">{stat.label}</div>
+            <div className="stat-value">
+              {stat.value}{stat.suffix && <span style={{fontSize:'14px',color:'var(--muted)'}}> {stat.suffix}</span>}
             </div>
-            <div className="form-group mb-16"><label className="form-label">Client / reference</label><input className="form-input" type="text" placeholder="e.g. Apex Hardware"/></div>
-            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'12px',marginBottom:'16px'}}>
-              <div style={{fontSize:'11px',color:'var(--muted)',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'0.5px'}}>Process stages (from design)</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:'4px'}}>
-                {['1. Cut','2. Forge','3. Thread','4. Electroplate'].map(s=><span style={{background:'rgba(139,124,248,0.12)',color:'var(--purple)',fontSize:'11px',padding:'3px 8px',borderRadius:'10px'}}>{s}</span>)}
-              </div>
-            </div>
-            <button className="btn btn-primary" onClick={() => { alert('Order created — sent to manager for approval'); setModalOpen(false); }}>Create order → send for approval</button>
+            <div className="stat-sub">{stat.sub}</div>
           </div>
-        )}
-        {modalContent === 'new_design' && (
-          <div>
-            <div className="modal-title">New design template</div>
-            <div className="modal-sub">Define process stages, dimensions and expected yield</div>
-            <div className="form-row">
-              <div className="form-group"><label className="form-label">Design name</label><input className="form-input" placeholder="e.g. Hex bolt M14"/></div>
-              <div className="form-group"><label className="form-label">Design code</label><input className="form-input" placeholder="e.g. HB-M14"/></div>
-            </div>
-            <div className="form-row">
-              <div className="form-group"><label className="form-label">Raw material</label><select className="form-input"><option>Steel rod 16mm</option><option>Steel rod 20mm</option><option>Steel rod 25mm</option></select></div>
-              <div className="form-group"><label className="form-label">Target dimensions</label><input className="form-input" placeholder="e.g. M14 × 70mm"/></div>
-            </div>
-            <div className="form-group" style={{marginBottom:'10px'}}><label className="form-label">Select process stages (in order)</label></div>
-            <div className="stage-builder" id="stage-builder">
-              {['Cutting','Chamfering','Forging','Skimming','Threading','Locking','Electroplating','Drilling','Grinding'].map((s,i) => (
-                <div className="stage-chip off" key={i} id={`chip-${i}`} onClick={() => toggleChip(i,'${s}')}>
-                  <span className="chip-num" id={`cn-${i}`}>·</span>{s}
-                </div>
-              ))}
-            </div>
-            <div className="form-row" style={{marginTop:'14px'}}>
-              <div className="form-group"><label className="form-label">Expected yield (%)</label><input className="form-input" type="number" placeholder="e.g. 88"/></div>
-              <div className="form-group"><label className="form-label">Kg per finished unit</label><input className="form-input" type="number" placeholder="e.g. 2.83"/></div>
-            </div>
-            <button className="btn btn-primary" style={{marginTop:'6px'}} onClick={() => { alert('Design saved'); setModalOpen(false); }}>Save design</button>
+        ))}
+      </div>
+
+      <div className="grid-2 mb-16">
+        <div className="card">
+          <div className="section-header mb-16">
+            <div className="section-title">Packaging Status</div>
+            <div style={{fontSize:'11px',color:'var(--muted)'}}>Current queue overview</div>
           </div>
-        )}
-        {modalContent === 'view_design' && (
-          <div>
-            <div className="modal-title">Hex bolt M12</div>
-            <div className="modal-sub" style={{fontFamily:'var(--font-mono)'}}>HB-M12 · Steel rod 16mm · M12 × 60mm</div>
-            <div className="grid-2" style={{gap:'10px',marginBottom:'16px'}}>
-              <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>EXPECTED YIELD</div><div style={{fontWeight:'600',color:'var(--teal)',marginTop:'3px'}}>88%</div></div>
-              <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>KG PER UNIT</div><div style={{fontFamily:'var(--font-mono)',marginTop:'3px'}}>2.83 kg</div></div>
-            </div>
-            <div style={{fontSize:'11px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'8px'}}>Process stages</div>
-            {['Cutting — 12mm rod → 70mm length','Forging — head formation','Threading — M12 thread cut','Electroplating — hot-dip galvanise'].map((s,i)=>(
-              <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'var(--surface2)',borderRadius:'var(--radius-sm)',marginBottom:'6px'}}>
-                <span style={{width:'20px',height:'20px',borderRadius:'50%',background:'rgba(139,124,248,0.2)',color:'var(--purple)',fontSize:'10px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center'}}>{i+1}</span>
-                <span style={{fontSize:'13px'}}>{s}</span>
-                <span className="badge badge-purple" style={{marginLeft:'auto'}}>{['Cutting','Forging','Threading','Electroplating'][i]} dept</span>
-              </div>
-            ))}
-            <button className="btn btn-ghost" style={{marginTop:'10px'}} onClick={() => setModalOpen(false)}>Close</button>
+          <div style={{padding: '20px', textAlign: 'center', color: 'var(--muted)'}}>
+            Packaging queue and shipment tracking will be displayed here.
+            <br />
+            <a href="/packaging" className="btn btn-primary" style={{marginTop: '16px', display: 'inline-block'}}>
+              Go to Packaging Queue
+            </a>
           </div>
-        )}
-        {modalContent === 'place_order_modal' && (
-          <div>
-            <div className="modal-title">Place sale order</div>
-            <div className="modal-sub">Hex bolt M12 — 120 units / 340 kg available</div>
-            <div className="form-row">
-              <div className="form-group"><label className="form-label">Quantity (units)</label><input className="form-input" type="number" placeholder="max 120"/></div>
-              <div className="form-group"><label className="form-label">Client</label><input className="form-input" placeholder="Client name"/></div>
-            </div>
-            <div className="form-group mb-16"><label className="form-label">Notes</label><input className="form-input" placeholder="Optional delivery notes"/></div>
-            <button className="btn btn-teal" onClick={() => { alert('Order placed — sent to packaging queue'); setModalOpen(false); }}>Place order → packaging</button>
+        </div>
+
+        <div className="card">
+          <div className="section-header mb-16">
+            <div className="section-title">Recent Shipments</div>
+            <div style={{fontSize:'11px',color:'var(--muted)'}}>Orders marked as shipped</div>
           </div>
-        )}
-      </Modal>
+          <div style={{padding: '20px', textAlign: 'center', color: 'var(--muted)'}}>
+            Recent shipment history will be displayed here.
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
+}
+
+// Admin Dashboard - Shows the full overview
+async function AdminView({ user, role }: { user: any; role: TeamRole }) {
+  const data = await import('@/app/actions/dashboard').then(m => m.getDashboardStats(user, role.toUpperCase() as Role))
+  const { stats, recentOrders, departmentScrap, throughput } = data
+
+  return (
+    <div>
+      <div className="section-header mb-16">
+        <div>
+          <div className="section-title">Management Overview</div>
+          <div className="section-sub">Full production and inventory insights</div>
+        </div>
+        <button className="btn btn-primary">+ New production order</button>
+      </div>
+
+      <div className="stats-grid">
+        {stats.map((stat: any, i: number) => (
+          <div key={i} className={`stat-card ${stat.color}`}>
+            <div className="stat-label">{stat.label}</div>
+            <div className="stat-value">
+              {stat.value}{stat.suffix && <span style={{fontSize:'14px',color:'var(--muted)'}}> {stat.suffix}</span>}
+            </div>
+            <div className="stat-sub">{stat.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid-2 mb-16">
+        {recentOrders.length > 0 && (
+          <div className="card">
+            <div className="section-header mb-16">
+              <div className="section-title">Recent production orders</div>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Design</th>
+                    <th>Kg reserved</th>
+                    <th>Status</th>
+                    <th>Dept</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.map((order: any) => (
+                    <tr key={order.id}>
+                      <td>
+                        <span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.id}</span>
+                      </td>
+                      <td>{order.design}</td>
+                      <td>
+                        <span className="job-kg">{order.kg} kg</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${
+                          order.status === 'Pending approval' ? 'badge-amber' :
+                          order.status === 'In production' ? 'badge-purple' :
+                          'badge-green'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td>{order.dept || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {departmentScrap.length > 0 && (
+          <div className="card">
+            <div className="section-header mb-16">
+              <div className="section-title">Scrap by department</div>
+              <div style={{fontSize:'11px',color:'var(--muted)'}}>This week</div>
+            </div>
+            {departmentScrap.map((item: any) => {
+              const cls = item.pct > 10 ? 'bad' : item.pct > 5 ? 'warn' : 'good'
+              return (
+                <div key={item.dept} className="scrap-bar-wrap">
+                  <div className="scrap-bar-label">
+                    <span>{item.dept}</span>
+                    <span>{item.kg} kg · {item.pct}%</span>
+                  </div>
+                  <div className="scrap-bar">
+                    <div className={`scrap-bar-fill ${cls}`} style={{width:`${item.pct*4}%`}} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {throughput.length > 0 && (
+        <div className="card">
+          <div className="section-header mb-16">
+            <div className="section-title">Department throughput — today</div>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Jobs active</th>
+                  <th>Kg processed</th>
+                  <th>Kg scrap</th>
+                  <th>Yield</th>
+                  <th>Operators</th>
+                </tr>
+              </thead>
+              <tbody>
+                {throughput.map((dept: any) => (
+                  <tr key={dept.dept}>
+                    <td>{dept.dept}</td>
+                    <td>{dept.jobs}</td>
+                    <td>
+                      <span className="job-kg">{dept.kg} kg</span>
+                    </td>
+                    <td>{dept.scrap} kg</td>
+                    <td>
+                      <span className={`badge ${
+                        dept.yield < 70 ? 'badge-red' :
+                        dept.yield < 90 ? 'badge-amber' : 'badge-green'
+                      }`}>
+                        {dept.yield}%
+                      </span>
+                    </td>
+                    <td>{dept.ops}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

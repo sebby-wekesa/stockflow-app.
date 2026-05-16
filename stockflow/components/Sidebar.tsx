@@ -1,90 +1,113 @@
-import { Role } from "@/lib/auth";
+"use client";
 
-const roleColors: Record<string, string> = {
-  admin: "var(--accent)",
-  manager: "var(--accent)",
-  operator: "var(--purple)",
-  sales: "var(--teal)",
-  packaging: "var(--green)",
-  warehouse: "var(--muted)",
-};
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { UserRole as Role } from "@/lib/types";
+import type { UserRole } from "@/lib/types";
+import { ROLE_NAMES, ROLE_COLORS } from "@/lib/types";
+import { signOut } from "@/actions/auth";
 
-const roleNames: Record<string, string> = {
-  admin: "Admin / Owner",
-  manager: "Production Manager",
-  operator: "Operator — Cutting",
-  sales: "Sales Team",
-  packaging: "Packaging Team",
-  warehouse: "Warehouse Team",
-};
+// Generate role-specific navigation items
+function getRoleNavItems(role: UserRole): any[] {
+  // Common navigation for all roles
+  const commonItems = [
+    { section: "Account" },
+    { label: "Profile", href: "/profile" },
+    { label: "Settings", href: "/settings" },
+  ];
 
-const roleNavItems: Record<string, any[]> = {
-  admin: [
-    { section: "Overview" },
-    { id: 'dashboard', label: 'Dashboard' },
-    { section: "Production" },
-    { id: 'designs', label: 'Design templates' },
-    { id: 'orders', label: 'Production orders', badge: "4" },
-    { id: 'departments', label: 'Departments' },
-    { section: "Inventory" },
-    { id: 'rawmaterials', label: 'Raw materials' },
-    { id: 'finishedgoods', label: 'Finished goods' },
-    { section: "Sales" },
-    { id: 'sales', label: 'Sales orders', badge: "2" },
-    { id: 'packaging', label: 'Packaging queue' },
-    { section: "Settings" },
-    { id: 'users', label: 'Users & roles' },
-  ],
-  manager: [
-    { section: "Overview" },
-    { id: 'manager_dash', label: 'Dashboard' },
-    { section: "Approvals" },
-    { id: 'approvals', label: 'Order approvals', badge: "3", badgeColor: "red" },
-    { section: "Production" },
-    { id: 'orders', label: 'All orders' },
-    { id: 'departments', label: 'Dept queues' },
-    { section: "Reports" },
-    { id: 'scrap', label: 'Scrap report' },
-    { id: 'rawmaterials', label: 'Raw materials' },
-  ],
-  operator: [
-    { section: "My Work" },
-    { id: 'operator_queue', label: 'Job queue', badge: "3", badgeColor: "purple" },
-    { id: 'operator_log', label: 'Log output' },
-    { section: "History" },
-    { id: 'operator_history', label: 'Completed jobs' },
-  ],
-  sales: [
-    { section: "Catalogue" },
-    { id: 'catalogue', label: 'Available stock' },
-    { id: 'place_order', label: 'Place order' },
-    { section: "My Orders" },
-    { id: 'my_orders', label: 'Order history' },
-  ],
-  packaging: [
-    { section: "Fulfilment" },
-    { id: 'pack_queue', label: 'Pending orders', badge: "5", badgeColor: "purple" },
-    { id: 'pack_done', label: 'Fulfilled today' },
-  ],
-  warehouse: [
-    { section: "Receiving" },
-    { id: 'receive', label: 'Receive stock' },
-    { id: 'rawmaterials', label: 'Stock levels' },
-  ],
-};
+  // Role-specific navigation
+  switch (role) {
+    case 'PENDING':
+      return [
+        { section: "Account Setup" },
+        { label: "Complete profile", href: "/profile" },
+      ];
 
-interface SidebarProps {
-  user?: { role: string; name: string };
-  currentRole: string;
-  currentScreen: string;
-  onNavigate: (screen: string) => void;
+    case 'ADMIN':
+      return [
+        { section: "Overview" },
+        { label: "Dashboard", href: "/dashboard" },
+        { section: "Production" },
+        { label: "Job cards", href: "/jobs" },
+        { label: "Raw materials", href: "/rawmaterials" },
+        { section: "Inventory" },
+        { label: "Stock overview", href: "/stock" },
+        { label: "Products", href: "/products" },
+        { section: "Sales" },
+        { label: "Sales orders", href: "/sales" },
+        { label: "Customers", href: "/customers" },
+        { section: "Data" },
+        { label: "Import centre", href: "/import" },
+        { label: "Reports", href: "/reports" },
+        { section: "Settings" },
+        { label: "Users", href: "/users" },
+      ];
+
+    case 'MANAGER':
+      return [
+        { section: "Overview" },
+        { label: "Dashboard", href: "/dashboard" },
+        { section: "Production" },
+        { label: "Job cards", href: "/jobs" },
+        { label: "Raw materials", href: "/rawmaterials" },
+        { section: "Inventory" },
+        { label: "Stock overview", href: "/stock" },
+        { section: "Sales" },
+        { label: "New order", href: "/sales/new" },
+        { label: "Sales orders", href: "/sales" },
+        { section: "Reports" },
+        { label: "Reports", href: "/reports" },
+      ];
+
+    case 'OPERATOR':
+      return [
+        { section: "My Work" },
+        { label: "Job queue", href: "/operator_queue", badge: "3", badgeColor: "purple" },
+        { label: "Log output", href: "/operator_log" },
+        { section: "History" },
+        { label: "Completed jobs", href: "/operator_history" },
+      ];
+
+    case 'SALES':
+      return [
+        { section: "Sales" },
+        { label: "New order", href: "/sales/new" },
+        { label: "Order history", href: "/sales" },
+        { section: "Catalogue" },
+        { label: "Available stock", href: "/catalogue" },
+      ];
+
+    case 'PACKAGING':
+      return [
+        { section: "Fulfilment" },
+        { label: "Pending orders", href: "/packaging", badge: "5", badgeColor: "purple" },
+        { label: "Fulfilled today", href: "/pack_done" },
+      ];
+
+    case 'WAREHOUSE':
+      return [
+        { section: "Overview" },
+        { label: "Dashboard", href: "/dashboard" },
+        { section: "Production" },
+        { label: "Job cards", href: "/jobs" },
+        { section: "Raw Materials" },
+        { label: "Raw materials", href: "/rawmaterials" },
+        { label: "Receive stock", href: "/receive" },
+        { section: "Inventory" },
+        { label: "Stock overview", href: "/stock" },
+      ];
+
+    default:
+      return commonItems;
+  }
 }
 
-export function Sidebar({ user, currentRole, currentScreen, onNavigate }: SidebarProps) {
-  const navItems = roleNavItems[currentRole];
-  const roleColor = roleColors[currentRole];
-  const roleName = roleNames[currentRole];
-  const userName = user?.name || 'User';
+export function Sidebar({ role }: { role: UserRole }) {
+  const pathname = usePathname();
+  const navItems = getRoleNavItems(role);
+  const roleColor = ROLE_COLORS[role];
+  const roleNameDisplay = ROLE_NAMES[role];
 
   return (
     <div className="sidebar">
@@ -95,7 +118,7 @@ export function Sidebar({ user, currentRole, currentScreen, onNavigate }: Sideba
       <div className="role-badge">
         <div className="role-label">Signed in as</div>
         <div className="role-name" style={{ color: roleColor }}>
-          {roleName}
+          {roleNameDisplay}
         </div>
       </div>
       <nav className="nav">
@@ -108,22 +131,34 @@ export function Sidebar({ user, currentRole, currentScreen, onNavigate }: Sideba
             );
           }
 
-          const isActive = currentScreen === item.id;
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const bc = item.badgeColor ? ` ${item.badgeColor}` : "";
           const badge = item.badge ? <span className={`nav-badge${bc}`}>{item.badge}</span> : null;
 
           return (
-            <div
-              key={item.id}
+            <Link
+              key={item.href}
+              href={item.href!}
               className={`nav-item ${isActive ? "active" : ""}`}
-              onClick={() => onNavigate(item.id)}
             >
               <span className="nav-dot"></span>
               {item.label}
               {badge}
-            </div>
+            </Link>
           );
         })}
+        
+        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+          <form action={signOut} style={{ display: 'block', width: '100%' }}>
+            <button
+              type="submit"
+              className="bg-[#f0c040] hover:bg-[#f5d060] text-black"
+              style={{ width: '100%', padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginTop: '20px' }}
+            >
+              Log out
+            </button>
+          </form>
+        </div>
       </nav>
     </div>
   );
@@ -131,6 +166,7 @@ export function Sidebar({ user, currentRole, currentScreen, onNavigate }: Sideba
 
 export function RoleBadge({ role }: { role: Role }) {
   const colors: Record<Role, string> = {
+    PENDING: "badge-muted",
     ADMIN: "badge-amber",
     MANAGER: "badge-amber",
     OPERATOR: "badge-purple",

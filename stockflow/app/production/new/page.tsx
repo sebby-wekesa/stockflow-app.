@@ -1,25 +1,27 @@
+export const dynamic = 'force-dynamic';
+
 import { prisma } from '@/lib/prisma'
 import { CreateOrderForm } from '@/components/OrderForm'
 import { AlertCircle } from 'lucide-react'
-
-interface Design {
-  id: string
-  name: string
-  targetWeight: number | null
-}
+import { Design } from '@/types'
 
 async function getDesigns(): Promise<Design[]> {
   try {
-    const designs = await prisma.design.findMany({
-      select: {
-        id: true,
-        name: true,
-        targetWeight: true,
-      },
+    const rawDesigns = await prisma.design.findMany({
       orderBy: {
         name: 'asc',
       },
-    })
+    });
+
+    // Shape the designs array to satisfy the 'Design' interface
+    const designs: Design[] = rawDesigns.map((d: any) => ({
+      ...d,
+      code: d.code || "TEMP-CODE", // Fallback for missing code
+      targetWeight: d.targetWeight ? Number(d.targetWeight) : 0, // Ensure it's a number
+      kgPerUnit: d.targetWeight ? Number(d.targetWeight) : 0,
+      createdAt: d.createdAt || new Date(),
+      updatedAt: d.updatedAt || new Date(),
+    }));
 
     return designs
   } catch (error) {

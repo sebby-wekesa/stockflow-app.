@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function exportYieldToCSV() {
   const orders = await prisma.productionOrder.findMany({
     include: {
-      design: true,
+      Design: true,
       logs: true,
     },
     orderBy: { createdAt: 'desc' }
@@ -15,9 +15,9 @@ export async function exportYieldToCSV() {
   const headers = ["Order ID", "Design", "Input (kg)", "Output (kg)", "Scrap (kg)", "Yield %", "Date"];
 
   const rows = orders.map(order => {
-    const totalIn = order.logs.reduce((sum, l) => sum + l.kgIn, 0);
-    const totalOut = order.logs.reduce((sum, l) => sum + l.kgOut, 0);
-    const totalScrap = order.logs.reduce((sum, l) => sum + l.kgScrap, 0);
+    const totalIn = order.logs.reduce((sum, l) => sum + l.kgIn.toNumber(), 0);
+    const totalOut = order.logs.reduce((sum, l) => sum + l.kgOut.toNumber(), 0);
+    const totalScrap = order.logs.reduce((sum, l) => sum + l.kgScrap.toNumber(), 0);
     const yieldPerc = totalIn > 0 ? ((totalOut / totalIn) * 100).toFixed(2) : 0;
 
     return [

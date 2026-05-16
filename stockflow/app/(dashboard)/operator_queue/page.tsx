@@ -1,44 +1,52 @@
-export default function OperatorQueuePage() {
+import { getOperatorQueue } from "@/app/actions/production";
+import Link from "next/link";
+
+export const dynamic = 'force-dynamic';
+
+export default async function OperatorQueuePage() {
+  const orders = await getOperatorQueue();
+
   return (
     <div>
       <div className="section-header mb-16">
-        <div><div className="section-title">Cutting dept — job queue</div><div className="section-sub">Jobs ready for your department</div></div>
-      </div>
-      <div className="job-card urgent" onClick={() => alert('Navigate to log')}>
-        <div className="job-header">
-          <span className="job-id">PO-0040 · Stage 1/3</span>
-          <span className="badge badge-red">Urgent</span>
-        </div>
-        <div className="job-design">Stud rod 8mm — Cut to 120mm</div>
-        <div className="job-meta" style={{marginTop:'8px'}}>
-          <span>Received: <span className="job-kg">85 kg</span></span>
-          <span>Target dims: 8mm × 120mm</span>
-          <span>Client: BuildPro Ltd</span>
+        <div>
+          <div className="section-title">Department — job queue</div>
+          <div className="section-sub">Jobs ready for your station</div>
         </div>
       </div>
-      <div className="job-card inprog" onClick={() => alert('Navigate to log')}>
-        <div className="job-header">
-          <span className="job-id">PO-0039 · Stage 1/6</span>
-          <span className="badge badge-amber">In progress</span>
+
+      <div className="card">
+        <div className="section-header mb-16">
+          <div className="section-title">Active Jobs</div>
+          <div className="section-sub">Jobs assigned to your department</div>
         </div>
-        <div className="job-design">Anchor bolt — Cut to 170mm</div>
-        <div className="job-meta" style={{marginTop:'8px'}}>
-          <span>Received: <span className="job-kg">200 kg</span></span>
-          <span>Target dims: 16mm × 170mm</span>
-          <span>Client: Apex Hardware</span>
-        </div>
-      </div>
-      <div className="job-card">
-        <div className="job-header">
-          <span className="job-id">PO-0045 · Stage 1/4</span>
-          <span className="badge badge-muted">Queued</span>
-        </div>
-        <div className="job-design">Hex bolt M12 — Cut to 70mm</div>
-        <div className="job-meta" style={{marginTop:'8px'}}>
-          <span>Received: <span className="job-kg">120 kg</span></span>
-          <span>Target dims: 12mm × 70mm</span>
-          <span>Client: Mech Supplies</span>
-        </div>
+
+        {orders.map((order) => {
+          const isUrgent = order.priority === "URGENT" || order.priority === "HIGH";
+          return (
+            <Link key={order.id} href={`/operator_log?orderId=${order.id}`} style={{textDecoration: 'none', color: 'inherit'}}>
+              <div className={`job-card ${isUrgent ? 'urgent' : ''}`} style={{cursor:'pointer', marginBottom: '16px'}}>
+                <div className="job-header">
+                  <span className="job-id">{order.orderNumber} · Stage {order.currentStage}/{order.totalStages}</span>
+                  <span className={`badge ${isUrgent ? 'badge-red' : 'badge-amber'}`}>
+                    {isUrgent ? 'Urgent' : 'In progress'}
+                  </span>
+                </div>
+                <div className="job-design">{order.designName} — {order.workDescription}</div>
+                <div className="job-meta" style={{marginTop:'8px', display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--muted)'}}>
+                  <span>Received: <span className="job-kg">{order.inheritedKg.toFixed(2)} kg</span></span>
+                  <span>Target init: {order.targetKg.toFixed(2)} kg</span>
+                </div>
+              </div>
+            </Link>
+          )
+        })}
+
+        {orders.length === 0 && (
+          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
+            No jobs currently assigned to your department queue.
+          </div>
+        )}
       </div>
     </div>
   );
