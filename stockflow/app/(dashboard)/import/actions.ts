@@ -86,21 +86,25 @@ export async function uploadSpecialized(formData: FormData) {
         throw new Error('Pick the branch this file belongs to')
       }
       const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
-      const inOutSheets = wb.SheetNames.filter((n) =>
-        n.toUpperCase().includes('IN-OUT')
-      )
+      // Try all sheets (not just those with "IN-OUT" in the name)
       const merged: ParsedStockRow[] = []
-      for (const name of inOutSheets) {
+      const sheetsTried: string[] = []
+      for (const name of wb.SheetNames) {
         try {
           const rows = parseConsumablesStock(buffer, name, branchOverride)
-          merged.push(...rows)
+          if (rows.length > 0) {
+            merged.push(...rows)
+            sheetsTried.push(`${name} (${rows.length} rows)`)
+          }
         } catch {
           // Skip sheets we can't parse — they may have a different layout
         }
       }
       parsedCount = merged.length
       parsedPreview = merged.slice(0, 10)
-      sourceLabel = `Consumables stock — ${inOutSheets.length} sheets parsed`
+      sourceLabel = `Consumables stock — ${sheetsTried.length} sheets parsed${
+        sheetsTried.length > 0 ? ': ' + sheetsTried.join(', ') : ''
+      }`
     } else {
       throw new Error(`Unknown sheet type: ${sheetType}`)
     }

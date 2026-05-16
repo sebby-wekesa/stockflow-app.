@@ -670,3 +670,50 @@ enum StockStatus {
   REORDER_NEEDED
   @@schema("public")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED IMPORT TABLES (for new global parser)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ProductMaster {
+  name            String
+  location        String
+  category        String
+  opening_stock   Decimal @db.Decimal(12, 2) @default(0)
+  current_stock   Decimal @db.Decimal(12, 2) @default(0)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@id([name, location])
+  @@index([location])
+  @@schema("public")
+}
+
+model SalesTransaction {
+  id               String    @id @default(uuid())
+  product_name     String
+  quantity         Decimal   @db.Decimal(12, 2)
+  transaction_date DateTime
+  invoice_number   String?
+  customer_name    String?
+  location         String
+  created_at       DateTime  @default(now())
+
+  @@index([location])
+  @@index([transaction_date])
+  @@schema("public")
+}
+
+model StockReceipt {
+  id               String    @id @default(uuid())
+  product_name     String
+  quantity         Decimal   @db.Decimal(12, 2)
+  transaction_date DateTime
+  reference_memo   String?
+  location         String
+  created_at       DateTime  @default(now())
+
+  @@index([location])
+  @@index([transaction_date])
+  @@schema("public")
+}

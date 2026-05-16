@@ -422,83 +422,19 @@ export function parseConsumablesStock(
   sheetName: string,
   branch: BranchCode
 ): ParsedStockRow[] {
-  const { rows, wb } = readSheetAsRows(buffer, sheetName)
+  const { rows } = readSheetAsRows(buffer, sheetName)
   const out: ParsedStockRow[] = []
 
-  // Find header row by looking for duplicate "PRODUCT DESCRIPTION" + "QTY"
-  let headerRowIndex = -1
-  let colInItem = -1, colInQty = -1
-  let colOutItem = -1, colOutQty = -1
-
-  for (let i = 0; i < rows.length; i++) {
-    const rowNorm = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
-
-    if (rowNorm.includes('PRODUCT DESCRIPTION') && rowNorm.includes('QTY')) {
-      headerRowIndex = i
-
-      // Map columns by position (first occurrence = IN, second = OUT)
-      rowNorm.forEach((cell, idx) => {
-        if (cell === 'PRODUCT DESCRIPTION') {
-          if (colInItem === -1) colInItem = idx
-          else if (colOutItem === -1) colOutItem = idx
-        }
-        if (cell === 'QTY') {
-          if (colInQty === -1) colInQty = idx
-          else if (colOutQty === -1) colOutQty = idx
-        }
-      })
-      break
-    }
-  }
-
-  if (headerRowIndex === -1 || colInItem === -1 || colOutItem === -1) {
-    // Fallback: try old fixed layout (row 5, cols 0-3)
-    for (let i = 4; i < rows.length; i++) {
-      const row = rows[i]
-      const inProduct = toStr(getCell(row, 0))
-      const inQty = toNumber(getCell(row, 1))
-      if (inProduct && inQty && inQty > 0) {
-        out.push({
-          source_row: i + 1,
-          movement_date: null,
-          raw_product_name: inProduct,
-          branch,
-          qty: inQty,
-          direction: 'in',
-          reference: `${sheetName} import`,
-          notes: `Stock in from ${sheetName}`,
-        })
-      }
-      const outProduct = toStr(getCell(row, 2))
-      const outQty = toNumber(getCell(row, 3))
-      if (outProduct && outQty && outQty > 0) {
-        out.push({
-          source_row: i + 1,
-          movement_date: null,
-          raw_product_name: outProduct,
-          branch,
-          qty: outQty,
-          direction: 'out',
-          reference: `${sheetName} import`,
-          notes: `Stock out from ${sheetName}`,
-        })
-      }
-    }
-    return out
-  }
-
-  // Main parsing using detected columns
-  for (let i = headerRowIndex + 1; i < rows.length; i++) {
+  for (let i = 4; i < rows.length; i++) {
     const row = rows[i]
-    if (!row || row.length === 0) continue
 
-    const inItem = toStr(row[colInItem])
-    const inQty = toNumber(row[colInQty])
-    if (inItem && inQty && inQty > 0) {
+    const inProduct = toStr(getCell(row, 0))
+    const inQty = toNumber(getCell(row, 1))
+    if (inProduct && inQty && inQty > 0) {
       out.push({
         source_row: i + 1,
         movement_date: null,
-        raw_product_name: inItem,
+        raw_product_name: inProduct,
         branch,
         qty: inQty,
         direction: 'in',
@@ -507,13 +443,13 @@ export function parseConsumablesStock(
       })
     }
 
-    const outItem = toStr(row[colOutItem])
-    const outQty = toNumber(row[colOutQty])
-    if (outItem && outQty && outQty > 0) {
+    const outProduct = toStr(getCell(row, 2))
+    const outQty = toNumber(getCell(row, 3))
+    if (outProduct && outQty && outQty > 0) {
       out.push({
         source_row: i + 1,
         movement_date: null,
-        raw_product_name: outItem,
+        raw_product_name: outProduct,
         branch,
         qty: outQty,
         direction: 'out',
@@ -524,4 +460,135 @@ export function parseConsumablesStock(
   }
 
   return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED WORKBOOK PARSER (Enhanced Global Parser)
+// Handles manufacturing data matrices + consumables + auto parts + sales
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ProductPayload {
+  name: string
+  uom: string
+  opening_stock: number
+  current_stock: number
+  location: 'Mombasa' | 'Nairobi'
+  category: 'Consumables' | 'Trailer Parts' | 'Brake Linings' | 'Springs' | 'Raw Material'
+}
+
+export interface SaleTransactionPayload {
+  product_name: string
+  quantity: number
+  transaction_date: string
+  invoice_number: string | null
+  customer_name: string | null
+  location: 'Mombasa' | 'Nairobi'
+}
+
+export interface StockInPayload {
+  product_name: string
+  quantity: number
+  transaction_date: string
+  reference_memo: string | null
+  location: 'Mombasa' | 'Nairobi'
+}
+
+export interface ParsedWorkbookResult {
+  products: ProductPayload[]
+  sales: SaleTransactionPayload[]
+  purchases: StockInPayload[]
+}
+
+export function parseAllWorkbooksUnified(
+  workbook: XLSX.WorkBook,
+  location: 'Mombasa' | 'Nairobi'
+): ParsedWorkbookResult {
+  const result: ParsedWorkbookResult = { products: [], sales: [], purchases: [] }
+
+  for (const sheetName of workbook.SheetNames) {
+    const upperName = sheetName.toUpperCase()
+    const sheet = workbook.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: null })
+
+    let category: ProductPayload['category'] = 'Trailer Parts'
+    if (upperName.includes('CONSUMABLE')) category = 'Consumables'
+    else if (upperName.includes('BRAKE')) category = 'Brake Linings'
+    else if (upperName.includes('SPRING') || upperName.includes('FINISHED')) category = 'Springs'
+    else if (upperName.includes('RAW') || upperName.includes('BAR')) category = 'Raw Material'
+
+    let headerRowIndex = -1
+    const map = {
+      inDate: -1, inItem: -1, inQty: -1,
+      outDate: -1, outItem: -1, outQty: -1,
+      balItem: -1, balOpStock: -1, balCurrentStock: -1, balUom: -1
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      if (!rows[i]) continue
+      const rowNorm = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
+
+      if ((rowNorm.includes('PRODUCT DESCRIPTION') || rowNorm.includes('PRODUCT DESCRIPTION3')) &&
+          (rowNorm.includes('QTY') || rowNorm.includes('BALANCE STOCK') || rowNorm.includes('B. STOCK'))) {
+        headerRowIndex = i
+        rowNorm.forEach((cell: string, idx: number) => {
+          if (cell === 'DATE' && map.inDate === -1) map.inDate = idx
+          if ((cell === 'PRODUCT DESCRIPTION' || cell === 'PRODUCT DESCRIPTION2') && map.inItem === -1) map.inItem = idx
+          if ((cell === 'QTY' || cell === 'QUANTITY') && map.inQty === -1) map.inQty = idx
+
+          if (cell === 'DATE' && map.inDate !== -1 && idx > map.inDate) map.outDate = idx
+          if ((cell === 'PRODUCT DESCRIPTION' || cell === 'PRODUCT DESCRIPTION2') && map.inItem !== -1 && idx > map.inItem) map.outItem = idx
+          if ((cell === 'QTY' || cell === 'QTY2' || cell === 'QUANTITY2') && map.inQty !== -1 && idx > map.inQty) map.outQty = idx
+
+          if ((cell === 'PRODUCT DESCRIPTION' || cell === 'PRODUCT DESCRIPTION3') && idx > map.outItem) map.balItem = idx
+          if (cell === 'OP. STOCK' || cell === 'OPENING STOCK' || cell === 'OP STOCK') map.balOpStock = idx
+          if (cell === 'BALANCE STOCK' || cell === 'CURRENT BALANCE' || cell === 'B. STOCK') map.balCurrentStock = idx
+          if (cell === 'UOM' || cell === 'U/M') map.balUom = idx
+        })
+        break
+      }
+    }
+
+    if (headerRowIndex !== -1) {
+      for (let i = headerRowIndex + 1; i < rows.length; i++) {
+        const row = rows[i]
+        if (!row || row.length === 0) continue
+
+        if (row[map.inItem] && String(row[map.inItem]).trim() !== '') {
+          result.purchases.push({
+            product_name: String(row[map.inItem]).trim(),
+            quantity: Number(row[map.inQty]) || 0,
+            transaction_date: row[map.inDate] ? new Date(row[map.inDate]).toISOString() : new Date().toISOString(),
+            reference_memo: `Inbound Ledger entry on sheet: ${sheetName}`,
+            location
+          })
+        }
+
+        if (row[map.outItem] && String(row[map.outItem]).trim() !== '') {
+          result.sales.push({
+            product_name: String(row[map.outItem]).trim(),
+            quantity: Number(row[map.outQty]) || 0,
+            transaction_date: row[map.outDate] ? new Date(row[map.outDate]).toISOString() : new Date().toISOString(),
+            invoice_number: row[map.outDate + 1] ? String(row[map.outDate + 1]) : null,
+            customer_name: row[map.outDate + 2] ? String(row[map.outDate + 2]) : null,
+            location
+          })
+        }
+
+        const balItemName = row[map.balItem]
+        if (balItemName && String(balItemName).trim() !== '' &&
+            !['CONSUMABLES', 'DOLL', 'SPRINGTECH'].includes(String(balItemName).toUpperCase())) {
+          result.products.push({
+            name: String(balItemName).trim(),
+            uom: row[map.balUom] ? String(row[map.balUom]).trim() : 'Pcs',
+            opening_stock: Number(row[map.balOpStock]) || 0,
+            current_stock: Number(row[map.balCurrentStock]) || 0,
+            location,
+            category
+          })
+        }
+      }
+    }
+  }
+
+  return result
 }
