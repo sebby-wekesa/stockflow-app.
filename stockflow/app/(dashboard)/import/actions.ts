@@ -22,6 +22,8 @@ import {
   type CommitResult,
 } from '@/lib/import/specialized-commit'
 import { clearAliasCache } from '@/lib/import/alias-matcher'
+import { parseIncomingWorkbook } from '@/lib/import/unified-parser'
+import { commitBundleToSupabase, commitBundleWithPrisma } from '@/lib/import/unified-commit'
 import * as XLSX from 'xlsx'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,6 +260,63 @@ export async function detectUploadedFile(formData: FormData) {
     }
   }
   return detectFile(file)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED IMPORT (auto-detect ledger vs stock matrix)
+// Writes to the unified import tables + (optionally) Supabase REST tables.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function runUnifiedImport(formData: FormData) {
+  await requireImporter()
+
+  const file = formData.get('file') as File | null
+  const locationOverride = (formData.get('location') as string | null) ?? 'auto'
+
+  if (!file || file.size === 0) throw new Error('Please choose a file to upload')
+
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+
+  const bundle = parseIncomingWorkbook(workbook, file.name)
+  if (locationOverride !== 'auto' && (locationOverride === 'Mombasa' || locationOverride === 'Nairobi')) {
+    bundle.location = locationOverride
+  }
+
+  const parsedCounts = {
+    products: bundle.products.length,
+    sales: bundle.sales.length,
+    purchases: bundle.purchases.length,
+  }
+
+  if (parsedCounts.products + parsedCounts.sales + parsedCounts.purchases === 0) {
+    throw new Error('No usable rows found in this workbook. Check the file format and sheet names.')
+  }
+
+  const prisma = await commitBundleWithPrisma(bundle).catch((err) => ({
+    productsUpserted: 0,
+    salesInserted: 0,
+    purchasesInserted: 0,
+    errors: [`prisma: ${(err as Error).message}`],
+  }))
+
+  const supabase = await commitBundleToSupabase(bundle).catch((err) => ({
+    productsUpserted: 0,
+    salesInserted: 0,
+    purchasesInserted: 0,
+    errors: [`supabase: ${(err as Error).message}`],
+  }))
+
+  revalidatePath('/reports')
+  revalidatePath('/sales')
+  revalidatePath('/stock')
+
+  return {
+    location: bundle.location,
+    parsedCounts,
+    prisma,
+    supabase,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

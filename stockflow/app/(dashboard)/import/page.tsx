@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { QuickImportForm } from './quick-import-form'
+import { UnifiedImportForm } from './unified-import-form'
 
 export default async function ImportCentrePage() {
   // Recent batches across both flows
@@ -97,6 +98,7 @@ export default async function ImportCentrePage() {
         </p>
       </div>
 
+      <UnifiedImportForm />
       <QuickImportForm />
     </div>
   )
