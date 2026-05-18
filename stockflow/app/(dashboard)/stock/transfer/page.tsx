@@ -17,18 +17,26 @@ export default async function TransferPage() {
     : ['mombasa', 'nairobi', 'bonje'] as Branch[] // For now, assume all branches
 
   // Get products with stock in any branch
-  const productsWithStock = await prisma.product.findMany({
+  const productRecords = await prisma.product.findMany({
     where: {
       category: { not: 'service' }, // Exclude service products from transfers
-      stock_levels: {
-        some: { qty: { gt: 0 } }
-      }
-    },
-    include: {
-      stock_levels: true
+      OR: [
+        { currentStock: { gt: 0 } },
+        { ProductReceipt: { some: { qtyReceived: { gt: 0 } } } },
+        { StockMovement: { some: { quantity: { gt: 0 } } } }
+      ]
     },
     orderBy: { sku: 'asc' }
   })
+
+  // Map to the format expected by TransferForm
+  const productsWithStock = productRecords.map(p => ({
+    id: p.id,
+    product_code: p.sku ?? '',
+    canonical_name: p.name,
+    uom: p.uom,
+    stock_levels: userBranches.map(branch => ({ branch, qty: p.currentStock }))
+  }))
 
   return (
     <div className="max-w-2xl">

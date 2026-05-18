@@ -7,7 +7,7 @@ export default async function CataloguePage() {
   const products = await prisma.finishedGoods.findMany({
     where: { quantity: { gt: 0 } },
     include: {
-      Design: true
+      design: true
     },
     orderBy: { createdAt: 'desc' }
   });

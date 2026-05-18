@@ -30,17 +30,17 @@ export async function GET(request: Request) {
     },
   })
 
-  // Get finished goods inventory
-  const finishedGoods = await prisma.finishedGoods.findMany({
-    include: {
-      InventoryFinishedGoods: {
-        include: {
-          Branch: true,
-        },
-      },
-      Design: true,
-    },
-  })
+   // Get finished goods inventory
+   const finishedGoods = await prisma.finishedGoods.findMany({
+     include: {
+       InventoryFinishedGoods: {
+         include: {
+           Branch: true,
+         },
+       },
+       design: true,
+     },
+   })
 
   // Flatten raw materials data
   const rawRows = rawMaterials.flatMap((material) =>
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     product.InventoryFinishedGoods.map((inv) => ({
       type: 'Finished Goods',
       sku: product.sku,
-      name: product.Design?.name || 'Unknown Design',
+       name: product.design?.name || 'Unknown Design',
       branch: inv.Branch?.name || 'Unknown',
       available_qty: inv.availableQty,
       reserved_qty: 0, // Not tracked yet

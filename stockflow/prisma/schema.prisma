@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native"]
 }
 
@@ -7,10 +7,6 @@ datasource db {
   provider = "postgresql"
   schemas  = ["public"]
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC SCHEMA MODELS
-// ─────────────────────────────────────────────────────────────────────────────
 
 model AuditLog {
   id         String   @id @default(uuid())
@@ -427,17 +423,17 @@ model SaleItem {
 }
 
 model SaleOrder {
-  id           String     @id @default(uuid())
-  customerId   String?
-  customerName String
-  totalAmount  Decimal    @db.Decimal(10, 2)
-  status       SaleStatus @default(PENDING)
-  createdBy    String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  SaleItem     SaleItem[]
-  Customer     Customer?  @relation(fields: [customerId], references: [id])
-  createdByUser User?     @relation(fields: [createdBy], references: [id])
+  id            String     @id @default(uuid())
+  customerId    String?
+  customerName  String
+  totalAmount   Decimal    @db.Decimal(10, 2)
+  status        SaleStatus @default(PENDING)
+  createdBy     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  SaleItem      SaleItem[]
+  createdByUser User?      @relation(fields: [createdBy], references: [id])
+  Customer      Customer?  @relation(fields: [customerId], references: [id])
 
   @@schema("public")
 }
@@ -522,37 +518,77 @@ model User {
   AuditLog             AuditLog[]
   ImportBatch          ImportBatch[]
   NotificationSettings NotificationSettings?
+  SaleOrderCreated     SaleOrder[]
   StageLog             StageLog[]
   Branch               Branch?               @relation(fields: [branchId], references: [id])
   Organization         Organization?         @relation(fields: [organizationId], references: [id])
-  SaleOrderCreated     SaleOrder[]
 
   @@schema("public")
 }
 
 model StockMovement {
-  id            String      @id @default(uuid())
-  productId     String
-  branchId      String?
-  movementType  String
-  quantity      Float
-  reference     String?
-  notes         String?
-  createdAt     DateTime    @default(now())
-  Product       Product     @relation(fields: [productId], references: [id])
-  Branch        Branch?     @relation(fields: [branchId], references: [id])
+  id           String   @id @default(uuid())
+  productId    String
+  branchId     String?
+  movementType String
+  quantity     Float
+  reference    String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  Branch       Branch?  @relation(fields: [branchId], references: [id])
+  Product      Product  @relation(fields: [productId], references: [id])
 
   @@schema("public")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────────────────────────────────────────
+model ProductMaster {
+  name          String
+  location      String
+  category      String
+  opening_stock Decimal  @default(0) @db.Decimal(12, 2)
+  current_stock Decimal  @default(0) @db.Decimal(12, 2)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@id([name, location])
+  @@index([location])
+  @@schema("public")
+}
+
+model SalesTransaction {
+  id               String   @id @default(uuid())
+  product_name     String
+  quantity         Decimal  @db.Decimal(12, 2)
+  transaction_date DateTime
+  invoice_number   String?
+  customer_name    String?
+  location         String
+  created_at       DateTime @default(now())
+
+  @@index([location])
+  @@index([transaction_date])
+  @@schema("public")
+}
+
+model StockReceipt {
+  id               String   @id @default(uuid())
+  product_name     String
+  quantity         Decimal  @db.Decimal(12, 2)
+  transaction_date DateTime
+  reference_memo   String?
+  location         String
+  created_at       DateTime @default(now())
+
+  @@index([location])
+  @@index([transaction_date])
+  @@schema("public")
+}
 
 enum ImportMode {
   update
   ignore
   replace
+
   @@schema("public")
 }
 
@@ -564,6 +600,7 @@ enum ImportStatus {
   committing
   imported
   failed
+
   @@schema("public")
 }
 
@@ -572,6 +609,7 @@ enum Priority {
   MEDIUM
   HIGH
   URGENT
+
   @@schema("public")
 }
 
@@ -582,6 +620,7 @@ enum ProductionStatus {
   COMPLETED
   REJECTED
   CANCELLED
+
   @@schema("public")
 }
 
@@ -591,6 +630,7 @@ enum PurchaseStatus {
   ORDERED
   RECEIVED
   CANCELLED
+
   @@schema("public")
 }
 
@@ -602,6 +642,7 @@ enum Role {
   WAREHOUSE
   SALES
   PACKAGING
+
   @@schema("public")
 }
 
@@ -610,6 +651,7 @@ enum SaleStatus {
   CONFIRMED
   SHIPPED
   CANCELLED
+
   @@schema("public")
 }
 
@@ -617,6 +659,7 @@ enum StockOrigin {
   FACTORY_MADE
   LOCAL_PURCHASE
   IMPORTED
+
   @@schema("public")
 }
 
@@ -626,6 +669,7 @@ enum ProductCategory {
   imported
   local_purchase
   service
+
   @@schema("public")
 }
 
@@ -654,12 +698,14 @@ enum ProductType {
   riveting
   straightening
   other_service
+
   @@schema("public")
 }
 
 enum UOM {
   PCS
   KGS
+
   @@schema("public")
 }
 
@@ -668,52 +714,6 @@ enum StockStatus {
   LOW_STOCK
   OUT_OF_STOCK
   REORDER_NEEDED
-  @@schema("public")
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// UNIFIED IMPORT TABLES (for new global parser)
-// ─────────────────────────────────────────────────────────────────────────────
-
-model ProductMaster {
-  name            String
-  location        String
-  category        String
-  opening_stock   Decimal @db.Decimal(12, 2) @default(0)
-  current_stock   Decimal @db.Decimal(12, 2) @default(0)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  @@id([name, location])
-  @@index([location])
-  @@schema("public")
-}
-
-model SalesTransaction {
-  id               String    @id @default(uuid())
-  product_name     String
-  quantity         Decimal   @db.Decimal(12, 2)
-  transaction_date DateTime
-  invoice_number   String?
-  customer_name    String?
-  location         String
-  created_at       DateTime  @default(now())
-
-  @@index([location])
-  @@index([transaction_date])
-  @@schema("public")
-}
-
-model StockReceipt {
-  id               String    @id @default(uuid())
-  product_name     String
-  quantity         Decimal   @db.Decimal(12, 2)
-  transaction_date DateTime
-  reference_memo   String?
-  location         String
-  created_at       DateTime  @default(now())
-
-  @@index([location])
-  @@index([transaction_date])
   @@schema("public")
 }
