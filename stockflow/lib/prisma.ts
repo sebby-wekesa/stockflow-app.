@@ -18,13 +18,19 @@ function getConnectionString(url: string) {
   }
 
   // Set reasonable connection limits to prevent pool exhaustion
+  // Supabase pooler supports higher connection limits
   if (!parsed.searchParams.has('connection_limit')) {
-    parsed.searchParams.set('connection_limit', '20')
+    parsed.searchParams.set('connection_limit', '50')
   }
 
-  // Increase pool size for better concurrent request handling
+  // Increase pool timeout for better handling under load
   if (!parsed.searchParams.has('pool_timeout')) {
-    parsed.searchParams.set('pool_timeout', '30')
+    parsed.searchParams.set('pool_timeout', '45')
+  }
+
+  // Set statement timeout to 30 seconds to prevent hanging connections
+  if (!parsed.searchParams.has('statement_timeout')) {
+    parsed.searchParams.set('statement_timeout', '30000')
   }
 
   return parsed.toString()
@@ -81,3 +87,48 @@ export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
 // 4. Prevent multiple instances in development
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+/**
+ * Helper function to retry database operations on connection pool exhaustion
+ * Implements exponential backoff with jitter to handle transient connection failures
+ */
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxAttempts: number = 3,
+  baseDelayMs: number = 100
+): Promise<T> {
+  let lastError: any
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation()
+    } catch (error: any) {
+      lastError = error
+
+      // Check if this is a connection pool exhaustion error
+      const isPoolError =
+        error?.message?.includes?.('EMAXCONNSESSION') ||
+        error?.message?.includes?.('max clients reached') ||
+        error?.code === 'XX000'
+
+      // If not a pool error or this is the last attempt, throw
+      if (!isPoolError || attempt === maxAttempts) {
+        throw error
+      }
+
+      // Exponential backoff with jitter: delay = baseDelay * 2^(attempt-1) + random(0, baseDelay)
+      const exponentialDelay = baseDelayMs * Math.pow(2, attempt - 1)
+      const jitter = Math.random() * baseDelayMs
+      const delayMs = exponentialDelay + jitter
+
+      console.warn(
+        `Database connection pool exhausted (attempt ${attempt}/${maxAttempts}). ` +
+        `Retrying in ${Math.round(delayMs)}ms...`
+      )
+
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+  }
+
+  throw lastError
+}
