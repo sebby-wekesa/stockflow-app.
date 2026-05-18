@@ -8,7 +8,7 @@ export default async function SalesLayout({ children }: { children: React.ReactN
     redirect('/login');
   }
 
-  if (user.role !== 'SALES' && user.role !== 'ADMIN') {
+  if (user.role !== 'SALES' && user.role !== 'MANAGER' && user.role !== 'ADMIN') {
     redirect('/unauthorized');
   }
 

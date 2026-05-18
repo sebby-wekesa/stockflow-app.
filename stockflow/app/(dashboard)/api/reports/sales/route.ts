@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
   const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user || !['admin', 'manager', 'accountant'].includes(user.role)) {
+  if (!user || !['ADMIN', 'MANAGER', 'SALES'].includes(user.role.toUpperCase())) {
     return new NextResponse('Forbidden', { status: 403 })
   }
 

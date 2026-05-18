@@ -16,7 +16,7 @@ export default async function DashboardPage({
   // Use previewRole from URL if present, else user role
   const effectiveRole = (params.previewRole || user.role).toUpperCase() as Role;
   const role = effectiveRole.toLowerCase() as TeamRole;
-  return <TeamDashboard role={role} user={user} />;
+  return await TeamDashboard({ role, user });
 }
 
 // Pending Dashboard - Shows pending approval message
@@ -451,8 +451,10 @@ async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
 }
 
 // TeamDashboard component - switches views based on role
-const TeamDashboard = ({ role, user }: { role: TeamRole; user: any }) => {
+async function TeamDashboard({ role, user }: { role: TeamRole; user: any }) {
   switch (role) {
+    case 'pending':
+      return <PendingView user={user} />;
     case 'sales':
       return <SalesView user={user} role={role} />;
     case 'packaging':
@@ -468,7 +470,7 @@ const TeamDashboard = ({ role, user }: { role: TeamRole; user: any }) => {
     default:
       return <AdminView user={user} role={role} />;
   }
-};
+}
 
 // Packaging Dashboard - Shows packaging operations overview
 async function PackagingView({ user, role }: { user: any; role: TeamRole }) {

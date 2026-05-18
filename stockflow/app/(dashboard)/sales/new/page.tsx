@@ -18,7 +18,7 @@ export default async function NewSalesPage() {
 
   if (!userWithBranches) redirect('/login')
 
-  const allowedBranches = user.role === 'admin'
+  const allowedBranches = (user.role === 'ADMIN' || user.role === 'MANAGER')
     ? (['mombasa', 'nairobi', 'bonje'] as Branch[])
     : (userWithBranches.Branch ? [userWithBranches.Branch.id as Branch] : [])
 
