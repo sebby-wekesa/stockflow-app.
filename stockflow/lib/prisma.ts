@@ -19,7 +19,12 @@ function getConnectionString(url: string) {
 
   // Set reasonable connection limits to prevent pool exhaustion
   if (!parsed.searchParams.has('connection_limit')) {
-    parsed.searchParams.set('connection_limit', '5')
+    parsed.searchParams.set('connection_limit', '20')
+  }
+
+  // Increase pool size for better concurrent request handling
+  if (!parsed.searchParams.has('pool_timeout')) {
+    parsed.searchParams.set('pool_timeout', '30')
   }
 
   return parsed.toString()

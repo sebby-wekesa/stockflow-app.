@@ -1,34 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from '@supabase/ssr'
-import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeUserRole } from '@/lib/types'
 import { getRoleHomePage } from '@/lib/auth-session'
-
-// Helper function to resolve user role
-async function resolveUserRole(userId: string, fallbackRole?: string) {
-  const supabaseAdmin = getSupabaseAdmin()
-
-  if (!supabaseAdmin) {
-    return normalizeUserRole(fallbackRole)
-  }
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle()
-
-    if (error) {
-      console.error("Profile lookup failed:", error)
-    }
-
-    return normalizeUserRole(data?.role ?? fallbackRole)
-  } catch (error) {
-    console.error("Profile lookup error:", error)
-    return normalizeUserRole(fallbackRole)
-  }
-}
 
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -77,42 +50,28 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // Get role from session metadata (already in JWT, no DB query needed)
+  const role = normalizeUserRole(session.user.user_metadata?.role)
+
   // If session exists and on login page, redirect based on role
   if (session && pathname === '/login') {
-    try {
-      console.log('Middleware - On login page, resolving role');
-      const role = await resolveUserRole(session.user.id, session.user.user_metadata?.role)
-      console.log('Middleware - Resolved role:', role);
-      const homePage = getRoleHomePage(role)
-      console.log('Middleware - Redirecting to:', homePage);
+    console.log('Middleware - On login page, resolved role from session:', role);
+    const homePage = getRoleHomePage(role)
+    console.log('Middleware - Redirecting to:', homePage);
 
-      // Prevent redirect loop - don't redirect to same path
-      if (homePage !== pathname) {
-        return NextResponse.redirect(new URL(homePage, request.url))
-      }
-    } catch (error) {
-      console.error('Role resolution failed:', error)
-      // Allow access to dashboard even if role resolution fails temporarily
-      if (pathname === '/login') {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
+    // Prevent redirect loop - don't redirect to same path
+    if (homePage !== pathname) {
+      return NextResponse.redirect(new URL(homePage, request.url))
     }
   }
 
-  // For protected routes, check role access
+  // For protected admin routes, check role access (using cached session data)
   if (session && pathname.startsWith('/admin')) {
-    try {
-      const role = await resolveUserRole(session.user.id, session.user.user_metadata?.role)
-      console.log('Middleware - Admin route, user role:', role);
-      if (role !== 'ADMIN') {
-        const homePage = getRoleHomePage(role)
-        console.log('Middleware - Non-admin, redirecting to:', homePage);
-        return NextResponse.redirect(new URL(homePage, request.url))
-      }
-    } catch (error) {
-      console.error('Role check failed:', error)
-      // Allow temporary access if role check fails
-      return response
+    console.log('Middleware - Admin route, user role from session:', role);
+    if (role !== 'ADMIN') {
+      const homePage = getRoleHomePage(role)
+      console.log('Middleware - Non-admin, redirecting to:', homePage);
+      return NextResponse.redirect(new URL(homePage, request.url))
     }
   }
 
