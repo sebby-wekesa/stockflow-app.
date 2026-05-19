@@ -42,5 +42,5 @@ next-env.d.ts
 
 #prompts
 .kilo
-
+.pnpm-store 
 /app/generated/prisma

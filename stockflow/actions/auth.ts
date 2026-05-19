@@ -138,7 +138,6 @@ export async function signIn(formData: FormData) {
         });
         console.log("Updated user metadata with current role from database");
       }
-    }
       console.log("User record already exists in database");
     }
   } catch (dbError) {
