@@ -128,6 +128,17 @@ export async function signIn(formData: FormData) {
       });
       console.log("Created new user record in database");
     } else {
+      // User exists - sync their role from Prisma to Supabase metadata in case admin updated it
+      if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
+        await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+          user_metadata: { 
+            name: existingUser.name,
+            role: existingUser.role
+          }
+        });
+        console.log("Updated user metadata with current role from database");
+      }
+    }
       console.log("User record already exists in database");
     }
   } catch (dbError) {

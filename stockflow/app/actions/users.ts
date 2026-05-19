@@ -189,6 +189,15 @@ export async function updateUser(formData: FormData) {
       console.error("Profile update error:", profileError);
     }
 
+    // Update Supabase Auth user metadata so role changes take effect immediately
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { name, role }
+    });
+
+    if (authError) {
+      console.error("Auth metadata update error:", authError);
+    }
+
     revalidatePath("/users");
   } catch (error) {
     console.error("Update user error:", error);
