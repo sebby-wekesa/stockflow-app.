@@ -64,20 +64,7 @@ export async function inviteUser(formData: FormData) {
 
     await prisma.user.create({ data: createData });
 
-    // 3. Create profile in Supabase
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: authUser.user!.id,
-        email,
-        full_name: name,
-        role,
-      });
-
-    if (profileError) {
-      console.error("Profile creation error:", profileError);
-      // Don't fail the whole operation
-    }
+    // profiles table removed - Prisma User is the source of truth
 
     revalidatePath("/users");
     return { success: true };
@@ -96,15 +83,7 @@ export async function updateUserRole(userId: string, newRole: string) {
 
   const normalizedRole = normalizeUserRole(newRole);
 
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ role: normalizedRole })
-    .eq('id', userId);
-
-  if (error) {
-    console.error("Role update error:", error);
-    throw new Error("Failed to update user role");
-  }
+  // profiles table removed - role is stored in Prisma User
 
   revalidatePath('/admin/users'); // Refresh the UI immediately
 }
@@ -125,15 +104,7 @@ export async function deleteUser(userId: string) {
     where: { userId },
   });
 
-  // Delete from Supabase profiles table
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .delete()
-    .eq('id', userId);
-
-  if (profileError) {
-    console.error("Profile delete error:", profileError);
-  }
+  // profiles table removed - deletion handled via Prisma + Auth
 
   try {
     // Delete from Supabase Auth
@@ -183,18 +154,7 @@ export async function updateUser(formData: FormData) {
       data: updateData
     });
 
-    // Update profile in Supabase
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        full_name: name,
-        role,
-      })
-      .eq('id', userId);
-
-    if (profileError) {
-      console.error("Profile update error:", profileError);
-    }
+    // profiles table removed - using Prisma User model instead
 
     // Update Supabase Auth user metadata so role changes take effect immediately
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {

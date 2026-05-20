@@ -28,20 +28,18 @@ async function createSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
+        setAll(cookiesToSet) {
           try {
-            cookieStore.set({ name, value, ...options });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
           } catch {
-            // Server Component called from a context where cookies are read-only
+            // The `setAll` method was called from a Server Component.
+            // We can ignore this in Server Actions.
           }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch {}
         },
       },
     }
@@ -140,6 +138,25 @@ export async function signIn(formData: FormData) {
         console.log("Updated user metadata with current role from database");
       }
       console.log("User record already exists in database");
+    }
+
+    // Ensure user has an organization (create default if missing)
+    const userWithOrg = await prisma.user.findUnique({
+      where: { id: data.user.id },
+      include: { Organization: true }
+    });
+    if (!userWithOrg?.Organization) {
+      let org = await prisma.organization.findFirst();
+      if (!org) {
+        org = await prisma.organization.create({
+          data: { name: "Default Org", code: "DEFAULT" }
+        });
+      }
+      await prisma.user.update({
+        where: { id: data.user.id },
+        data: { organizationId: org.id }
+      });
+      console.log("Linked user to organization:", org.id);
     }
   } catch (dbError) {
     console.error("Database user creation failed:", dbError);

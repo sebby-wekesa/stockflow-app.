@@ -127,7 +127,7 @@ export default async function JobsPage({
                       </div>
                       <div>
                         <div className="text-muted">Target</div>
-                        <div className="font-medium font-mono">{job.targetKg}kg</div>
+                        <div className="font-medium font-mono">{job.targetKg?.toString() ?? '0'}kg</div>
                       </div>
                       <div>
                         <div className="text-muted">Progress</div>

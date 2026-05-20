@@ -425,9 +425,19 @@ export function parseConsumablesStock(
   const { rows } = readSheetAsRows(buffer, sheetName)
   const out: ParsedStockRow[] = []
 
-  for (let i = 4; i < rows.length; i++) {
+  // Start from row 0 and skip header-like rows
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+    const rowStr = JSON.stringify(row).toLowerCase()
 
+    // Skip obvious header rows
+    if (rowStr.includes('product') || rowStr.includes('qty') || rowStr.includes('in') || rowStr.includes('out')) {
+      continue
+    }
+
+    // Try common layouts:
+
+    // Layout 1: Product | Qty In | Product | Qty Out  (columns 0-3)
     const inProduct = toStr(getCell(row, 0))
     const inQty = toNumber(getCell(row, 1))
     if (inProduct && inQty && inQty > 0) {
@@ -455,6 +465,22 @@ export function parseConsumablesStock(
         direction: 'out',
         reference: `${sheetName} import`,
         notes: `Stock out from ${sheetName}`,
+      })
+    }
+
+    // Layout 2: Product | Qty  (single movement per row, assume IN)
+    const product = toStr(getCell(row, 0))
+    const qty = toNumber(getCell(row, 1))
+    if (product && qty && qty > 0 && !inProduct && !outProduct) {
+      out.push({
+        source_row: i + 1,
+        movement_date: null,
+        raw_product_name: product,
+        branch,
+        qty: qty,
+        direction: 'in',
+        reference: `${sheetName} import`,
+        notes: `Stock import from ${sheetName}`,
       })
     }
   }

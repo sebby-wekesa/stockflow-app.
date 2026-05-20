@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ALL_BRANCHES, BRANCH_LABELS } from '@/lib/branches'
-import type { BranchCode as Branch } from '@/lib/branches'
+import { getBranches } from '@/app/actions/users'
 import type { UserRole } from '@/lib/types'
 
 const ROLE_OPTIONS: { value: UserRole; label: string; description: string }[] = [
@@ -58,6 +57,11 @@ export function UserForm({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    getBranches().then(setBranches)
+  }, [])
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -138,12 +142,11 @@ export function UserForm({
           name="branchId"
           className="select select-bordered w-full"
           defaultValue={initial?.branchId}
-          required
         >
           <option value="">Select a branch</option>
-          {ALL_BRANCHES.map((branch) => (
-            <option key={branch} value={branch}>
-              {BRANCH_LABELS[branch]}
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
             </option>
           ))}
         </select>

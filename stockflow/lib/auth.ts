@@ -40,7 +40,6 @@ export type AuthUser = {
   organization: {
     id: string;
     name: string;
-    slug: string | null;
     status: string;
   };
 };
@@ -62,7 +61,7 @@ export async function getUser(): Promise<AuthUser | null> {
       include: {
         Branch: true,
         Organization: {
-          select: { id: true, name: true, slug: true, status: true },
+          select: { id: true, name: true },
         },
       },
     });
@@ -77,11 +76,6 @@ export async function getUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    // Hard gate: SUSPENDED and CLOSED orgs cannot access the app at all
-    if (user.Organization.status === 'SUSPENDED' || user.Organization.status === 'CLOSED') {
-      return null;
-    }
-
     return {
       id: user.id,
       email: user.email,
@@ -93,8 +87,6 @@ export async function getUser(): Promise<AuthUser | null> {
       organization: {
         id: user.Organization.id,
         name: user.Organization.name,
-        slug: user.Organization.slug,
-        status: user.Organization.status,
       },
     };
   } catch (error) {

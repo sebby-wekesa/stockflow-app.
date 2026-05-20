@@ -116,7 +116,8 @@ export async function uploadSpecialized(formData: FormData) {
 
   if (parsedCount === 0) {
     throw new Error(
-      `No usable rows found in the file. Check the format matches ${sourceLabel}.`
+      `No usable rows found in the file. Check the format matches ${sourceLabel}. ` +
+      `Tried columns 0-3 (Product | In-Qty | Product | Out-Qty) and simple Product | Qty layout.`
     )
   }
 
