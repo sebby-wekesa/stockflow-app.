@@ -156,10 +156,10 @@ export async function updateUser(formData: FormData) {
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;
     const role = formData.get('role') as string;
-    const branchId = formData.get('branchId') as string;
+    const branchId = formData.get('branchId') as string | null;
 
-    if (!userId || !name || !role || !branchId) {
-      throw new Error("All fields are required");
+    if (!userId || !name || !role) {
+      throw new Error("userId, name and role are required");
     }
 
     if (typeof role !== "string" || !USER_ROLES.includes(role as typeof USER_ROLES[number])) {
@@ -167,13 +167,15 @@ export async function updateUser(formData: FormData) {
     }
 
     // Update user in Prisma
+    const updateData: any = {
+      name,
+      role: role as typeof USER_ROLES[number],
+    };
+    if (branchId) updateData.branchId = branchId;
+
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        name,
-        role: role as typeof USER_ROLES[number],
-        branchId,
-      }
+      data: updateData
     });
 
     // Update profile in Supabase

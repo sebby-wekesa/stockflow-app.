@@ -50,8 +50,6 @@ export function UserRow({ user }: UserRowProps) {
     const newName = prompt("Enter new name:", user.name || "");
     if (newName === null) return;
 
-    const newDepartment = prompt("Enter department:", user.department || "") || "";
-
     setError(null);
     startTransition(async () => {
       try {
@@ -59,11 +57,12 @@ export function UserRow({ user }: UserRowProps) {
         formData.append("userId", user.id);
         formData.append("name", newName);
         formData.append("role", user.role);
-        formData.append("branchId", newDepartment); // reuse branchId field for department
+        // branchId is now optional
         
         await updateUser(formData);
         window.location.reload();
-      } catch {
+      } catch (err) {
+        console.error(err);
         setError("Failed to update user. Please try again.");
       }
     });
