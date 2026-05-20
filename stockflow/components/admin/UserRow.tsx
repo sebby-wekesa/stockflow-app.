@@ -1,6 +1,6 @@
 "use client";
 
-import { updateUserRole, deleteUser } from "@/app/actions/users";
+import { updateUserRole, deleteUser, updateUser } from "@/app/actions/users";
 import { useTransition, useState } from "react";
 import type { UserRole } from "@/lib/types";
 
@@ -46,6 +46,29 @@ export function UserRow({ user }: UserRowProps) {
     }
   };
 
+  const handleEdit = () => {
+    const newName = prompt("Enter new name:", user.name || "");
+    if (newName === null) return;
+
+    const newDepartment = prompt("Enter department:", user.department || "") || "";
+
+    setError(null);
+    startTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.append("userId", user.id);
+        formData.append("name", newName);
+        formData.append("role", user.role);
+        formData.append("branchId", newDepartment); // reuse branchId field for department
+        
+        await updateUser(formData);
+        window.location.reload();
+      } catch {
+        setError("Failed to update user. Please try again.");
+      }
+    });
+  };
+
   return (
     <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px'}}>
       <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
@@ -72,6 +95,18 @@ export function UserRow({ user }: UserRowProps) {
           <option value="SALES">Sales</option>
           <option value="PACKAGING">Packaging</option>
         </select>
+        <button
+          disabled={isPending}
+          onClick={handleEdit}
+          className="btn btn-ghost"
+          style={{
+            padding: '4px 8px',
+            fontSize: '11px',
+            fontWeight: 600
+          }}
+        >
+          Edit
+        </button>
         <button
           disabled={isPending}
           onClick={handleDelete}

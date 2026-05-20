@@ -1,4 +1,5 @@
 import { getManagerData, approveOrder } from '@/app/actions/dashboard'
+import Link from 'next/link'
 
 export default async function ManagerContent() {
   const { pendingApprovals, activeProduction, scrapAlerts, totalActiveOrders, totalTonnage, pendingCount } = await getManagerData()
@@ -52,8 +53,14 @@ export default async function ManagerContent() {
                 <form action={approveOrder.bind(null, order.id)}>
                   <button className="btn btn-teal">Approve & release</button>
                 </form>
-                <button className="btn btn-ghost">Edit specs</button>
-                <button className="btn btn-red btn-sm" style={{marginLeft:'auto'}}>Reject</button>
+                <Link href={`/production-orders/${order.id}/edit`} className="btn btn-ghost">Edit specs</Link>
+                <button 
+  className="btn btn-red btn-sm" 
+  style={{marginLeft:'auto'}}
+  onClick={() => alert('Reject functionality will be implemented in Stage 4 (approvals flow)')}
+>
+  Reject
+</button>
               </div>
             </div>
           ))

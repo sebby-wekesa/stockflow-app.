@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth'
 import { Role } from '@/lib/auth'
 import { RawMaterial } from '@prisma/client'
 import { TeamRole } from '@/lib/proxy'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -265,7 +266,7 @@ async function WarehouseView({ user, role }: { user: any; role: TeamRole }) {
           <div className="section-title">Warehouse Dashboard</div>
           <div className="section-sub">Manage raw materials and receiving</div>
         </div>
-        <button className="btn btn-primary">Receive Stock</button>
+        <Link href="/rawmaterials" className="btn btn-primary">Receive Stock</Link>
       </div>
 
       {/* Raw Materials Inventory */}
@@ -320,7 +321,7 @@ async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
         </div>
         <div style={{display: 'flex', gap: '8px'}}>
           <a href="/manager" className="btn btn-primary">View Approvals</a>
-          <button className="btn btn-ghost">+ New order</button>
+          <Link href="/catalogue" className="btn btn-ghost">+ New order</Link>
         </div>
       </div>
 
@@ -490,7 +491,7 @@ async function PackagingView({ user, role }: { user: any; role: TeamRole }) {
         </div>
         <div style={{display: 'flex', gap: '8px'}}>
           <a href="/packaging" className="btn btn-primary">View Packaging Queue</a>
-          <button className="btn btn-ghost">+ New shipment</button>
+          <Link href="/packaging" className="btn btn-ghost">+ New shipment</Link>
         </div>
       </div>
 
@@ -548,7 +549,7 @@ async function AdminView({ user, role }: { user: any; role: TeamRole }) {
           <div className="section-title">Management Overview</div>
           <div className="section-sub">Full production and inventory insights</div>
         </div>
-        <button className="btn btn-primary">+ New production order</button>
+        <Link href="/production/new" className="btn btn-primary">+ New production order</Link>
       </div>
 
       <div className="stats-grid">

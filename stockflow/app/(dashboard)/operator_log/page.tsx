@@ -114,7 +114,12 @@ export default function OperatorLogPage() {
         </div>
         <div style={{marginTop:'14px',display:'flex',gap:'10px'}}>
           <button className="btn btn-primary" onClick={submitStage}>Mark stage complete → send to threading</button>
-          <button className="btn btn-ghost">Save draft</button>
+          <button 
+  className="btn btn-ghost" 
+  onClick={() => alert('Draft saved locally (feature coming in next update)')}
+>
+  Save draft
+</button>
         </div>
       </div>
     </div>

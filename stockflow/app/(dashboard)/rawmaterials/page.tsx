@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export default async function RawmaterialsPage() {
           <div className="section-title">Raw materials</div>
           <div className="section-sub">Current stock levels in kg</div>
         </div>
-        <button className="btn btn-primary">+ Receive stock</button>
+        <Link href="/import" className="btn btn-primary">+ Receive stock</Link>
       </div>
       <div className="stats-grid mb-24" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
         {materials.map(m => {

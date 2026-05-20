@@ -15,7 +15,7 @@ export default async function OperatorHistoryPage() {
   // Get completed orders or logs for the user
   const completedOrders = await prisma.productionOrder.findMany({
     where: { status: "COMPLETED" },
-    include: { Design: true },
+    include: { design: true },
     orderBy: { updatedAt: "desc" },
     take: 20,
   });
@@ -43,7 +43,7 @@ export default async function OperatorHistoryPage() {
                 <span className="job-id">{order.id.slice(0, 8)}</span>
                 <span className="badge badge-green">Completed</span>
               </div>
-              <div className="job-design">{order.Design.name}</div>
+              <div className="job-design">{order.design?.name || 'Unknown'}</div>
               <div className="job-meta" style={{ marginTop: "8px" }}>
                 <span>Target: <span className="job-kg">{order.targetKg.toNumber()} kg</span></span>
                 <span>Qty: {order.quantity} units</span>

@@ -179,7 +179,13 @@ export default function OperatorLogPage() {
           >
             {isSubmitting ? "Processing..." : `Mark stage complete → send to ${nextStageInfo?.department || "Finished Goods"}`}
           </button>
-          <button className="btn btn-ghost" disabled={isSubmitting}>Save draft</button>
+          <button 
+  className="btn btn-ghost" 
+  disabled={isSubmitting}
+  onClick={() => alert('Draft saved locally')}
+>
+  Save draft
+</button>
         </div>
       </div>
     </div>
