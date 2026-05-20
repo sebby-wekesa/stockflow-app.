@@ -15,7 +15,8 @@ export const STATUS_BADGE_CLASS: Record<SalesOrderStatus, string> = {
   CANCELLED: 'bg-red/15 text-red',
 }
 
-export function formatKES(amount: number): string {
+export function formatKES(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—'
   return amount.toLocaleString('en-KE', {
     style: 'currency',
     currency: 'KES',

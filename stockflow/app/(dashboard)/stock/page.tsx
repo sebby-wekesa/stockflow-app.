@@ -85,7 +85,7 @@ export default async function BranchStockPage({
      }),
     Promise.all(
       ALL_BRANCHES.map(async (branch) => {
-        const [stockAgg, lowStock] = await Promise.all([
+        const [rawAgg, finishedAgg] = await Promise.all([
           // For raw materials
           prisma.inventoryRawMaterial.aggregate({
             where: { branchId: branch, availableKg: { gt: 0 } },
@@ -140,8 +140,8 @@ export default async function BranchStockPage({
 
         return {
           branch,
-          totalUnits: ((stockAgg[0]?._sum.availableKg ?? 0) + (stockAgg[1]?._sum.availableQty ?? 0)),
-          totalSkus: ((stockAgg[0]?._count._all ?? 0) + (stockAgg[1]?._count._all ?? 0)),
+          totalUnits: ((rawAgg._sum.availableKg ?? 0) + (finishedAgg._sum.availableQty ?? 0)),
+          totalSkus: ((rawAgg._count._all ?? 0) + (finishedAgg._count._all ?? 0)),
           value,
           lowStock: (rawLowStock + finishedLowStock),
         }
