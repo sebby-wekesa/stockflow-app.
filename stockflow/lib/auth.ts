@@ -37,12 +37,11 @@ export type AuthUser = {
   branches: { id: string; name: string }[];
   // New in Stage 2 — multitenancy
   organizationId: string;
-  organization: {
-    id: string;
-    name: string;
-    slug: string;
-    status: OrgStatus;
-  };
+      organization: {
+        id: string;
+        name: string;
+        code: string;
+      };
 };
 
 export async function getUser(): Promise<AuthUser | null> {
@@ -62,7 +61,7 @@ export async function getUser(): Promise<AuthUser | null> {
       include: {
         Branch: true,
         Organization: {
-          select: { id: true, name: true, slug: true, status: true },
+          select: { id: true, name: true, code: true },
         },
       },
     });
@@ -93,8 +92,7 @@ export async function getUser(): Promise<AuthUser | null> {
       organization: {
         id: user.Organization.id,
         name: user.Organization.name,
-        slug: user.Organization.slug,
-        status: user.Organization.status,
+        code: user.Organization.code,
       },
     };
   } catch (error) {
