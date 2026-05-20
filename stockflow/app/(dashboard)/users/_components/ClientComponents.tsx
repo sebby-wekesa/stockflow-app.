@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { inviteUser, updateUser } from '@/actions/users'
+import { inviteUser, updateUser } from '@/app/actions/users'
 import { UserForm } from '@/components/users/UserForm'
 import type { User } from '@prisma/client'
 
