@@ -75,6 +75,20 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
+  // Stage 2: Org status gating
+  const orgStatus = session.user.user_metadata?.orgStatus as string | undefined;
+  if (orgStatus) {
+    if (orgStatus === 'SUSPENDED' && !pathname.startsWith('/account-suspended')) {
+      return NextResponse.redirect(new URL('/account-suspended', request.url));
+    }
+    if (orgStatus === 'CLOSED' && !pathname.startsWith('/account-closed')) {
+      return NextResponse.redirect(new URL('/account-closed', request.url));
+    }
+    if (orgStatus === 'PENDING_APPROVAL' && !pathname.startsWith('/awaiting-approval')) {
+      return NextResponse.redirect(new URL('/awaiting-approval', request.url));
+    }
+  }
+
   console.log('Middleware - Allowing access');
   return response
 }

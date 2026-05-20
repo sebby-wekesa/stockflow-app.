@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useActionState, useEffect } from 'react'
 import { inviteUser, updateUser } from '@/app/actions/users'
 import { UserForm } from '@/components/users/UserForm'
 import type { User } from '@prisma/client'
@@ -10,36 +10,26 @@ interface InviteModalProps {
 }
 
 function InviteModal({ onClose }: InviteModalProps) {
-  const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
+  const [state, formAction, isPending] = useActionState(inviteUser, null)
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    
-    const formData = new FormData(e.currentTarget)
-    
-    startTransition(async () => {
-      const result = await inviteUser(formData)
-      if (result.success) {
-        onClose()
-      } else {
-        setError(result.error)
-      }
-    })
-  }
+  // Close modal on successful invite
+  useEffect(() => {
+    if (state?.success) {
+      onClose()
+    }
+  }, [state, onClose])
 
   return (
     <div className="modal-overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>✕</button>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form action={formAction} className="space-y-4">
           <h3 className="font-bold text-lg mb-4">Invite new user</h3>
 
-          {error && (
+          {state && !state.success && (
             <div className="alert alert-error">
-              <span>{error}</span>
+              <span>{state.error}</span>
             </div>
           )}
 

@@ -24,10 +24,10 @@ export async function inviteUser(formData: FormData) {
     const email = formData.get('email') as string;
     const name = formData.get('name') as string;
     const role = formData.get('role') as string;
-    const branchId = formData.get('branchId') as string;
+    const branchId = formData.get('branchId') as string | null;
 
-    if (!email || !name || !role || !branchId) {
-      return { success: false, error: "All fields are required" };
+    if (!email || !name || !role) {
+      return { success: false, error: "Email, name and role are required" };
     }
 
     if (typeof role !== "string" || !USER_ROLES.includes(role as typeof USER_ROLES[number])) {
@@ -53,16 +53,16 @@ export async function inviteUser(formData: FormData) {
     }
 
     // 2. Create user in Prisma
-    await prisma.user.create({
-      data: {
-        id: authUser.user!.id,
-        email,
-        name,
-        role: role as typeof USER_ROLES[number],
-        organizationId: "org-1", // TODO: get from current user
-        branchId,
-      }
-    });
+    const createData: any = {
+      id: authUser.user!.id,
+      email,
+      name,
+      role: role as typeof USER_ROLES[number],
+      organizationId: "org-1", // TODO: get from current user
+    };
+    if (branchId) createData.branchId = branchId;
+
+    await prisma.user.create({ data: createData });
 
     // 3. Create profile in Supabase
     const { error: profileError } = await supabaseAdmin
@@ -172,8 +172,9 @@ export async function updateUser(formData: FormData) {
       role: role as typeof USER_ROLES[number],
     };
 
-    // Only update branchId if it's a non-empty value (avoid foreign key violations)
-    if (branchId && branchId.trim() !== '') {
+    // Only include branchId if it looks like a valid UUID (avoid foreign key violations from old string codes)
+    const isValidUuid = branchId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId);
+    if (isValidUuid) {
       updateData.branchId = branchId;
     }
 

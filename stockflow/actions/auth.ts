@@ -165,28 +165,11 @@ export async function signOut() {
 }
 
 export async function signUp(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const name = formData.get("name") as string;
-  const branch = formData.get("branch") as string;
-
-  if (!email || !password) {
-    return { error: "Email and password are required" };
-  }
-
-  if (!name || !branch) {
-    return { error: "Name and branch are required" };
-  }
-
-  if (!ALL_BRANCHES.includes(branch as any)) {
-    return { error: "Invalid branch selected" };
-  }
-
-  try {
-    // Create Supabase server client
-    const supabase = await createSupabaseClient();
-
-    // Create user with Supabase Auth
+  // Stage 2: Old signUp is disabled. New multitenant signup flow coming in Stage 4.
+  return { 
+    error: "Signup is currently disabled. Please use the new signup flow at /signup (coming soon)." 
+  };
+}
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
