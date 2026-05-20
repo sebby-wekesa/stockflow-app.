@@ -23,7 +23,7 @@ export async function getPackagingQueue() {
         include: {
           FinishedGoods: {
             include: {
-              Design: true
+              design: true
             }
           }
         }
@@ -52,8 +52,8 @@ export async function getPackagingQueue() {
     createdAt: order.createdAt,
     items: order.SaleItem.map(item => ({
       id: item.id,
-      designName: item.FinishedGoods?.Design?.name || 'Unknown',
-      designCode: item.FinishedGoods?.Design?.code || 'N/A',
+      designName: item.FinishedGoods?.design?.name || 'Unknown',
+      designCode: item.FinishedGoods?.design?.code || 'N/A',
       quantity: item.quantity,
       unitPrice: Number(item.unitPrice),
       totalPrice: Number(item.totalPrice),
@@ -98,7 +98,7 @@ export async function fulfillOrder(orderId: string) {
     // Verify all items are still available
     for (const item of order.SaleItem) {
       if (!item.FinishedGoods || item.FinishedGoods.quantity < item.quantity) {
-        throw new Error(`Insufficient stock for ${item.FinishedGoods?.Design?.name || 'item'}`);
+        throw new Error(`Insufficient stock for ${item.FinishedGoods?.design?.name || 'item'}`);
       }
     }
 

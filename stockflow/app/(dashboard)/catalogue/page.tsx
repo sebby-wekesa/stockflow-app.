@@ -12,5 +12,11 @@ export default async function CataloguePage() {
     orderBy: { createdAt: 'desc' }
   });
 
-  return <CatalogueClient products={products} />;
+  // Map unitCost → price for client component compatibility
+  const catalogueProducts = products.map(p => ({
+    ...p,
+    price: p.unitCost,
+  }));
+
+  return <CatalogueClient products={catalogueProducts} />;
 }
