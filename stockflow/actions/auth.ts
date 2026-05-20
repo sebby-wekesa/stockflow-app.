@@ -165,78 +165,9 @@ export async function signOut() {
 }
 
 export async function signUp(formData: FormData) {
-  // Stage 2: Old signUp is disabled. New multitenant signup flow coming in Stage 4.
-  return { 
-    error: "Signup is currently disabled. Please use the new signup flow at /signup (coming soon)." 
+  // Stage 2+: Old signup flow is disabled.
+  // New multitenant signup will be implemented in Stage 4.
+  return {
+    error: "Signup is currently disabled. Please contact an administrator or use the new signup flow (coming soon)."
   };
-}
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: name || '',
-          role: 'PENDING', // Default role for new signups
-          branch: branch,
-        }
-      }
-    });
-
-    if (error) {
-      console.error("Supabase signup error:", error);
-      // Check for various forms of "user already exists" error
-      if (error.message.includes('already registered') ||
-          error.message.includes('User already registered') ||
-          error.message.includes('user_already_exists') ||
-          (error as any).status === 422) {
-        return { error: "An account with this email already exists. Please sign in instead." };
-      }
-      return { error: getAuthErrorMessage(error) };
-    }
-
-    if (!data.user) {
-      return { error: "Failed to create account. Please try again." };
-    }
-
-    if (!data.session) {
-      return {
-        message: "Account created successfully. Please check your email and sign in to continue.",
-      };
-    }
-
-    // Create profile record in database if it doesn't exist
-    await prisma.profile.upsert({
-      where: { id: data.user.id },
-      update: {},
-      create: {
-        id: data.user.id,
-        email: data.user.email!,
-        full_name: data.user.user_metadata?.name || name || '',
-        role: 'PENDING', // Default role for new signups
-      },
-    });
-
-    // Create User record
-    await prisma.user.upsert({
-      where: { email: data.user.email! },
-      update: {},
-        create: {
-          id: data.user.id,
-          email: data.user.email!,
-          password: '', // Password handled by Supabase
-          name: data.user.user_metadata?.name || name || '',
-          role: 'PENDING', // Default role
-          branchId: branch,
-          organizationId: 'org-stockflow-001', // Default organization
-          updatedAt: new Date(),
-        },
-    });
-
-    // Middleware will handle cookie setting and redirects
-    return { success: true };
-
-  } catch (error) {
-    console.error("Sign up error:", error);
-    return { error: "An unexpected error occurred. Please try again." };
-  }
 }
