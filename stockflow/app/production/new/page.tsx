@@ -45,45 +45,34 @@ export default async function ProductionNewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      {/* Header Section */}
-      <div className="border-b border-slate-800 bg-slate-950/50 backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-white">
-              Launch Production
-            </h1>
-            <p className="mt-4 text-lg text-slate-400">
-              Initialize a new manufacturing order with complete weight traceability.
-              Every kilogram is tracked from intake through completion.
-            </p>
+    <div>
+      <div className="section-header mb-16">
+        <div>
+          <div className="section-title">New Production Order</div>
+          <div className="section-sub">
+            Initialize a new manufacturing order with complete weight traceability
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        {error ? (
-          /* Error State */
-          <div className="rounded-lg border border-red-500/30 bg-red-900/10 p-6 backdrop-blur">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-400 mt-0.5" />
-              <div>
-                <h2 className="text-lg font-semibold text-red-100">
-                  Failed to Load Production Form
-                </h2>
-                <p className="mt-2 text-sm text-red-300">{error}</p>
-                <p className="mt-3 text-xs text-red-400">
-                  Please contact your system administrator if this problem persists.
-                </p>
-              </div>
+      {error ? (
+        <div className="card">
+          <div className="flex items-start gap-4 text-red-400">
+            <AlertCircle className="h-6 w-6 flex-shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-lg font-semibold">Failed to Load Production Form</h2>
+              <p className="mt-2 text-sm text-muted">{error}</p>
+              <p className="mt-3 text-xs text-muted">
+                Please contact your system administrator if this problem persists.
+              </p>
             </div>
           </div>
-        ) : (
-          /* Form Component */
+        </div>
+      ) : (
+        <div className="card">
           <CreateOrderForm designs={designs} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

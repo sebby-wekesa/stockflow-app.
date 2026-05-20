@@ -39,21 +39,23 @@ export default async function TransferPage() {
   }))
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
-        <Link href="/stock" className="text-sm text-muted hover:text-text">
-          ← Back to stock overview
-        </Link>
-        <h1 className="font-head text-2xl font-bold mt-2">Transfer stock</h1>
-        <p className="text-muted text-sm mt-1">
-          Move finished goods between branches
-        </p>
+    <div>
+      <div className="section-header mb-16">
+        <div>
+          <Link href="/stock" className="text-sm text-muted hover:text-text mb-2 inline-block">
+            ← Back to stock
+          </Link>
+          <div className="section-title">Transfer Stock</div>
+          <div className="section-sub">Move finished goods between branches</div>
+        </div>
       </div>
 
-      <TransferForm
-        products={productsWithStock}
-        userBranches={userBranches}
-      />
+      <div className="card">
+        <TransferForm
+          products={productsWithStock}
+          userBranches={userBranches}
+        />
+      </div>
     </div>
   )
 }

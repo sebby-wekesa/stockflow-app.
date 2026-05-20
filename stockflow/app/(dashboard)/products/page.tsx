@@ -84,10 +84,10 @@ export default async function ProductsPage({
         </Link>
       </div>
 
-      {/* CATEGORY TABS */}
-      <div className="section-header mb-8">
+      {/* ORIGIN FILTERS */}
+      <div className="section-header mb-6">
         <div className="section-title">Filter by Origin</div>
-        <div className="section-sub">Click any category to filter the product list</div>
+        <div className="section-sub">Click any tab to filter the list</div>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-16">
@@ -105,10 +105,10 @@ export default async function ProductsPage({
         })}
       </div>
 
-      {/* SEARCH FORM */}
-      <div className="section-header mb-8">
+      {/* SEARCH */}
+      <div className="section-header mb-6">
         <div className="section-title">Search Products</div>
-        <div className="section-sub">Find products by SKU or name</div>
+        <div className="section-sub">Find by SKU or name</div>
       </div>
 
       <form className="mb-16">
