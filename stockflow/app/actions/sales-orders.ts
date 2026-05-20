@@ -118,7 +118,7 @@ export async function getSalesOrders(role?: string) {
         include: {
           FinishedGoods: {
             include: {
-              Design: true
+              design: true
             }
           }
         }
@@ -138,8 +138,8 @@ export async function getSalesOrders(role?: string) {
     createdAt: order.createdAt,
     items: order.SaleItem.map(item => ({
       id: item.id,
-      designName: item.FinishedGoods?.Design?.name || 'Unknown',
-      designCode: item.FinishedGoods?.Design?.code || 'N/A',
+      designName: item.FinishedGoods?.design?.name || 'Unknown',
+      designCode: item.FinishedGoods?.design?.code || 'N/A',
       quantity: item.quantity,
       unitPrice: Number(item.unitPrice),
       totalPrice: Number(item.totalPrice)
