@@ -584,6 +584,18 @@ model StockReceipt {
   @@schema("public")
 }
 
+model inventory_transactions {
+  id               String   @id
+  product_name     String
+  quantity         Float
+  transaction_date DateTime @db.Timestamp(6)
+  reference_memo   String?
+  location         String?
+  created_at       DateTime @db.Timestamp(6)
+
+  @@schema("public")
+}
+
 enum ImportMode {
   update
   ignore
