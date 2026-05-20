@@ -171,7 +171,11 @@ export async function updateUser(formData: FormData) {
       name,
       role: role as typeof USER_ROLES[number],
     };
-    if (branchId) updateData.branchId = branchId;
+
+    // Only update branchId if it's a non-empty value (avoid foreign key violations)
+    if (branchId && branchId.trim() !== '') {
+      updateData.branchId = branchId;
+    }
 
     await prisma.user.update({
       where: { id: userId },
