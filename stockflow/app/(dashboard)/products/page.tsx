@@ -111,9 +111,9 @@ export default async function ProductsPage({
         <div className="section-sub">Find by SKU or name</div>
       </div>
 
-      <form className="mb-16">
+      <form className="mb-16 flex gap-2 items-end">
         {origin && <input type="hidden" name="origin" value={origin} />}
-        <div className="form-group max-w-md">
+        <div className="form-group max-w-md flex-1">
           <label className="form-label">Search</label>
           <input
             type="search"
@@ -123,6 +123,9 @@ export default async function ProductsPage({
             className="form-input"
           />
         </div>
+        <button type="submit" className="btn btn-primary h-[42px]">
+          Search
+        </button>
       </form>
 
       <div className="section-header mb-8">
