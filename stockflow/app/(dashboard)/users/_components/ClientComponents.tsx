@@ -26,10 +26,12 @@ function InviteModal({ onClose }: InviteModalProps) {
   }
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-md">
+    <div className="modal-overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        
         <form action={handleSubmit} className="space-y-4">
-          <h3 className="font-bold text-lg">Invite new user</h3>
+          <h3 className="font-bold text-lg mb-4">Invite new user</h3>
 
           {error && (
             <div className="alert alert-error">
@@ -38,13 +40,11 @@ function InviteModal({ onClose }: InviteModalProps) {
           )}
 
           <div>
-            <label className="label">
-              <span className="label-text">Email address</span>
-            </label>
+            <label className="block text-sm mb-1">Email address</label>
             <input
               type="email"
               name="email"
-              className="input input-bordered w-full"
+              className="form-input w-full"
               placeholder="user@company.com"
               required
               disabled={isPending}
@@ -52,13 +52,11 @@ function InviteModal({ onClose }: InviteModalProps) {
           </div>
 
           <div>
-            <label className="label">
-              <span className="label-text">Full name</span>
-            </label>
+            <label className="block text-sm mb-1">Full name</label>
             <input
               type="text"
               name="name"
-              className="input input-bordered w-full"
+              className="form-input w-full"
               placeholder="John Doe"
               required
               disabled={isPending}
@@ -66,10 +64,8 @@ function InviteModal({ onClose }: InviteModalProps) {
           </div>
 
           <div>
-            <label className="label">
-              <span className="label-text">Role</span>
-            </label>
-            <select name="role" className="select select-bordered w-full" required disabled={isPending}>
+            <label className="block text-sm mb-1">Role</label>
+            <select name="role" className="form-input w-full" required disabled={isPending}>
               <option value="">Select a role</option>
               <option value="ADMIN">Admin</option>
               <option value="MANAGER">Manager</option>
@@ -81,9 +77,7 @@ function InviteModal({ onClose }: InviteModalProps) {
           </div>
 
           <div>
-            <label className="label">
-              <span className="label-text">Branches</span>
-            </label>
+            <label className="block text-sm mb-2">Branches</label>
             <div className="space-y-2">
               {(['mombasa', 'nairobi', 'bonje'] as const).map((branch) => (
                 <label key={branch} className="flex items-center gap-2">
@@ -101,8 +95,8 @@ function InviteModal({ onClose }: InviteModalProps) {
             </div>
           </div>
 
-          <div className="modal-action">
-            <button type="button" className="btn" onClick={onClose} disabled={isPending}>
+          <div className="flex justify-end gap-3 pt-4">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isPending}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={isPending}>
@@ -111,8 +105,7 @@ function InviteModal({ onClose }: InviteModalProps) {
           </div>
         </form>
       </div>
-      <div className="modal-backdrop" onClick={onClose} />
-    </dialog>
+    </div>
   )
 }
 
@@ -183,8 +176,10 @@ function UserTable({ users }: UserTableProps) {
 
       {/* Edit Modal */}
       {editingId && (
-        <dialog className="modal modal-open">
-          <div className="modal-box">
+        <div className="modal-overlay open" onClick={() => setEditingId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setEditingId(null)}>✕</button>
+            
             <h3 className="font-bold text-lg mb-4">Edit user</h3>
             <UserForm
               mode="edit"
@@ -199,8 +194,7 @@ function UserTable({ users }: UserTableProps) {
               }}
             />
           </div>
-          <div className="modal-backdrop" onClick={() => setEditingId(null)} />
-        </dialog>
+        </div>
       )}
     </div>
   )
