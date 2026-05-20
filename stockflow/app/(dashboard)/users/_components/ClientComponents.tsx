@@ -13,8 +13,12 @@ function InviteModal({ onClose }: InviteModalProps) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setError(null)
+    
+    const formData = new FormData(e.currentTarget)
+    
     startTransition(async () => {
       const result = await inviteUser(formData)
       if (result.success) {
@@ -30,7 +34,7 @@ function InviteModal({ onClose }: InviteModalProps) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>✕</button>
         
-        <form action={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <h3 className="font-bold text-lg mb-4">Invite new user</h3>
 
           {error && (
