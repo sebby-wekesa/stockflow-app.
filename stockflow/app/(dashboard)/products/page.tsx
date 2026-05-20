@@ -145,12 +145,13 @@ export default async function ProductsPage({
                 <th>UOM</th>
                 <th>Current Stock</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={7} className="py-12 text-center text-muted text-sm">
                     {q || origin ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -190,6 +191,14 @@ export default async function ProductsPage({
                       <span className="badge badge-teal">
                         Active
                       </span>
+                    </td>
+                    <td>
+                      <Link 
+                        href={`/products/${p.id}/edit`} 
+                        className="btn btn-ghost btn-sm"
+                      >
+                        Edit
+                      </Link>
                     </td>
                   </tr>
                 ))
