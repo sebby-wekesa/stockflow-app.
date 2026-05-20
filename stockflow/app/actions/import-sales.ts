@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { SaleStatus } from "@prisma/client";
 
 interface ParsedSaleRow {
@@ -21,9 +21,10 @@ export async function importSalesData(rawText: string, branchName: string = "Nai
     throw new Error("Unauthorized: Only admins and warehouse staff can import sales");
   }
 
-  const branch = await prisma.branch.findUnique({ where: { name: branchName } });
+  const db = getTenantPrisma(user.organizationId);
+  const branch = await db.branch.findFirst({ where: { name: branchName, organizationId: user.organizationId } });
   if (!branch) {
-    throw new Error(`Branch '${branchName}' not found`);
+    throw new Error(`Branch '${branchName}' not found for this organization`);
   }
 
   const lines = rawText.trim().split(/\r?\n/);
@@ -72,7 +73,7 @@ export async function importSalesData(rawText: string, branchName: string = "Nai
 
   let created = 0;
 
-  await prisma.$transaction(async (tx) => {
+  await withTenantTransaction(user.organizationId, async (tx) => {
     for (const sale of sales) {
       let product = await tx.product.findFirst({
         where: { name: sale.productName, branchId: branch.id },
