@@ -12,10 +12,18 @@ export default async function CataloguePage() {
     orderBy: { createdAt: 'desc' }
   });
 
-  // Map unitCost → price for client component compatibility
+  // Transform to plain objects (convert Decimal → number, Date → string)
   const catalogueProducts = products.map(p => ({
-    ...p,
+    id: p.id,
+    design: {
+      name: p.design.name,
+      code: p.design.code,
+      description: p.design.description,
+    },
+    quantity: p.quantity,
+    kgProduced: Number(p.kgProduced),
     price: p.unitCost,
+    createdAt: p.createdAt.toISOString(),
   }));
 
   return <CatalogueClient products={catalogueProducts} />;

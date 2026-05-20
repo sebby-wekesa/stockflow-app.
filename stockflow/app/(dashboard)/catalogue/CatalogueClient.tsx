@@ -25,7 +25,7 @@ interface CatalogueProduct {
   quantity: number;
   kgProduced: number;
   price: number | null;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export default function CatalogueClient({ products }: { products: CatalogueProduct[] }) {
