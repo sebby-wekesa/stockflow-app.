@@ -1,7 +1,6 @@
-import { PrismaClient, StockOrigin, ProductCategory, StockStatus, SaleStatus, Design, FinishedGoods } from '@prisma/client';
+import { StockOrigin, ProductCategory, StockStatus, SaleStatus, Design, FinishedGoods } from '@prisma/client';
 import * as XLSX from 'xlsx';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 /**
  * Normalizes item names to ensure case-sensitive inner joins match 

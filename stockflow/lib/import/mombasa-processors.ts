@@ -1,5 +1,5 @@
 // Category-specific processors for Mombasa stock imports
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
 export interface ProcessedProduct {
   name: string
@@ -208,7 +208,6 @@ export async function processMombasaInventory(
   headers: string[],
   userId: string
 ) {
-  const prisma = new PrismaClient()
   const processor = detectCategory(headers)
 
   console.log(`Processing ${rows.length} rows as ${processor.categoryName} category`)

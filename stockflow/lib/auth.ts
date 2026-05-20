@@ -1,5 +1,5 @@
 import { supabaseServerComponent } from "./supabase-admin";
-import { prisma } from "./prisma";
+import { prisma, withRetry } from "./prisma";
 import { type UserRole } from "./types";
 
 export type Role = UserRole;
@@ -26,13 +26,15 @@ export async function getUser() {
       return null;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: authUser.id },
-      include: {
-        Branch: true,
-        Organization: true,
-      },
-    });
+    const user = await withRetry(() =>
+      prisma.user.findUnique({
+        where: { id: authUser.id },
+        include: {
+          Branch: true,
+          Organization: true,
+        },
+      })
+    );
 
     if (!user) {
       console.log("User not found in database for ID:", authUser.id);

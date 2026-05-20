@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { clearAuthCookies } from "@/lib/auth-session";
-import { prisma } from "@/lib/prisma";
+import { prisma, withRetry } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
 import { ALL_BRANCHES } from "@/lib/branches";
 
@@ -110,25 +110,26 @@ export async function signIn(formData: FormData) {
 
   // Ensure user exists in database (public.User table)
   try {
-    const existingUser = await prisma.user.findUnique({
-      where: { id: data.user.id }
-    });
+    const existingUser = await withRetry(() =>
+      prisma.user.findUnique({ where: { id: data.user.id } })
+    );
 
     if (!existingUser) {
-      await prisma.user.create({
-        data: {
-          id: data.user.id,
-          email: data.user.email!,
-          name: data.user.user_metadata?.name || '',
-          role: (data.user.user_metadata?.role as any) || 'PENDING',
-          password: 'SUPABASE_AUTH',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
+      await withRetry(() =>
+        prisma.user.create({
+          data: {
+            id: data.user.id,
+            email: data.user.email!,
+            name: data.user.user_metadata?.name || '',
+            role: (data.user.user_metadata?.role as any) || 'PENDING',
+            password: 'SUPABASE_AUTH',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      );
       console.log("Created new user record in database");
     } else {
-      // User exists - sync their role from Prisma to Supabase metadata in case admin updated it
       if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
         await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
           user_metadata: { 

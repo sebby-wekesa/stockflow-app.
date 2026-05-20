@@ -12,25 +12,22 @@ function getConnectionString(url: string) {
     parsed.searchParams.set('uselibpqcompat', 'true')
   }
 
-  // Enable connection pooling for Supabase
+  // Enable connection pooling for Supabase (transaction mode recommended)
   if (!parsed.searchParams.has('pgbouncer')) {
     parsed.searchParams.set('pgbouncer', 'true')
   }
 
-  // Set reasonable connection limits to prevent pool exhaustion
-  // Supabase pooler supports higher connection limits
+  // Very conservative limit for Supabase session pooler
   if (!parsed.searchParams.has('connection_limit')) {
-    parsed.searchParams.set('connection_limit', '50')
+    parsed.searchParams.set('connection_limit', '5')
   }
 
-  // Increase pool timeout for better handling under load
   if (!parsed.searchParams.has('pool_timeout')) {
-    parsed.searchParams.set('pool_timeout', '45')
+    parsed.searchParams.set('pool_timeout', '15')
   }
 
-  // Set statement timeout to 30 seconds to prevent hanging connections
   if (!parsed.searchParams.has('statement_timeout')) {
-    parsed.searchParams.set('statement_timeout', '30000')
+    parsed.searchParams.set('statement_timeout', '10000')
   }
 
   return parsed.toString()
