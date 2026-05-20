@@ -62,97 +62,77 @@ export default async function BranchStockPage({
     productWhere.stockStatus = params.status
   }
 
-   // Fetch all the dashboard data in parallel
-   const [products, total, branchSummaries, lowStockCount, allRawStock, allFinishedStock] = await Promise.all([
+    // Fetch all the dashboard data in parallel
+    const [products, total, branchSummaries, lowStockCount, allRawStock, allFinishedStock] = await Promise.all([
       prisma.product.findMany({
-         where: productWhere,
-         orderBy: {
-           sku: 'asc',
-         },
-         take: PAGE_SIZE,
-         skip: (page - 1) * PAGE_SIZE,
-       }),
-     prisma.product.count({ where: productWhere }),
-     // Get all raw material stock
-     prisma.inventoryRawMaterial.findMany({
-       where: { availableKg: { gt: 0 } },
-       include: { RawMaterial: { select: { id: true } } }
-     }),
-     // Get all finished goods stock
-     prisma.inventoryFinishedGoods.findMany({
-       where: { availableQty: { gt: 0 } },
-       include: { FinishedGoods: { select: { id: true } } }
-     }),
-    Promise.all(
-      ALL_BRANCHES.map(async (branch) => {
-        const [rawAgg, finishedAgg] = await Promise.all([
-          // For raw materials
-          prisma.inventoryRawMaterial.aggregate({
-            where: { branchId: branch, availableKg: { gt: 0 } },
-            _sum: { availableKg: true },
-            _count: { _all: true },
-          }),
-          // For finished goods
-          prisma.inventoryFinishedGoods.aggregate({
-            where: { branchId: branch, availableQty: { gt: 0 } },
-            _sum: { availableQty: true },
-            _count: { _all: true },
-          }),
-        ])
+        where: productWhere,
+        orderBy: { sku: 'asc' },
+        take: PAGE_SIZE,
+        skip: (page - 1) * PAGE_SIZE,
+      }),
+      prisma.product.count({ where: productWhere }),
 
-        // Calculate low stock for both raw materials and finished goods
-        const [rawLowStock, finishedLowStock] = await Promise.all([
-          prisma.inventoryRawMaterial.count({
-            where: {
-              branchId: branch,
-              availableKg: { gt: 0, lt: 5 },
-            },
-          }),
-          prisma.inventoryFinishedGoods.count({
-            where: {
-              branchId: branch,
-              availableQty: { gt: 0, lt: 5 },
-            },
-          }),
-        ])
+      // Branch summaries
+      Promise.all(
+        ALL_BRANCHES.map(async (branch) => {
+          const [rawAgg, finishedAgg] = await Promise.all([
+            prisma.inventoryRawMaterial.aggregate({
+              where: { branchId: branch, availableKg: { gt: 0 } },
+              _sum: { availableKg: true },
+              _count: { _all: true },
+            }),
+            prisma.inventoryFinishedGoods.aggregate({
+              where: { branchId: branch, availableQty: { gt: 0 } },
+              _sum: { availableQty: true },
+              _count: { _all: true },
+            }),
+          ])
 
-        // Compute approximate value: sum(availableKg * unitCost) for raw materials + sum(availableQty * unitCost) for finished goods
-        const [valuedRawStock, valuedFinishedStock] = await Promise.all([
-          prisma.inventoryRawMaterial.findMany({
-            where: { branchId: branch, availableKg: { gt: 0 } },
-            include: { RawMaterial: { select: { costPerKg: true } } },
-          }),
-          prisma.inventoryFinishedGoods.findMany({
-            where: { branchId: branch, availableQty: { gt: 0 } },
-            include: { FinishedGoods: { select: { unitCost: true } } },
-          }),
-        ])
+          const [rawLowStock, finishedLowStock] = await Promise.all([
+            prisma.inventoryRawMaterial.count({ where: { branchId: branch, availableKg: { gt: 0, lt: 5 } } }),
+            prisma.inventoryFinishedGoods.count({ where: { branchId: branch, availableQty: { gt: 0, lt: 5 } } }),
+          ])
 
-        const rawValue = valuedRawStock.reduce(
-          (sum, s) => sum + (Number(s.availableKg) * (Number(s.RawMaterial?.costPerKg) || 0)),
-          0
-        )
-        const finishedValue = valuedFinishedStock.reduce(
-          (sum, s) => sum + (Number(s.availableQty) * (Number(s.FinishedGoods?.unitCost) || 0)),
-          0
-        )
-        const value = rawValue + finishedValue
+          const [valuedRaw, valuedFinished] = await Promise.all([
+            prisma.inventoryRawMaterial.findMany({
+              where: { branchId: branch, availableKg: { gt: 0 } },
+              include: { RawMaterial: { select: { costPerKg: true } } },
+            }),
+            prisma.inventoryFinishedGoods.findMany({
+              where: { branchId: branch, availableQty: { gt: 0 } },
+              include: { FinishedGoods: { select: { unitCost: true } } },
+            }),
+          ])
 
-        return {
-          branch,
-          totalUnits: ((rawAgg._sum.availableKg ?? 0) + (finishedAgg._sum.availableQty ?? 0)),
-          totalSkus: ((rawAgg._count._all ?? 0) + (finishedAgg._count._all ?? 0)),
-          value,
-          lowStock: (rawLowStock + finishedLowStock),
-        }
-      })
-    ),
-    // Low stock count for both raw materials and finished goods
-    Promise.all([
-      prisma.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5 } } }),
-      prisma.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5 } } }),
-    ]).then(([rawCount, finishedCount]) => rawCount + finishedCount),
-  ])
+          const rawValue = valuedRaw.reduce((sum, s) => sum + (Number(s.availableKg) * (Number(s.RawMaterial?.costPerKg) || 0)), 0)
+          const finishedValue = valuedFinished.reduce((sum, s) => sum + (Number(s.availableQty) * (Number(s.FinishedGoods?.unitCost) || 0)), 0)
+
+          return {
+            branch,
+            totalUnits: Number(rawAgg._sum.availableKg ?? 0) + Number(finishedAgg._sum.availableQty ?? 0),
+            totalSkus: (rawAgg._count._all ?? 0) + (finishedAgg._count._all ?? 0),
+            value: rawValue + finishedValue,
+            lowStock: rawLowStock + finishedLowStock,
+          }
+        })
+      ),
+
+      // Global low stock count
+      Promise.all([
+        prisma.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5 } } }),
+        prisma.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5 } } }),
+      ]).then(([r, f]) => r + f),
+
+      // All raw + finished stock (for per-product branch breakdown)
+      prisma.inventoryRawMaterial.findMany({
+        where: { availableKg: { gt: 0 } },
+        include: { RawMaterial: { select: { id: true } } },
+      }),
+      prisma.inventoryFinishedGoods.findMany({
+        where: { availableQty: { gt: 0 } },
+        include: { FinishedGoods: { select: { id: true } } },
+      }),
+    ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
