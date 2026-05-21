@@ -382,27 +382,27 @@ export async function getManagerData() {
   try {
     pendingApprovals = await prisma.productionOrder.findMany({
       where: { status: 'PENDING' },
-      include: { Design: true },
+      include: { design: true },
     });
   } catch (error) {
     console.warn('Failed to fetch pending approvals:', error)
     pendingApprovals = []
   }
 
-  let activeProduction: { currentDept: string | null; _count: { _all: number } }[] = []
+  let activeProduction: any[] = []
   try {
-    const activeOrders = await prisma.productionOrder.findMany({
+    const grouped = await prisma.productionOrder.groupBy({
+      by: ['currentDept'],
       where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] } },
-      select: { currentDept: true },
+      _count: { _all: true },
+      _sum: { targetKg: true },
     });
-    const deptMap: Record<string, number> = {};
-    activeOrders.forEach(o => {
-      const dept = o.currentDept ?? 'Unknown';
-      deptMap[dept] = (deptMap[dept] || 0) + 1;
-    });
-    activeProduction = Object.entries(deptMap).map(([currentDept, count]) => ({
-      currentDept,
-      _count: { _all: count },
+    activeProduction = grouped.map(g => ({
+      currentDept: g.currentDept,
+      _count: g._count,
+      _sum: {
+        targetKg: g._sum.targetKg ? g._sum.targetKg.toNumber() : null,
+      },
     }));
   } catch (error) {
     console.warn('Failed to group active production:', error)

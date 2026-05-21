@@ -8,9 +8,11 @@ export async function createSalesOrder(data: {
   customerId?: string;
   customerName: string;
   items: {
-    finishedGoodsId: string;
+    finishedGoodsId?: string;
+    productId?: string;
     quantity: number;
     unitPrice: number;
+    source?: 'manufactured' | 'product';
   }[];
 }) {
   // Validate input data
@@ -23,8 +25,8 @@ export async function createSalesOrder(data: {
   }
 
   for (const item of data.items) {
-    if (!item.finishedGoodsId) {
-      throw new Error('All items must have a finished goods ID');
+    if (!item.finishedGoodsId && !item.productId) {
+      throw new Error('Each item must reference either a finished good or a product');
     }
     if (item.quantity <= 0) {
       throw new Error('Item quantities must be positive');
@@ -43,19 +45,72 @@ export async function createSalesOrder(data: {
 
   // Use transaction for atomic order creation
   return await prisma.$transaction(async (tx) => {
-    // Validate all items are available
-    for (const item of data.items) {
-      const finishedGoods = await tx.finishedGoods.findUnique({
-        where: { id: item.finishedGoodsId },
-        include: {
-          Design: true
-        }
-      });
-
-      if (!finishedGoods || finishedGoods.quantity < item.quantity) {
-        throw new Error(`Insufficient stock for item ${finishedGoods?.Design?.name || 'unknown'}`);
-      }
+    // Ensure placeholder design exists for non-manufactured product shadows
+    let placeholderDesignId: string
+    const existingDesign = await tx.design.findUnique({ where: { code: 'IMPORTED' } })
+    if (existingDesign) {
+      placeholderDesignId = existingDesign.id
+    } else {
+      const d = await tx.design.create({
+        data: {
+          name: 'Manual sale placeholder',
+          code: 'IMPORTED',
+          description: 'Placeholder design used when recording sales of non-manufactured items.',
+        },
+      })
+      placeholderDesignId = d.id
     }
+
+    // Resolve every line to a valid finishedGoodsId (creating shadow records for general Products)
+    const resolvedItems = await Promise.all(
+      data.items.map(async (item) => {
+        let fgId = item.finishedGoodsId
+
+        if (!fgId && item.productId) {
+          // General Product → create/lookup shadow FinishedGoods
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { id: true, sku: true, name: true, unitCost: true },
+          })
+          if (!product) throw new Error('Referenced product not found')
+
+          const fgSku = product.sku || `PROD-${product.id.slice(0, 8)}`
+          let fg = await tx.finishedGoods.findUnique({ where: { sku: fgSku } })
+
+          if (!fg) {
+            fg = await tx.finishedGoods.create({
+              data: {
+                sku: fgSku,
+                designId: placeholderDesignId,
+                quantity: 0,
+                kgProduced: 0,
+                unitCost: item.unitPrice ?? product.unitCost ?? 0,
+              },
+            })
+          }
+          fgId = fg.id
+        }
+
+        if (!fgId) throw new Error('Could not resolve item to a finished good')
+
+        // Validate stock for manufactured items (shadow items have qty=0 and are decremented on Product instead)
+        if (item.source !== 'product') {
+          const fg = await tx.finishedGoods.findUnique({
+            where: { id: fgId },
+            include: { Design: true },
+          })
+          if (!fg || fg.quantity < item.quantity) {
+            throw new Error(`Insufficient stock for ${fg?.Design?.name || 'item'}`)
+          }
+        }
+
+        return {
+          finishedGoodsId: fgId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        }
+      })
+    )
 
     // Calculate totals
     const totalAmount = data.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -66,9 +121,9 @@ export async function createSalesOrder(data: {
         customerId: data.customerId,
         customerName: data.customerName,
         totalAmount,
-        status: 'PENDING', // Orders start as pending and need confirmation
+        status: 'PENDING',
         SaleItem: {
-          create: data.items.map(item => ({
+          create: resolvedItems.map(item => ({
             finishedGoodsId: item.finishedGoodsId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,

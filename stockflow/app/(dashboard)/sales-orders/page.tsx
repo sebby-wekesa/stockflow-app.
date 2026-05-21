@@ -34,10 +34,28 @@ async function getAvailableStock() {
   });
 }
 
+async function getAvailableProducts() {
+  return await prisma.product.findMany({
+    where: { currentStock: { gt: 0 } },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      currentStock: true,
+      uom: true,
+      origin: true,
+      unitCost: true,
+      createdAt: true,
+    },
+    orderBy: { name: 'asc' },
+  });
+}
+
 export default async function SalesOrdersPage() {
-  const [rawSaleOrders, stock] = await Promise.all([
+  const [rawSaleOrders, stock, products] = await Promise.all([
     getSaleOrders(),
-    getAvailableStock()
+    getAvailableStock(),
+    getAvailableProducts()
   ]);
 
   // Transform saleOrders to match component expectations
@@ -50,15 +68,33 @@ export default async function SalesOrdersPage() {
     amount: Number(order.totalAmount)
   }));
 
-  // Transform the data to satisfy the 'CatalogueItem' type for SalesOrderForm
-  const formattedProducts = stock.map(item => ({
+  // Manufactured / Design items (current FinishedGoods with design info)
+  const manufactured = stock.map(item => ({
     id: item.id,
     name: item.Design.name,
     code: item.Design.code,
     availableQty: item.quantity,
     kgProduced: Number(item.kgProduced),
-    createdAt: item.createdAt
+    price: item.unitCost ? Number(item.unitCost) : undefined,
+    createdAt: item.createdAt,
+    source: 'manufactured' as const,
   }));
+
+  // General catalog products (can be services, imported, local purchase, etc.)
+  const otherProducts = products.map(p => ({
+    id: p.id,                    // Note: for these we will create a shadow FinishedGoods on submit
+    name: p.name,
+    code: p.sku || p.id.slice(0, 8),
+    availableQty: Math.floor(p.currentStock),
+    kgProduced: 0,
+    price: p.unitCost ? Number(p.unitCost) : undefined,
+    createdAt: p.createdAt,
+    source: 'product' as const,
+    origin: p.origin,
+    uom: p.uom,
+  }));
+
+  const formattedProducts = [...manufactured, ...otherProducts];
 
   return (
     <div className="p-8 bg-[#0f1113] min-h-screen">

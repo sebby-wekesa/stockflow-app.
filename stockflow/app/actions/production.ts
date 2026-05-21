@@ -42,10 +42,9 @@ export async function getOperatorQueue(role?: string, department?: string) {
     currentStage: o.currentStage,
     totalStages: o.design.stages.length,
     priority: o.priority,
-    targetKg: o.targetKg,
-    // Add logic to get the current stage target dims or specific work
+    targetKg: o.targetKg ? Number(o.targetKg) : 0,
     workDescription: o.design.stages.find((s: { sequence: number; name: string }) => s.sequence === o.currentStage)?.name || "Production",
-    inheritedKg: o.targetKg, // Simplified for now
+    inheritedKg: o.targetKg ? Number(o.targetKg) : 0,
   }));
 }
 
@@ -149,4 +148,33 @@ export async function updateOrderPriority(orderId: string, priority: string) {
   revalidatePath('/production');
 
   return { success: true };
+}
+
+export async function getActiveDepartments() {
+  const user = await requireAuth();
+
+  try {
+    const depts = await prisma.productionOrder.findMany({
+      where: {
+        status: { in: ["APPROVED", "IN_PRODUCTION"] },
+        ...(user.branchId ? { branchId: user.branchId } : {}),
+      },
+      select: { currentDept: true },
+      distinct: ["currentDept"],
+    });
+
+    const active = depts
+      .map(d => d.currentDept)
+      .filter((d): d is string => !!d);
+
+    // Always include user's own department if set
+    if (user.department && !active.includes(user.department)) {
+      active.unshift(user.department);
+    }
+
+    return active.length > 0 ? active : ["Cutting", "Bending", "Welding", "Assembly"];
+  } catch (error) {
+    console.warn("Failed to fetch active departments:", error);
+    return ["Cutting", "Bending", "Welding", "Assembly", "Packaging"];
+  }
 }

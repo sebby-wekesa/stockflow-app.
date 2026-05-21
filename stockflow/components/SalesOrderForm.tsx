@@ -9,54 +9,119 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ShoppingCart, CheckCircle, AlertTriangle } from 'lucide-react'
 
-interface CatalogueItem {
-  id: string
+interface SellableItem {
+  id: string                    // FinishedGoods id (shadow or real)
   name: string
   code: string
   availableQty: number
   kgProduced: number
   price?: number
-  createdAt: Date
+  createdAt: Date | string
+  source?: 'manufactured' | 'product'
+  origin?: string               // FACTORY_MADE | LOCAL_PURCHASE | IMPORTED | etc.
+  uom?: string
 }
 
 interface SalesOrderFormProps {
-  products: CatalogueItem[]
+  products: SellableItem[]
   onOrderPlaced?: () => void
 }
 
 export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps) {
-  const [selectedItems, setSelectedItems] = useState<Record<string, number>>({})
+  // Normalize whatever shape we receive (old catalogue shape with .design or new flat shape)
+  const allItems: SellableItem[] = products.map((p: Record<string, unknown>) => ({
+    id: p.id,
+    name: p.name || p.design?.name || 'Unnamed',
+    code: p.code || p.design?.code || p.sku || p.id?.slice(0, 8),
+    availableQty: p.availableQty ?? p.quantity ?? 0,
+    kgProduced: Number(p.kgProduced || 0),
+    price: p.price ?? p.unitCost ?? undefined,
+    createdAt: p.createdAt,
+    source: p.source,
+    origin: p.origin || p.design?.origin,
+    uom: p.uom,
+  }));
+
+  // New line-item based selection for sales team (supports mixing Products + Designs easily)
+  type OrderLine = {
+    itemId: string
+    name: string
+    code: string
+    source?: 'manufactured' | 'product'
+    origin?: string
+    maxQty: number
+    quantity: number
+    unitPrice: number
+  }
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [orderLines, setOrderLines] = useState<OrderLine[]>([])
   const [customerName, setCustomerName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      const newItems = { ...selectedItems }
-      delete newItems[productId]
-      setSelectedItems(newItems)
-    } else {
-      const product = products.find(p => p.id === productId)
-      if (product && quantity <= product.availableQty) {
-        setSelectedItems(prev => ({ ...prev, [productId]: quantity }))
+  // Filtered items for the search picker (sales team can search across Products and Designs)
+  const filteredItems = allItems
+    .filter(item =>
+      !searchTerm ||
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.code.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .slice(0, 20) // limit for performance
+
+  const addLine = (item: SellableItem) => {
+    // Prevent duplicates
+    if (orderLines.some(l => l.itemId === item.id)) return
+
+    const unitPrice = item.price ?? 0
+    const maxQty = item.availableQty
+
+    setOrderLines(prev => [
+      ...prev,
+      {
+        itemId: item.id,
+        name: item.name,
+        code: item.code,
+        source: item.source,
+        origin: item.origin,
+        maxQty,
+        quantity: 1,
+        unitPrice,
       }
-    }
+    ])
+    setSearchTerm('') // clear search after adding
   }
 
-  const getSelectedProducts = () => {
-    return products.filter(product => selectedItems[product.id])
+  const updateLineQty = (itemId: string, newQty: number) => {
+    setOrderLines(prev =>
+      prev.map(line =>
+        line.itemId === itemId
+          ? { ...line, quantity: Math.max(1, Math.min(newQty, line.maxQty)) }
+          : line
+      )
+    )
+  }
+
+  const updateLinePrice = (itemId: string, newPrice: number) => {
+    setOrderLines(prev =>
+      prev.map(line =>
+        line.itemId === itemId ? { ...line, unitPrice: Math.max(0, newPrice) } : line
+      )
+    )
+  }
+
+  const removeLine = (itemId: string) => {
+    setOrderLines(prev => prev.filter(l => l.itemId !== itemId))
   }
 
   const getTotal = () => {
-    return getSelectedProducts().reduce((sum, product) => {
-      return sum + ((product.price || 0) * selectedItems[product.id])
-    }, 0)
+    return orderLines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (getSelectedProducts().length === 0 || !customerName.trim()) return
+    if (orderLines.length === 0 || !customerName.trim()) return
 
     setSubmitting(true)
     setError(null)
@@ -64,26 +129,30 @@ export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps)
     try {
       const orderData = {
         customerName: customerName.trim(),
-        items: getSelectedProducts().map(product => ({
-          finishedGoodsId: product.id,
-          quantity: selectedItems[product.id],
-          unitPrice: product.price || 0
+        items: orderLines.map(line => ({
+          // manufactured → real FinishedGoods id
+          // product → Product id (server will create shadow FinishedGoods)
+          finishedGoodsId: line.source === 'manufactured' ? line.itemId : undefined,
+          productId: line.source === 'product' ? line.itemId : undefined,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          source: line.source,
         }))
       }
 
       await createSalesOrder(orderData)
 
       setSuccess(true)
-      setSelectedItems({})
+      setOrderLines([])
       setCustomerName('')
+      setSearchTerm('')
 
       if (onOrderPlaced) {
         onOrderPlaced()
       }
 
-      // Reset success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000)
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.message)
     } finally {
       setSubmitting(false)
@@ -97,7 +166,7 @@ export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps)
           <ShoppingCart className="h-5 w-5" />
           Place Sales Order
         </CardTitle>
-        <CardDescription>Create a new sales order from available finished goods</CardDescription>
+        <CardDescription>Create a sales order by choosing from Products and manufactured Designs</CardDescription>
       </CardHeader>
       <CardContent>
         {success && (
@@ -127,79 +196,136 @@ export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps)
             />
           </div>
 
-          {/* Product Selection */}
+          {/* Product / Design Selection - Searchable for Sales Team */}
           <div>
-            <Label>Available Products</Label>
-            <div className="space-y-3 mt-2 max-h-96 overflow-y-auto">
-              {products.map((product) => {
-                const selectedQty = selectedItems[product.id] || 0
-                return (
-                  <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-gray-500">{product.code}</div>
-                      <div className="text-sm text-gray-600">
-                        {product.availableQty} units available • {product.kgProduced.toFixed(2)} kg
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">${(product.price || 0).toFixed(2)}</span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateQuantity(product.id, selectedQty - 1)}
-                          disabled={selectedQty === 0}
-                        >
-                          -
-                        </Button>
-                        <span className="w-8 text-center text-sm">{selectedQty}</span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateQuantity(product.id, selectedQty + 1)}
-                          disabled={selectedQty >= product.availableQty}
-                        >
-                          +
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              {products.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No products available for ordering
-                </div>
-              )}
-            </div>
-          </div>
+            <Label className="mb-1 block">Add items (search Products or Designs)</Label>
+            <Input
+              placeholder="Type to search products, SKUs, or design codes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mb-2"
+            />
 
-          {/* Order Summary */}
-          {getSelectedProducts().length > 0 && (
-            <div className="border-t pt-4">
-              <h3 className="font-semibold mb-3">Order Summary</h3>
-              <div className="space-y-2">
-                {getSelectedProducts().map((product) => (
-                  <div key={product.id} className="flex justify-between text-sm">
-                    <span>{product.name} × {selectedItems[product.id]}</span>
-                    <span>${((product.price || 0) * selectedItems[product.id]).toFixed(2)}</span>
+            {/* Search Results */}
+            {searchTerm && filteredItems.length > 0 && (
+              <div className="border rounded-lg max-h-48 overflow-auto mb-3 bg-white shadow-sm">
+                {filteredItems.map(item => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-2 hover:bg-gray-50 border-b last:border-b-0 cursor-pointer"
+                    onClick={() => addLine(item)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium flex items-center gap-2 text-sm">
+                        {item.name}
+                        {item.source === 'manufactured' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">Design</span>
+                        )}
+                        {item.source === 'product' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                            {item.origin || 'Product'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono">{item.code}</div>
+                      <div className="text-xs text-gray-600">
+                        {item.availableQty} {item.uom || 'units'} available
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">${(item.price || 0).toFixed(2)}</div>
+                      <Button type="button" size="sm" variant="secondary" className="mt-1 h-7 text-xs">
+                        Add
+                      </Button>
+                    </div>
                   </div>
                 ))}
-                <div className="border-t pt-2 flex justify-between font-semibold">
-                  <span>Total:</span>
+              </div>
+            )}
+
+            {searchTerm && filteredItems.length === 0 && (
+              <div className="text-sm text-gray-500 mb-3">No matching items found.</div>
+            )}
+
+            {/* Selected Order Lines */}
+            {orderLines.length > 0 && (
+              <div className="border rounded-lg p-3">
+                <div className="font-semibold mb-2 text-sm">Order Lines ({orderLines.length})</div>
+                <div className="space-y-2">
+                  {orderLines.map(line => (
+                    <div key={line.itemId} className="flex flex-wrap items-center gap-2 bg-gray-50 p-2 rounded">
+                      <div className="flex-1 min-w-[140px]">
+                        <div className="font-medium text-sm flex items-center gap-1.5">
+                          {line.name}
+                          {line.source === 'manufactured' && <span className="text-[10px] bg-teal-100 text-teal-700 px-1 rounded">Design</span>}
+                          {line.source === 'product' && <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">{line.origin || 'Product'}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 font-mono">{line.code}</div>
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] block">Qty</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={line.maxQty}
+                          value={line.quantity}
+                          onChange={(e) => updateLineQty(line.itemId, parseInt(e.target.value) || 1)}
+                          className="w-20 h-8 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-[10px] block">Unit Price</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={line.unitPrice}
+                          onChange={(e) => updateLinePrice(line.itemId, parseFloat(e.target.value) || 0)}
+                          className="w-24 h-8 text-sm"
+                        />
+                      </div>
+
+                      <div className="text-right min-w-[70px]">
+                        <Label className="text-[10px] block">Line Total</Label>
+                        <div className="font-mono text-sm font-semibold">
+                          ${(line.quantity * line.unitPrice).toFixed(2)}
+                        </div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeLine(line.itemId)}
+                        className="text-red-600 hover:text-red-700 mt-4"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t mt-3 pt-3 flex justify-between font-semibold">
+                  <span>Order Total</span>
                   <span>${getTotal().toFixed(2)}</span>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {orderLines.length === 0 && !searchTerm && (
+              <div className="text-sm text-gray-500 border rounded p-4 text-center">
+                Start typing above to search across all Products and Designs, then click <strong>Add</strong>.
+              </div>
+            )}
+          </div>
+
+          {/* The order lines above already show live totals */}
 
           <Button
             type="submit"
             className="w-full"
-            disabled={getSelectedProducts().length === 0 || !customerName.trim() || submitting}
+            disabled={orderLines.length === 0 || !customerName.trim() || submitting}
           >
             {submitting ? (
               <>

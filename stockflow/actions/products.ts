@@ -41,6 +41,8 @@ const createSchema = z.object({
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
   reorder_point: z.coerce.number().int().nonnegative().optional().nullable(),
   vendor: z.string().max(200).optional().nullable(),
+  current_stock: z.coerce.number().optional().nullable(),
+  adjustment_reason: z.string().max(500).optional().nullable(),
   // Fields below are not in the schema — accepted but ignored so existing forms don't crash:
   product_type: z.string().optional().nullable(),
   description: z.string().max(500).optional().nullable(),
@@ -62,6 +64,8 @@ function extractForm(formData: FormData) {
     selling_price: formData.get('selling_price') || null,
     reorder_point: formData.get('reorder_point') || null,
     vendor: formData.get('vendor') || null,
+    current_stock: formData.get('current_stock') ?? null,
+    adjustment_reason: formData.get('adjustment_reason') || null,
     product_type: formData.get('product_type') || null,
     description: formData.get('description') || null,
     vehicle_make: formData.get('vehicle_make') || null,
@@ -150,6 +154,15 @@ export async function updateProduct(productId: string, formData: FormData) {
     }
   }
 
+  const oldStock = existing.currentStock ?? 0
+  const newStock = parsed.data.current_stock != null ? Number(parsed.data.current_stock) : oldStock
+  const stockChanged = Math.abs(newStock - oldStock) > 0.0001
+  const reason = parsed.data.adjustment_reason?.trim() || null
+
+  if (stockChanged && !reason) {
+    throw new Error('Adjustment reason is required when changing stock')
+  }
+
   await prisma.product.update({
     where: { id: productId },
     data: {
@@ -160,8 +173,22 @@ export async function updateProduct(productId: string, formData: FormData) {
       unitCost: parsed.data.cost_price ?? null,
       vendor: parsed.data.vendor ?? null,
       reorderLevel: parsed.data.reorder_point ?? null,
+      currentStock: newStock,
     },
   })
+
+  if (stockChanged) {
+    const delta = newStock - oldStock
+    await prisma.stockMovement.create({
+      data: {
+        productId,
+        movementType: 'adjustment',
+        quantity: delta,
+        reference: 'Manual edit via UI',
+        notes: reason,
+      },
+    })
+  }
 
   revalidatePath('/products')
   revalidatePath(`/products/${productId}`)

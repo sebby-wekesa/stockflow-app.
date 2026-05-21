@@ -46,8 +46,8 @@ export default async function ManagerContent() {
               <div className="grid-2" style={{gap:'10px',marginBottom:'2px'}}>
                 <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>QUANTITY</div><div style={{fontWeight:'600',marginTop:'3px'}}>{order.quantity} units</div></div>
                 <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>KG RESERVED</div><div style={{fontFamily:'var(--font-mono)',marginTop:'3px',color:'var(--accent)'}}>{order.targetKg.toFixed(0)} kg</div></div>
-                <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>MATERIAL</div><div style={{fontSize:'12px',marginTop:'3px'}}>Steel rod {order.materialDiameter}mm</div></div>
-                <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>SPECIFICATIONS</div><div style={{fontSize:'12px',marginTop:'3px'}}>{order.design.code} · {order.targetDims}</div></div>
+                <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>MATERIAL</div>                  <div style={{fontSize:'12px',marginTop:'3px'}}>Steel rod {order.materialDiameter ?? '—'}mm</div></div>
+                <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>SPECIFICATIONS</div><div style={{fontSize:'12px',marginTop:'3px'}}>{order.design?.code} · {order.targetDims ?? order.design?.targetDimensions ?? '—'}</div></div>
               </div>
               <div className="approval-actions">
                 <form action={approveOrder.bind(null, order.id)}>
@@ -55,9 +55,11 @@ export default async function ManagerContent() {
                 </form>
                 <Link href={`/production-orders/${order.id}/edit`} className="btn btn-ghost">Edit specs</Link>
                 <button 
+  type="button"
   className="btn btn-red btn-sm" 
   style={{marginLeft:'auto'}}
-  onClick={() => alert('Reject functionality will be implemented in Stage 4 (approvals flow)')}
+  disabled
+  title="Reject functionality will be implemented in Stage 4"
 >
   Reject
 </button>

@@ -1,91 +1,146 @@
-export const dynamic = 'force-dynamic';
+'use client';
 
-import { getUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
-import Link from "next/link";
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { getOperatorQueue, getActiveDepartments } from '@/app/actions/production';
 
-async function getOperatorStats(department: string | null) {
-  if (!department) return null;
-
-  const pendingJobs = await prisma.productionOrder.findMany({
-    where: {
-      status: { in: ["APPROVED", "IN_PRODUCTION"] },
-      currentDept: department,
-    },
-    include: {
-      design: { include: { stages: true } },
-      StageLog: { orderBy: { sequence: "desc" }, take: 1 },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  return { pendingJobs, department };
+interface Job {
+  id: string;
+  orderNumber: string;
+  designName: string;
+  currentStage: number;
+  totalStages: number;
+  priority: string;
+  targetKg: number;
+  workDescription: string;
+  inheritedKg: number;
 }
 
-type OperatorStats = NonNullable<Awaited<ReturnType<typeof getOperatorStats>>>;
-type PendingJob = OperatorStats["pendingJobs"][number];
+export default function OperatorQueuePage() {
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string>('');
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function OperatorQueuePage() {
-  const user = await getUser();
-  if (!user) redirect("/login");
+  // Load available departments that have active work
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const depts = await getActiveDepartments();
+        setDepartments(depts.length > 0 ? depts : ['Cutting', 'Bending', 'Welding', 'Assembly']);
 
-  if (user.role !== "OPERATOR" && user.role !== "ADMIN") {
-    redirect("/unauthorized");
-  }
+        const initialDept = depts[0] || 'Cutting';
+        setSelectedDept(initialDept);
 
-  const department = user.department;
-  const stats = department ? await getOperatorStats(department) : null;
+        // Try to get current user name (best effort)
+        // For now we just show a generic welcome
+      } catch (err) {
+        setDepartments(['Cutting', 'Bending', 'Welding', 'Assembly']);
+        setSelectedDept('Cutting');
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
-  if (!stats) {
-    return (
-      <div className="card">
-        <p className="text-muted text-sm">No department assigned</p>
-      </div>
-    );
-  }
+  // Load jobs whenever department changes
+  useEffect(() => {
+    if (!selectedDept) return;
+
+    const loadJobs = async () => {
+      setLoading(true);
+      try {
+        const result = await getOperatorQueue(undefined, selectedDept);
+        setJobs(result || []);
+      } catch (err) {
+        setJobs([]);
+      }
+      setLoading(false);
+    };
+
+    loadJobs();
+  }, [selectedDept]);
 
   return (
     <div className="mb-24">
-      <div className="section-header mb-16">
+      <div className="section-header mb-12">
         <div>
-          <div className="section-title">{department} dept — job queue</div>
+          <div className="section-title">Operator — Job Queue</div>
           <div className="section-sub">
-            Welcome back, {user.name || user.email}
+            Select your current department to see available active jobs
           </div>
         </div>
       </div>
-      {stats.pendingJobs.length === 0 ? (
-        <div className="card">
-          <p className="text-muted text-sm">No jobs in queue</p>
-        </div>
-      ) : (
-        <div>
-          {stats.pendingJobs.map((order) => (
-            <JobCard key={order.id} order={order} />
+
+      {/* Department Chooser */}
+      <div className="mb-8">
+        <div className="text-xs uppercase tracking-[1px] text-muted mb-2">Choose Department / Station</div>
+        <div className="flex flex-wrap gap-2">
+          {departments.map((dept) => (
+            <button
+              key={dept}
+              onClick={() => setSelectedDept(dept)}
+              className={`btn btn-sm ${selectedDept === dept ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              {dept}
+            </button>
           ))}
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
 
-function JobCard({ order }: { order: PendingJob }) {
-  const currentStage = order.design.stages.find((stage) => stage.sequence === order.currentStage);
+      {/* Jobs List */}
+      <div className="card">
+        <div className="section-header mb-8">
+          <div className="section-title">{selectedDept || 'Loading...'} — Active Jobs</div>
+          <div className="section-sub">Jobs waiting to be processed at this station</div>
+        </div>
 
-  return (
-    <div className="job-card inprog" style={{ marginBottom: "10px" }}>
-      <Link href={`/jobs/${order.id}`} className="block">
-        <div className="job-header">
-          <span className="job-id">{order.id.slice(0, 8)} · Stage {order.currentStage}/{order.design.stages.length}</span>
-          <span className="badge badge-amber">In progress</span>
-        </div>
-        <div className="job-design">{order.design.name} — {currentStage?.name || "Unknown"}</div>
-        <div className="job-meta" style={{ marginTop: "8px" }}>
-          <span>Target: <span className="job-kg">{order.targetKg.toString()} kg</span></span>
-          <span>Qty: {order.quantity} units</span>
-        </div>
-      </Link>
+        {loading && (
+          <div className="p-8 text-center text-muted text-sm">Loading jobs...</div>
+        )}
+
+        {!loading && jobs.length > 0 && (
+          <div className="space-y-3">
+            {jobs.map((job) => {
+              const isUrgent = job.priority === 'URGENT' || job.priority === 'HIGH';
+              return (
+                <Link
+                  key={job.id}
+                  href={`/operator_log/${job.id}`}
+                  className="block"
+                >
+                  <div className={`job-card ${isUrgent ? 'urgent' : 'inprog'}`}>
+                    <div className="job-header">
+                      <span className="job-id">
+                        {job.orderNumber} · Stage {job.currentStage}/{job.totalStages}
+                      </span>
+                      <span className={`badge ${isUrgent ? 'badge-red' : 'badge-amber'}`}>
+                        {isUrgent ? 'Urgent' : 'Ready'}
+                      </span>
+                    </div>
+                    <div className="job-design">
+                      {job.designName} — {job.workDescription}
+                    </div>
+                    <div className="job-meta" style={{ marginTop: '6px', fontSize: '12px', color: 'var(--muted)' }}>
+                      <span>Target: <span className="job-kg">{Number(job.targetKg).toFixed(1)} kg</span></span>
+                      <span>Received: {Number(job.inheritedKg).toFixed(1)} kg</span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && jobs.length === 0 && selectedDept && (
+          <div className="p-8 text-center">
+            <p className="text-muted text-sm">
+              No active jobs currently in the <strong>{selectedDept}</strong> department.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

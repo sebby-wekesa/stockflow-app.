@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth'
 import { Role } from '@/lib/auth'
-import { RawMaterial } from '@prisma/client'
+
 import { TeamRole } from '@/lib/proxy'
 import Link from 'next/link'
 
@@ -124,7 +124,7 @@ async function OperatorQueue({ user, role }: { user: any; role: TeamRole }) {
                     <td>{item.designName}</td>
                     <td>{new Date(item.completedAt).toLocaleDateString()}</td>
                     <td>
-                      <span className="job-kg">{item.kgOut} kg</span>
+                      <span className="job-kg">{Number(item.kgOut)} kg</span>
                     </td>
                     <td>
                       <span className="badge badge-green">Completed</span>
@@ -178,7 +178,7 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
                 <div className="product-stock">
                   <span className="job-kg">{product.availableQty} units</span> available
                 </div>
-                <div className="product-price">${product.price}/unit</div>
+                <div className="product-price">${Number(product.price)}/unit</div>
                 <a href="/catalogue" className="btn btn-sm">Order Now</a>
               </div>
             ))}
@@ -245,15 +245,22 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
 async function WarehouseView({ user, role }: { user: any; role: TeamRole }) {
   const { prisma } = await import('@/lib/prisma')
 
-  // Initialize with the specific Prisma type
-  let materials: RawMaterial[] = []
+  // Use any[] because we convert Decimal → number for rendering
+  let materials: any[] = []
 
   try {
-    materials = await prisma.rawMaterial.findMany({
+    const rawMaterials = await prisma.rawMaterial.findMany({
       orderBy: {
         materialName: "asc",
       },
     })
+
+    // Convert Prisma Decimal fields to plain numbers so they can be rendered in JSX
+    materials = rawMaterials.map(m => ({
+      ...m,
+      availableKg: Number(m.availableKg),
+      reservedKg: Number(m.reservedKg),
+    }))
   } catch (error) {
     console.warn('Failed to fetch raw materials:', error)
     materials = []
@@ -292,9 +299,9 @@ async function WarehouseView({ user, role }: { user: any; role: TeamRole }) {
                   <td>{material.materialName}</td>
                   <td>{material.diameter}</td>
                   <td>
-                    <span className="job-kg">{material.availableKg} kg</span>
+                    <span className="job-kg">{Number(material.availableKg)} kg</span>
                   </td>
-                  <td>{material.reservedKg} kg</td>
+                  <td>{Number(material.reservedKg)} kg</td>
                   <td>{material.supplier || '—'}</td>
                 </tr>
               ))}
@@ -363,7 +370,7 @@ async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
                       </td>
                       <td>{order.design}</td>
                       <td>
-                        <span className="job-kg">{order.kg} kg</span>
+                        <span className="job-kg">{Number(order.kg)} kg</span>
                       </td>
                       <td>
                         <span className={`badge ${
@@ -395,7 +402,7 @@ async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
                 <div key={item.dept} className="scrap-bar-wrap">
                   <div className="scrap-bar-label">
                     <span>{item.dept}</span>
-                    <span>{item.kg} kg · {item.pct}%</span>
+                    <span>{Number(item.kg)} kg · {item.pct}%</span>
                   </div>
                   <div className="scrap-bar">
                     <div className={`scrap-bar-fill ${cls}`} style={{width:`${Math.min(item.pct*4, 100)}%`}} />
@@ -430,7 +437,7 @@ async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
                     <td>{dept.dept}</td>
                     <td>{dept.jobs}</td>
                     <td>
-                      <span className="job-kg">{dept.kg} kg</span>
+                      <span className="job-kg">{Number(dept.kg)} kg</span>
                     </td>
                     <td>
                       <span className={`badge ${
@@ -589,7 +596,7 @@ async function AdminView({ user, role }: { user: any; role: TeamRole }) {
                       </td>
                       <td>{order.design}</td>
                       <td>
-                        <span className="job-kg">{order.kg} kg</span>
+                        <span className="job-kg">{Number(order.kg)} kg</span>
                       </td>
                       <td>
                         <span className={`badge ${
@@ -621,7 +628,7 @@ async function AdminView({ user, role }: { user: any; role: TeamRole }) {
                 <div key={item.dept} className="scrap-bar-wrap">
                   <div className="scrap-bar-label">
                     <span>{item.dept}</span>
-                    <span>{item.kg} kg · {item.pct}%</span>
+                    <span>{Number(item.kg)} kg · {item.pct}%</span>
                   </div>
                   <div className="scrap-bar">
                     <div className={`scrap-bar-fill ${cls}`} style={{width:`${item.pct*4}%`}} />
@@ -656,9 +663,9 @@ async function AdminView({ user, role }: { user: any; role: TeamRole }) {
                     <td>{dept.dept}</td>
                     <td>{dept.jobs}</td>
                     <td>
-                      <span className="job-kg">{dept.kg} kg</span>
+                      <span className="job-kg">{Number(dept.kg)} kg</span>
                     </td>
-                    <td>{dept.scrap} kg</td>
+                    <td>{Number(dept.scrap)} kg</td>
                     <td>
                       <span className={`badge ${
                         dept.yield < 70 ? 'badge-red' :

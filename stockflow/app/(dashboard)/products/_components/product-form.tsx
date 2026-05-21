@@ -23,6 +23,7 @@ type Initial = {
   cost_price?: number | null
   selling_price?: number | null
   reorder_point?: number | null
+  currentStock?: number | null
 }
 
 export function ProductForm({
@@ -322,6 +323,41 @@ export function ProductForm({
           )}
         </div>
       </div>
+
+      {mode === 'edit' && (
+        <div className="card p-6 border-amber-500/50">
+          <div className="font-head font-bold mb-2 text-amber-600">⚠ Stock Adjustment</div>
+          <div className="text-sm text-muted mb-4">
+            Changing stock here creates an adjustment record. Prefer using receipts or production for normal changes.
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+                Current Stock (PCS or units)
+              </label>
+              <input
+                name="current_stock"
+                type="number"
+                step="0.01"
+                defaultValue={initial?.currentStock ?? 0}
+                className="input font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+                Reason for adjustment <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="adjustment_reason"
+                type="text"
+                required
+                placeholder="e.g. Physical count correction, damaged goods, etc."
+                className="input"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3">
         <button type="submit" disabled={isPending} className="btn btn-primary">
