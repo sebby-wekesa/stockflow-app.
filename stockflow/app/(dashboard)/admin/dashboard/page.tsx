@@ -1,39 +1,83 @@
 export const dynamic = 'force-dynamic';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { getUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
+interface ScrapByDept {
+  dept: string;
+  kg: number;
+  pct: number;
+}
 
-async function getAdminStats() {
-  const totalOrders = await prisma.productionOrder.count();
-  const pendingOrders = await prisma.productionOrder.count({ where: { status: "PENDING" } });
-  const inProduction = await prisma.productionOrder.count({ where: { status: "IN_PRODUCTION" } });
-  const completed = await prisma.productionOrder.count({ where: { status: "COMPLETED" } });
-  const designs = await prisma.design.count();
+interface DeptThroughput {
+  department: string;
+  jobsActive: number;
+  kgProcessed: number;
+  kgScrap: number;
+  yield: number;
+  operators: number;
+}
+
+interface RecentOrder {
+  id: string;
+  design: string;
+  kg: number;
+  status: string;
+  dept: string | null;
+}
+
+interface AdminStats {
+  totalOrders: number;
+  pendingOrders: number;
+  inProduction: number;
+  completed: number;
+  designs: number;
+  users: number;
+  inventory: any[];
+  rawMaterialStock: number;
+  totalFree: number;
+  activeOrdersCount: number;
+  pendingApprovalsCount: number;
+  finishedGoods: { _sum: { kgProduced: number; quantity: number } };
+  scrapThisWeek: number;
+  scrapByDept: ScrapByDept[];
+  departmentThroughput: DeptThroughput[];
+  recentOrders: RecentOrder[];
+}
+
+
+async function getAdminStats(db: any): Promise<AdminStats> {
+  const totalOrders = await db.productionOrder.count();
+  const pendingOrders = await db.productionOrder.count({ where: { status: "PENDING" } });
+  const inProduction = await db.productionOrder.count({ where: { status: "IN_PRODUCTION" } });
+  const completed = await db.productionOrder.count({ where: { status: "COMPLETED" } });
+  const designs = await db.design.count();
 
   // Count users from Prisma User table
-  const users = await prisma.user.count();
+  const users = await db.user.count();
 
-  const inventory = await prisma.rawMaterial.findMany();
+  const inventory = await db.rawMaterial.findMany();
 
   // Calculate dashboard stats
   const rawMaterialStock = inventory.reduce(
-    (sum, m) => sum + (m.availableKg?.toNumber() ?? 0) + (m.reservedKg?.toNumber() ?? 0),
+    (sum: number, m: any) => sum + (m.availableKg?.toNumber() ?? 0) + (m.reservedKg?.toNumber() ?? 0),
     0
   );
   const totalFree = inventory.reduce(
-    (sum, m) => sum + (m.availableKg?.toNumber() ?? 0),
+    (sum: number, m: any) => sum + (m.availableKg?.toNumber() ?? 0),
     0
   );
 
-  const activeOrdersCount = await prisma.productionOrder.count({
+  const activeOrdersCount = await db.productionOrder.count({
     where: { status: { in: ["APPROVED", "IN_PRODUCTION"] } },
   });
   const pendingApprovalsCount = pendingOrders;
 
-  const finishedGoodsAgg = await prisma.finishedGoods.aggregate({
+  const finishedGoodsAgg = await db.finishedGoods.aggregate({
     _sum: {
       kgProduced: true,
       quantity: true,
@@ -46,13 +90,94 @@ async function getAdminStats() {
     }
   };
 
-  // Scrap this week calculation (simplified)
-  const scrapThisWeek = 0; // Would need more complex query
+  // ── Real data for previously hardcoded sections ──────────────────────────────
+  const now = new Date();
+  const oneWeekAgo = new Date(now);
+  oneWeekAgo.setDate(now.getDate() - 7);
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
 
-  // Recent orders
-  const recentOrders = await prisma.productionOrder.findMany({
+  // Scrap this week (from StageLog)
+  const scrapWeekAgg = await db.stageLog.aggregate({
+    _sum: { kgScrap: true },
+    where: { completedAt: { gte: oneWeekAgo } },
+  });
+  const scrapThisWeek = scrapWeekAgg._sum.kgScrap?.toNumber() ?? 0;
+
+  // Scrap by department this week
+  const scrapDeptRaw = await db.stageLog.groupBy({
+    by: ['department'],
+    _sum: { kgScrap: true },
+    where: {
+      completedAt: { gte: oneWeekAgo },
+      department: { not: null },
+    },
+    orderBy: { _sum: { kgScrap: 'desc' } },
+  });
+  const totalScrapForPct = scrapDeptRaw.reduce((s: number, r: any) => s + (r._sum.kgScrap?.toNumber() ?? 0), 0) || 1;
+  const scrapByDept = scrapDeptRaw.map((r: any) => {
+    const kg = r._sum.kgScrap?.toNumber() ?? 0;
+    const pct = Math.round((kg / totalScrapForPct) * 100);
+    return { dept: r.department!, kg, pct };
+  });
+
+  // Department throughput for today (from StageLog + active ProductionOrders)
+  const knownDepts = ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding'];
+
+  const activeByDeptRaw = await db.productionOrder.groupBy({
+    by: ['currentDept'],
+    _count: { _all: true },
+    where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] }, currentDept: { not: null } },
+  });
+  const activeMap = new Map(activeByDeptRaw.map((a: any) => [ (a.currentDept || '').toLowerCase(), a._count._all ]));
+
+  // Fetch today's logs to compute distinct operators + aggregates per dept
+  const todayLogs = await db.stageLog.findMany({
+    where: { completedAt: { gte: todayStart }, department: { not: null } },
+    select: { department: true, operatorId: true, kgIn: true, kgOut: true, kgScrap: true },
+  });
+
+  const deptToday = new Map<string, { kgIn: number; kgOut: number; kgScrap: number; ops: Set<string> }>();
+  for (const log of todayLogs) {
+    const d = log.department!;
+    if (!deptToday.has(d)) deptToday.set(d, { kgIn: 0, kgOut: 0, kgScrap: 0, ops: new Set() });
+    const s = deptToday.get(d)!;
+    s.kgIn += log.kgIn?.toNumber?.() ?? Number(log.kgIn) ?? 0;
+    s.kgOut += log.kgOut?.toNumber?.() ?? Number(log.kgOut) ?? 0;
+    s.kgScrap += log.kgScrap?.toNumber?.() ?? Number(log.kgScrap) ?? 0;
+    s.ops.add(log.operatorId);
+  }
+
+  const departmentThroughput = knownDepts.map(dept => {
+    let s = deptToday.get(dept);
+    if (!s) {
+      // fuzzy match (e.g. stored as "Forging" vs "Forging / chamfer")
+      const lower = dept.toLowerCase();
+      for (const [key, val] of deptToday) {
+        if (key.toLowerCase().includes(lower.split('/')[0].trim()) || lower.includes(key.toLowerCase().split('/')[0].trim())) {
+          s = val; break;
+        }
+      }
+    }
+    const kgIn = s?.kgIn ?? 0;
+    const kgOut = s?.kgOut ?? 0;
+    const kgScrap = s?.kgScrap ?? 0;
+    const yieldPct = kgIn > 0 ? Math.round((kgOut / kgIn) * 1000) / 10 : 0;
+    const jobs = activeMap.get(dept.toLowerCase()) ?? activeMap.get(dept.split('/')[0].trim().toLowerCase()) ?? 0;
+    const ops = s?.ops.size ?? 0;
+    return {
+      department: dept,
+      jobsActive: jobs,
+      kgProcessed: Math.round(kgOut || kgIn),
+      kgScrap: Math.round(kgScrap),
+      yield: yieldPct,
+      operators: ops,
+    };
+  });
+
+  // Recent orders (tenant-scoped via db)
+  const recentOrders = await db.productionOrder.findMany({
     take: 4,
-    where: {},
     orderBy: { createdAt: "desc" },
     include: { design: true },
   });
@@ -71,10 +196,12 @@ async function getAdminStats() {
     pendingApprovalsCount,
     finishedGoods,
     scrapThisWeek,
-    recentOrders: recentOrders.map(o => ({
+    scrapByDept,
+    departmentThroughput,
+    recentOrders: recentOrders.map((o: any) => ({
       id: o.orderNumber,
-      design: o.design.name,
-      kg: o.targetKg?.toNumber() ?? 0,
+      design: o.design?.name ?? '—',
+      kg: o.targetKg?.toNumber?.() ?? Number(o.targetKg) ?? 0,
       status: o.status === "PENDING" ? "Pending approval" :
               o.status === "APPROVED" || o.status === "IN_PRODUCTION" ? "In production" : "Complete",
       dept: o.currentDept,
@@ -87,7 +214,8 @@ export default async function AdminDashboardPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN") redirect("/unauthorized");
 
-  const stats = await getAdminStats();
+  const db = getTenantPrisma(user.organizationId);
+  const stats = await getAdminStats(db);
 
   return (
     <div>
@@ -99,7 +227,8 @@ export default async function AdminDashboardPage() {
         <div className="stat-card amber">
           <div className="stat-label">Raw material stock</div>
           <div className="stat-value">{stats.rawMaterialStock.toFixed(0)}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-           <div className="stat-sub">{stats.inventory.length} materials · <span>+200 kg today</span></div>
+            <div className="stat-sub">{stats.inventory.length} materials · {stats.totalFree.toFixed(0)} kg free</div>
+
         </div>
         <div className="stat-card teal">
           <div className="stat-label">Active production orders</div>
@@ -113,8 +242,8 @@ export default async function AdminDashboardPage() {
         </div>
         <div className="stat-card red">
           <div className="stat-label">Scrap this week</div>
-          <div className="stat-value">{stats.scrapThisWeek}</div>
-          <div className="stat-sub"><span className="down">↑ 12 kg</span> vs last week</div>
+          <div className="stat-value">{(stats.scrapThisWeek || 0).toFixed(0)}</div>
+          <div className="stat-sub">From production logs (last 7 days)</div>
         </div>
       </div>
 
@@ -125,7 +254,7 @@ export default async function AdminDashboardPage() {
             <table>
               <thead><tr><th>Order</th><th>Design</th><th>Kg reserved</th><th>Status</th><th>Dept</th></tr></thead>
               <tbody>
-                {stats.recentOrders.slice(0, 4).map((order) => (
+                {stats.recentOrders.slice(0, 4).map((order: any) => (
                   <tr key={order.id}>
                     <td><span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.id}</span></td>
                     <td>{order.design}</td>
@@ -140,12 +269,24 @@ export default async function AdminDashboardPage() {
         </div>
         <div className="card">
           <div className="section-header mb-16"><div className="section-title">Scrap by department</div><div style={{fontSize:'11px',color:'var(--muted)'}}>This week</div></div>
-          {/* Placeholder for department scrap - would need actual data */}
-          {['Cutting','Forging','Threading','Electroplating','Drilling'].map((d,i) => {
-            const vals = [8,22,5,31,16]; const pcts = [4,11,2,15,8];
-            const cls = pcts[i] > 10 ? 'bad' : pcts[i] > 5 ? 'warn' : 'good';
-            return `<div class="scrap-bar-wrap"><div class="scrap-bar-label"><span>${d}</span><span>${vals[i]} kg · ${pcts[i]}%</span></div><div class="scrap-bar"><div class="scrap-bar-fill ${cls}" style="width:${pcts[i]*4}%"></div></div></div>`;
-          }).join('')}
+          {stats.scrapByDept.length > 0 ? (
+            stats.scrapByDept.map((item: any, i: number) => {
+              const cls = item.pct > 10 ? 'bad' : item.pct > 5 ? 'warn' : 'good';
+              return (
+                <div className="scrap-bar-wrap" key={i}>
+                  <div className="scrap-bar-label">
+                    <span>{item.dept}</span>
+                    <span>{item.kg.toFixed(0)} kg · {item.pct}%</span>
+                  </div>
+                  <div className="scrap-bar">
+                    <div className={`scrap-bar-fill ${cls}`} style={{width: `${Math.min(item.pct * 4, 100)}%`}}></div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div style={{fontSize:'12px', color:'var(--muted)', padding:'8px 0'}}>No scrap data recorded this week.</div>
+          )}
         </div>
       </div>
       <div className="card">
@@ -154,11 +295,20 @@ export default async function AdminDashboardPage() {
           <table>
             <thead><tr><th>Department</th><th>Jobs active</th><th>Kg processed</th><th>Kg scrap</th><th>Yield</th><th>Operators</th></tr></thead>
             <tbody>
-              <tr><td>Cutting</td><td>3</td><td><span className="job-kg">340 kg</span></td><td>14 kg</td><td><span className="badge badge-green">95.9%</span></td><td>2</td></tr>
-              <tr><td>Forging / chamfer</td><td>2</td><td><span className="job-kg">180 kg</span></td><td>22 kg</td><td><span className="badge badge-amber">87.8%</span></td><td>2</td></tr>
-              <tr><td>Threading / locking</td><td>4</td><td><span className="job-kg">210 kg</span></td><td>5 kg</td><td><span className="badge badge-green">97.6%</span></td><td>3</td></tr>
-              <tr><td>Electroplating</td><td>1</td><td><span className="job-kg">95 kg</span></td><td>31 kg</td><td><span className="badge badge-red">67.4%</span></td><td>1</td></tr>
-              <tr><td>Drilling / grinding</td><td>2</td><td><span className="job-kg">120 kg</span></td><td>10 kg</td><td><span className="badge badge-green">91.7%</span></td><td>2</td></tr>
+              {stats.departmentThroughput.map((row: any, i: number) => {
+                const y = row.yield;
+                const yClass = y >= 95 ? 'badge-green' : y >= 85 ? 'badge-amber' : 'badge-red';
+                return (
+                  <tr key={i}>
+                    <td>{row.department}</td>
+                    <td>{row.jobsActive}</td>
+                    <td><span className="job-kg">{row.kgProcessed} kg</span></td>
+                    <td>{row.kgScrap} kg</td>
+                    <td><span className={`badge ${yClass}`}>{y.toFixed(1)}%</span></td>
+                    <td>{row.operators}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

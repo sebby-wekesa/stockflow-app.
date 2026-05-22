@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import type { ProductAlias } from '@prisma/client'
-import { addAlias, removeAlias } from '../actions'
+import { addAlias, removeAlias } from '@/actions/products'
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export function AliasManager({
   productId,
@@ -77,7 +79,7 @@ export function AliasManager({
               className="inline-flex items-center gap-2 bg-purple/10 text-purple px-3 py-1.5 rounded-md text-xs font-mono"
             >
               <span>{a.alias}</span>
-              {a.source === 'canonical' ? (
+              {(a as any).source === 'canonical' ? (
                 <span className="text-[10px] text-muted normal-case">canonical</span>
               ) : (
                 <button

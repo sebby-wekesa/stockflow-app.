@@ -5,15 +5,20 @@ import { useRouter } from 'next/navigation'
 import { ProductForm } from '@/app/(dashboard)/products/_components/product-form'
 import { updateProduct } from '@/actions/products'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 interface Props {
   product: any
+  initialForForm?: any
 }
 
-export default function EditProductClient({ product }: Props) {
+export default function EditProductClient({ product, initialForForm }: Props) {
   const router = useRouter()
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleUpdate(formData: FormData) {
+    setError(null)
     try {
       await updateProduct(product.id, formData)
       setSuccess(true)
@@ -21,7 +26,11 @@ export default function EditProductClient({ product }: Props) {
         router.push('/products')
       }, 1500)
     } catch (err) {
+      const msg = (err as Error).message || 'Update failed'
       console.error('Failed to update product:', err)
+      setError(msg)
+      // Re-throw so the inner ProductForm's error handler can also catch if needed
+      throw err
     }
   }
 
@@ -34,6 +43,12 @@ export default function EditProductClient({ product }: Props) {
         </div>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
       {success ? (
         <div className="bg-teal-50 border-l-4 border-teal-400 p-4 mb-6">
           <p className="text-sm text-teal-800">
@@ -44,7 +59,7 @@ export default function EditProductClient({ product }: Props) {
         <div className="card">
           <ProductForm 
             mode="edit" 
-            initial={product} 
+            initial={initialForForm ?? product} 
             action={handleUpdate} 
           />
         </div>
