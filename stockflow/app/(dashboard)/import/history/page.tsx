@@ -1,8 +1,15 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import { getUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 
 export default async function ImportHistoryPage() {
-  const batches = await prisma.importBatch.findMany({
+  const user = await getUser()
+  if (!user) redirect('/login')
+
+  const db = getTenantPrisma(user.organizationId)
+
+  const batches = await db.importBatch.findMany({
     include: { User: { select: { name: true } } },
     orderBy: { created_at: 'desc' },
   })

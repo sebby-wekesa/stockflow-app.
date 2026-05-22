@@ -6,6 +6,7 @@ import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import {
   parseSalesQuickbooks,
+  parseSimpleSales,
   parseSpringsList,
   parseUBoltList,
   parseConsumablesStock,
@@ -62,6 +63,11 @@ export async function uploadSpecialized(formData: FormData) {
       parsedCount = rows.length
       parsedPreview = rows.slice(0, 10)
       sourceLabel = 'QuickBooks sales export'
+    } else if (sheetType === 'sales_simple') {
+      const rows = parseSimpleSales(buffer)
+      parsedCount = rows.length
+      parsedPreview = rows.slice(0, 10)
+      sourceLabel = 'Simple sales list'
     } else if (sheetType === 'springs_master') {
       const rows = parseSpringsList(buffer)
       parsedCount = rows.length
@@ -101,7 +107,9 @@ export async function uploadSpecialized(formData: FormData) {
 
   if (parsedCount === 0) {
     throw new Error(
-      `No usable rows found in the file. Check the format matches ${sourceLabel}.`
+      `No usable rows found in the file (sheet type: ${sheetType}). ` +
+      `Check that you selected the correct file type in the Import Centre. ` +
+      `Detailed diagnostics were printed to the server console.`
     )
   }
 
@@ -161,6 +169,9 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
   try {
     if (sheetType === 'sales_quickbooks_v2') {
       const rows = parseSalesQuickbooks(buffer)
+      result = await commitSalesImport(rows, batch.id, user.id, user.organizationId)
+    } else if (sheetType === 'sales_simple') {
+      const rows = parseSimpleSales(buffer)
       result = await commitSalesImport(rows, batch.id, user.id, user.organizationId)
     } else if (sheetType === 'springs_master') {
       const rows = parseSpringsList(buffer)
@@ -251,23 +262,25 @@ export async function detectUploadedFile(formData: FormData) {
 // These were referenced by components after the Stage 3/4 merge
 // ─────────────────────────────────────────────────────────────────────────────
 
+const DEPRECATED_ERROR = 'Legacy generic/unified import flow (with column mapping) is deprecated after multitenancy merge. Use Quick Import (specialized) from the Import Centre for QuickBooks sales, springs/ubolt masters, and consumables stock files.'
+
 export async function approveAndSyncImport(batchId: string) {
-  throw new Error('approveAndSyncImport is not yet implemented after multitenancy merge')
+  throw new Error(DEPRECATED_ERROR)
 }
 
 export async function resolveConflict(rowId: string, resolution: string) {
-  throw new Error('resolveConflict is not yet implemented after multitenancy merge')
+  throw new Error(DEPRECATED_ERROR)
 }
 
 export async function saveColumnMapping(batchId: string, mapping: Record<string, string>) {
-  throw new Error('saveColumnMapping is not yet implemented after multitenancy merge')
+  throw new Error(DEPRECATED_ERROR)
 }
 
 export async function runUnifiedImport(formData: FormData) {
-  throw new Error('runUnifiedImport is not yet implemented after multitenancy merge')
+  throw new Error(DEPRECATED_ERROR)
 }
 
 export async function uploadImport(formData: FormData) {
-  return runUnifiedImport(formData)
+  throw new Error(DEPRECATED_ERROR)
 }
 

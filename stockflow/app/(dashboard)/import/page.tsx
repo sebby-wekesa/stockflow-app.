@@ -1,11 +1,17 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import { getUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { QuickImportForm } from './quick-import-form'
-import { UnifiedImportForm } from './unified-import-form'
 
 export default async function ImportCentrePage() {
-  // Recent batches across both flows
-  const recentBatches = await prisma.importBatch.findMany({
+  const user = await getUser()
+  if (!user) redirect('/login')
+
+  const db = getTenantPrisma(user.organizationId)
+
+  // Recent batches across both flows (auto-scoped to org via tenant prisma)
+  const recentBatches = await db.importBatch.findMany({
     orderBy: { created_at: 'desc' },
     take: 5,
     include: { User: { select: { name: true } } },
@@ -95,11 +101,6 @@ export default async function ImportCentrePage() {
         </div>
 
         <div className="space-y-12">
-          <div>
-            <div className="font-medium mb-4 text-sm text-muted">UNIFIED IMPORT</div>
-            <UnifiedImportForm />
-          </div>
-          
           <div>
             <div className="font-medium mb-4 text-sm text-muted">QUICK IMPORT</div>
             <QuickImportForm />

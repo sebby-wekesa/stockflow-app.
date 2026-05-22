@@ -5,7 +5,7 @@
  */
 
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
-import { matchProductName } from './alias-matcher'
+import { matchProductName, clearAliasCache } from './alias-matcher'
 import type {
   ParsedSalesRow,
   ParsedProductRow,
@@ -193,6 +193,50 @@ export async function commitSalesImport(
       unmatched.set(name, { rows: [], total_qty: 0 })
     }
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // AUTO-CREATE MISSING PRODUCTS (for sales imports)
+  // If a product name from the sales file does not exist, create it as
+  // local_purchase so the sale can still be recorded and stock reduced.
+  // ─────────────────────────────────────────────────────────────────────────────
+  for (const name of Array.from(unmatched.keys())) {
+    try {
+      const sku = generateSku(null, name)
+      const newProduct = await db.product.create({
+        data: {
+          name: name.trim(),
+          sku,
+          category: 'local_purchase',
+          origin: 'LOCAL_PURCHASE',
+          uom: 'pcs',
+          currentStock: 0,
+          organizationId,
+        },
+      })
+
+      nameToProductId.set(name, newProduct.id)
+
+      // Create an alias so future imports with the same name match automatically
+      await db.productAlias.create({
+        data: {
+          product_id: newProduct.id,
+          alias: name.trim(),
+          organizationId,
+        },
+      }).catch(() => {
+        // ignore duplicate alias errors
+      })
+
+      // Remove from unmatched since we successfully created it
+      unmatched.delete(name)
+    } catch (err) {
+      // Leave it in unmatched — it will be reported in the final result
+      console.error(`[commitSalesImport] Failed to auto-create product "${name}":`, err)
+    }
+  }
+
+  // Refresh matcher cache so any subsequent calls in the same process see new products
+  clearAliasCache(organizationId)
 
   // Group resolved rows by order_number
   type OrderGroup = {

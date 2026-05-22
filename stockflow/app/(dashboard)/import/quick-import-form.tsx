@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { uploadSpecialized } from './actions'
 import { ALL_BRANCHES, BRANCH_LABELS } from '@/lib/branches'
 import type { BranchCode as Branch } from '@/lib/branches'
+import * as XLSX from 'xlsx'
 
 type SheetTypeOption = {
   value: string
@@ -14,10 +15,17 @@ type SheetTypeOption = {
 
 const SHEET_TYPES: SheetTypeOption[] = [
   {
+    value: 'sales_simple',
+    label: 'Simple sales list',
+    description:
+      'Basic sales file with columns: product, quantity, invoice_number, customer, location, date.',
+    needsBranch: false,
+  },
+  {
     value: 'sales_quickbooks_v2',
     label: 'QuickBooks sales export',
     description:
-      'The "SALES_JAN-APR.xlsx" style file with scattered columns and product group headers.',
+      'The "SALES_JAN-APR.xlsx" style file with scattered columns and product group headers (only for real QuickBooks exports).',
     needsBranch: false,
   },
   {
@@ -38,7 +46,7 @@ const SHEET_TYPES: SheetTypeOption[] = [
     value: 'consumables_stock',
     label: 'Branch consumables stock',
     description:
-      'A Mombasa or Nairobi stocks file with IN-OUT sheets. Imports stock movements.',
+      'Consumables IN-OUT sheets (must contain "IN-OUT" in sheet name). Requires selecting the branch.',
     needsBranch: true,
   },
 ]
@@ -47,7 +55,7 @@ export function QuickImportForm() {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [sheetType, setSheetType] = useState<string>('sales_quickbooks_v2')
+  const [sheetType, setSheetType] = useState<string>('sales_simple') // default to the most common case for you
   const [branch, setBranch] = useState<Branch>('mombasa')
 
   const selected = SHEET_TYPES.find((t) => t.value === sheetType)!
@@ -56,14 +64,78 @@ export function QuickImportForm() {
     const f = e.target.files?.[0] ?? null
     setFile(f)
     setError(null)
-    // Try to auto-pick the sheet type based on the filename
-    if (f) {
-      const lower = f.name.toLowerCase()
-      if (lower.includes('sales')) setSheetType('sales_quickbooks_v2')
-      else if (lower.includes('mombasa') || lower.includes('nairobi') || lower.includes('bonje'))
-        setSheetType('consumables_stock')
-      else if (lower.includes('spring')) setSheetType('springs_master')
+
+    if (!f) return
+
+    const lower = f.name.toLowerCase()
+
+    // First pass: filename hints (quick & safe)
+    if (lower.includes('quickbook') || lower.includes('qb') || lower.includes('quick')) {
+      setSheetType('sales_quickbooks_v2')
+      return
     }
+    if (lower.includes('consumable') || lower.includes('in-out') || lower.includes('in out')) {
+      setSheetType('consumables_stock')
+      return
+    }
+    if (lower.includes('spring') && !lower.includes('stock')) {
+      setSheetType('springs_master')
+      return
+    }
+    if (lower.includes('u bolt') || lower.includes('ubolt')) {
+      setSheetType('ubolt_master')
+      return
+    }
+
+    // Second pass: inspect actual file content (most reliable)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const firstSheet = wb.Sheets[wb.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as any[][]
+        if (rows.length === 0) return
+
+        const header = rows[0].map((c: any) => String(c || '').trim().toLowerCase())
+
+        const has = (name: string) => header.some((h: string) => h.includes(name))
+
+        if (has('product') && (has('quantity') || has('qty')) && has('invoice')) {
+          setSheetType('sales_simple')
+          return
+        }
+        if (has('type') && has('memo') && has('qty')) {
+          setSheetType('sales_quickbooks_v2')
+          return
+        }
+        if (has('springs') || header.some((h) => h.includes('spring'))) {
+          setSheetType('springs_master')
+          return
+        }
+        if (has('u bolt') || has('ubolt')) {
+          setSheetType('ubolt_master')
+          return
+        }
+        if (header.some((h) => h.includes('in-out') || h.includes('consumable'))) {
+          setSheetType('consumables_stock')
+          return
+        }
+
+        // Default for anything that looks like a sales file
+        if (has('product') || has('quantity') || has('invoice')) {
+          setSheetType('sales_simple')
+        }
+      } catch {
+        // If content inspection fails, fall back to filename
+        if (lower.includes('sales') || lower.includes('invoice') || lower.includes('transaction')) {
+          setSheetType('sales_simple')
+        } else if (lower.includes('mombasa') || lower.includes('nairobi') || lower.includes('bonje')) {
+          setSheetType('sales_simple')
+        }
+      }
+    }
+    reader.readAsArrayBuffer(f)
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -75,7 +147,12 @@ export function QuickImportForm() {
     }
     const fd = new FormData(e.currentTarget)
     fd.set('file', file)
-    fd.set('sheet_type', sheetType)
+
+    // TEMPORARY UNBLOCK for your sales file — forces the correct parser
+    // Remove this line once your file imports successfully
+    fd.set('sheet_type', 'sales_simple')
+
+    // fd.set('sheet_type', sheetType)   // <-- original line (commented while debugging)
     if (selected.needsBranch) fd.set('branch', branch)
     startTransition(async () => {
       try {

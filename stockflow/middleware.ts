@@ -95,10 +95,10 @@ export default async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // No session
-  if (!session) {
+  // No session / invalid token
+  if (!user) {
     if (isPublicRoute) {
       return response // allow access
     }
@@ -108,10 +108,10 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Has a session — look up role and org status
+  // Has a valid user — look up role and org status
   const ctx = await resolveUserContext(
-    session.user.id,
-    session.user.user_metadata?.role
+    user.id,
+    user.user_metadata?.role
   )
 
   // Hard blocks: SUSPENDED or CLOSED orgs cannot do anything except see the

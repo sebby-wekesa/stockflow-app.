@@ -1,10 +1,12 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { notFound, redirect } from 'next/navigation'
+import { getUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { CommitButton } from '../../commit-button'
 
 const SHEET_TYPE_LABELS: Record<string, string> = {
   sales_quickbooks_v2: 'QuickBooks sales export',
+  sales_simple: 'Simple sales list',
   springs_master: 'Springs master list',
   ubolt_master: 'U-bolt master list',
   consumables_stock: 'Branch consumables stock',
@@ -16,8 +18,14 @@ export default async function SpecializedBatchPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const batch = await prisma.importBatch.findUnique({
-    where: { id },
+
+  const user = await getUser()
+  if (!user) redirect('/login')
+
+  const db = getTenantPrisma(user.organizationId)
+
+  const batch = await db.importBatch.findFirst({
+    where: { id, organizationId: user.organizationId },
     include: { User: { select: { name: true } } },
   })
   if (!batch) notFound()
@@ -28,7 +36,7 @@ export default async function SpecializedBatchPage({
 
   // Render different table columns based on sheet type
   const isProduct = sheetType === 'springs_master' || sheetType === 'ubolt_master'
-  const isSales = sheetType === 'sales_quickbooks_v2'
+  const isSales = sheetType === 'sales_quickbooks_v2' || sheetType === 'sales_simple'
   const isStock = sheetType === 'consumables_stock'
 
   const isImported = batch.status === 'imported'

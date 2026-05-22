@@ -73,6 +73,7 @@ export type ParsedStockRow = {
 
 export type SpecializedSheetType =
   | 'sales_quickbooks_v2'
+  | 'sales_simple'
   | 'springs_master'
   | 'ubolt_master'
   | 'consumables_stock'
@@ -92,20 +93,36 @@ export function detectFile(file: File): Promise<DetectResult> {
         const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
         const sheetNames = wb.SheetNames
 
-        // Check for QuickBooks sales export
+        // Check for QuickBooks sales export (flexible — any column)
         if (sheetNames.length === 1) {
           const ws = wb.Sheets[sheetNames[0]]
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
-          if (rows.length > 1) {
-            // Look for "Invoice" in column H (7)
-            const hasInvoiceType = rows.some((row) => toStr(getCell(row, 7)) === 'Invoice')
-            if (hasInvoiceType) {
-              return resolve({
-                recommendedSheetType: 'sales_quickbooks_v2',
-                sheetNames,
-                reason: 'Found "Invoice" entries in column H — looks like QuickBooks export',
-              })
-            }
+          const hasInvoiceType = rows.some((row) =>
+            row.some((cell) => toStr(cell) === 'Invoice')
+          )
+          if (hasInvoiceType) {
+            return resolve({
+              recommendedSheetType: 'sales_quickbooks_v2',
+              sheetNames,
+              reason: 'Found "Invoice" rows — looks like QuickBooks sales export',
+            })
+          }
+        }
+
+        // Check for simple sales ledger (product, quantity, invoice_number, customer, location, date)
+        {
+          const ws = wb.Sheets[sheetNames[0]]
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
+          const hasSimpleSalesHeaders = rows.some((row) => {
+            const norm = row.map((c) => toStr(c)?.toLowerCase() ?? '')
+            return norm.includes('product') && norm.includes('quantity') && norm.includes('invoice_number')
+          })
+          if (hasSimpleSalesHeaders) {
+            return resolve({
+              recommendedSheetType: 'sales_simple',
+              sheetNames,
+              reason: 'Found columns "product", "quantity", "invoice_number" — looks like simple sales list',
+            })
           }
         }
 
@@ -216,56 +233,346 @@ function readSheetAsRows(buffer: ArrayBuffer, sheetName?: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PARSER 1 — QuickBooks sales export
+// PARSER 1 — QuickBooks sales export (robust column mapping)
 //
-// Column layout:
-//   7: Type (we filter to "Invoice")
-//   9: Date
-//   11: Num (invoice number)
-//   13: Memo (product name)
-//   15: Name (customer)
-//   17: Class (branch)
-//   19: Qty
-//   23: Sales Price
-//   25: Amount
-//
-// We only keep rows where col 7 === "Invoice".
+// Supports both the original fixed layout and any QuickBooks export where the
+// user included the standard columns (Type, Date, Num, Memo, Name, Class, Qty,
+// Sales Price, Amount). We locate the header row and map columns by name so
+// different column orders / extra columns do not break the import.
 // ─────────────────────────────────────────────────────────────────────────────
+
+interface QBColumnMap {
+  type: number
+  date: number
+  num: number
+  memo: number
+  name: number
+  class: number
+  qty: number
+  salesPrice: number
+  amount: number
+}
+
+function findQuickBooksColumnMap(rows: unknown[][]): { map: QBColumnMap; headerRow: number } | null {
+  // Scan first 15 rows — some QB exports have title + blank rows before the real table header
+  for (let r = 0; r < Math.min(15, rows.length); r++) {
+    const row = rows[r]
+    const normalized = row.map((c) => toStr(c)?.toLowerCase() ?? '')
+
+    const map: Partial<QBColumnMap> = {}
+    for (let c = 0; c < normalized.length; c++) {
+      const cell = normalized[c]
+      if (!cell) continue
+
+      if (!map.type && (cell === 'type' || cell.includes('type'))) map.type = c
+      if (!map.date && (cell === 'date' || cell === 'txn date')) map.date = c
+      if (!map.num && (cell === 'num' || cell === 'number' || cell.includes('invoice') || cell === '#')) map.num = c
+      if (!map.memo && (cell === 'memo' || cell === 'description' || cell.includes('item') || cell.includes('product') || cell.includes('desc'))) map.memo = c
+      if (!map.name && (cell === 'name' || cell === 'customer' || cell.includes('customer'))) map.name = c
+      if (!map.class && (cell === 'class' || cell === 'location' || cell === 'branch')) map.class = c
+      if (!map.qty && (cell === 'qty' || cell === 'quantity' || cell.includes('qty') || cell.includes('quantity'))) map.qty = c
+      if (!map.salesPrice && (cell.includes('sales price') || cell === 'rate' || cell === 'price' || cell.includes('unit price'))) map.salesPrice = c
+      if (!map.amount && (cell === 'amount' || cell === 'total')) map.amount = c
+    }
+
+    // Minimum required: type column + a product/description column + qty column
+    if (map.type !== undefined && map.memo !== undefined && map.qty !== undefined) {
+      return {
+        map: {
+          type: map.type,
+          date: map.date ?? 9,
+          num: map.num ?? 11,
+          memo: map.memo,
+          name: map.name ?? 15,
+          class: map.class ?? 17,
+          qty: map.qty,
+          salesPrice: map.salesPrice ?? 23,
+          amount: map.amount ?? 25,
+        },
+        headerRow: r,
+      }
+    }
+  }
+
+  return null
+}
 
 export function parseSalesQuickbooks(buffer: ArrayBuffer): ParsedSalesRow[] {
   const { rows } = readSheetAsRows(buffer)
   const out: ParsedSalesRow[] = []
 
-  // Skip header row (row 1, index 0)
-  for (let i = 1; i < rows.length; i++) {
+  const found = findQuickBooksColumnMap(rows)
+  const colMap = found ? found.map : null
+  const headerRow = found ? found.headerRow : -1
+
+  // Fallback to the original hard-coded layout if we couldn't find a header
+  const getIdx = (logical: keyof QBColumnMap) => (colMap ? colMap[logical] : getFallbackIndex(logical))
+
+  function getFallbackIndex(logical: keyof QBColumnMap): number {
+    switch (logical) {
+      case 'type': return 7
+      case 'date': return 9
+      case 'num': return 11
+      case 'memo': return 13
+      case 'name': return 15
+      case 'class': return 17
+      case 'qty': return 19
+      case 'salesPrice': return 23
+      case 'amount': return 25
+    }
+  }
+
+  // Start data from the row after the detected header (or row 1 for fallback)
+  const startRow = headerRow >= 0 ? headerRow + 1 : 1
+
+  // Accept common QuickBooks sales transaction types
+  const isSaleType = (t: string | null) => {
+    if (!t) return false
+    const lower = t.toLowerCase().trim()
+    return lower === 'invoice' || lower.includes('sales receipt') || lower === 'salesreceipt'
+  }
+
+  // Support two common QuickBooks layouts:
+  // 1. Every line-item row has "Invoice" in the Type column (flattened)
+  // 2. Type only appears on the invoice header row; subsequent rows with Qty + product have blank Type (grouped)
+  type InvoiceContext = {
+    movement_date: Date | null
+    order_number: string | null
+    customer_name: string | null
+    branch: BranchCode | null
+    branchNote: string | null
+  }
+  let currentContext: InvoiceContext | null = null
+
+  for (let i = startRow; i < rows.length; i++) {
     const row = rows[i]
-    const typeCell = toStr(getCell(row, 7))
-    if (typeCell !== 'Invoice') continue
+    const typeCell = toStr(getCell(row, getIdx('type')))
+    const qty = toNumber(getCell(row, getIdx('qty')))
+    const memo = toStr(getCell(row, getIdx('memo')))
 
-    const qty = toNumber(getCell(row, 19))
-    const memo = toStr(getCell(row, 13))
-    if (qty === null || !memo) continue // require qty and product name
-
-    const originalBranchLabel = toStr(getCell(row, 17))
+    const originalBranchLabel = toStr(getCell(row, getIdx('class')))
     const normalisedBranch = normaliseBranch(originalBranchLabel)
-    // If the original was "Upcountry", note it so the audit trail preserves it
     const branchNote =
       originalBranchLabel && originalBranchLabel.toLowerCase().includes('upcountry')
         ? `Upcountry sale (assigned to Mombasa)`
         : null
 
-    out.push({
-      source_row: i + 1, // 1-indexed for user-facing reference
-      movement_date: toDate(getCell(row, 9)),
-      order_number: toStr(getCell(row, 11)),
-      raw_product_name: memo,
-      customer_name: toStr(getCell(row, 15)),
-      branch: normalisedBranch,
-      qty: Math.abs(Math.round(qty)),
-      unit_price: toNumber(getCell(row, 23)),
-      amount: toNumber(getCell(row, 25)),
-      notes: branchNote,
+    const rowDate = toDate(getCell(row, getIdx('date')))
+    const rowNum = toStr(getCell(row, getIdx('num')))
+    const rowCustomer = toStr(getCell(row, getIdx('name')))
+
+    if (isSaleType(typeCell)) {
+      // This row starts (or is) a sale transaction
+      if (qty !== null && memo) {
+        // Direct line item with full info on the same row (layout 1)
+        out.push({
+          source_row: i + 1,
+          movement_date: rowDate,
+          order_number: rowNum,
+          raw_product_name: memo,
+          customer_name: rowCustomer,
+          branch: normalisedBranch,
+          qty: Math.abs(Math.round(qty)),
+          unit_price: toNumber(getCell(row, getIdx('salesPrice'))),
+          amount: toNumber(getCell(row, getIdx('amount'))),
+          notes: branchNote,
+        })
+        // Keep context updated in case next lines are blank-Type
+        currentContext = {
+          movement_date: rowDate,
+          order_number: rowNum,
+          customer_name: rowCustomer,
+          branch: normalisedBranch,
+          branchNote,
+        }
+      } else {
+        // Header row for a new invoice — update context for following blank-Type lines
+        currentContext = {
+          movement_date: rowDate,
+          order_number: rowNum,
+          customer_name: rowCustomer,
+          branch: normalisedBranch,
+          branchNote,
+        }
+      }
+      continue
+    }
+
+    // Not a sale-type row. If we have a context and this row has qty + product name, treat it as a line item belonging to the previous invoice.
+    if (currentContext && qty !== null && memo) {
+      out.push({
+        source_row: i + 1,
+        movement_date: currentContext.movement_date ?? rowDate,
+        order_number: currentContext.order_number ?? rowNum,
+        raw_product_name: memo,
+        customer_name: currentContext.customer_name ?? rowCustomer,
+        branch: currentContext.branch ?? normalisedBranch,
+        qty: Math.abs(Math.round(qty)),
+        unit_price: toNumber(getCell(row, getIdx('salesPrice'))),
+        amount: toNumber(getCell(row, getIdx('amount'))),
+        notes: currentContext.branchNote ?? branchNote,
+      })
+    }
+  }
+
+  if (out.length === 0) {
+    console.error('=== QuickBooks Sales Parser — 0 rows produced ===')
+    console.error('Total rows read from sheet:', rows.length)
+    console.error('startRow (first data row):', startRow)
+    console.error('Header row index found by detector:', headerRow)
+
+    if (colMap) {
+      console.error('Column indices used:', colMap)
+      const hdr = rows[headerRow] || []
+      console.error('Raw header row (cols 0-30):', hdr.slice(0, 30))
+    } else {
+      console.error('No suitable header row containing Type + product-name + Qty columns was detected in the first 15 rows.')
+      console.error('First 3 raw rows (for inspection):')
+      for (let k = 0; k < Math.min(3, rows.length); k++) {
+        console.error(`  Row ${k}:`, rows[k]?.slice(0, 15))
+      }
+    }
+
+    // Show what the parser actually saw in the columns it decided to use
+    const sampleStart = Math.max(0, startRow)
+    const samples = rows.slice(sampleStart, sampleStart + 8).map((r, idx) => {
+      const actualRow = sampleStart + idx + 1
+      return {
+        excelRow: actualRow,
+        Type: toStr(getCell(r, getIdx('type'))),
+        Qty_raw: getCell(r, getIdx('qty')),
+        Qty_parsed: toNumber(getCell(r, getIdx('qty'))),
+        Memo: toStr(getCell(r, getIdx('memo'))),
+        Customer: toStr(getCell(r, getIdx('name'))),
+        Class: toStr(getCell(r, getIdx('class'))),
+      }
     })
+    console.error('First data rows using the chosen columns:', samples)
+
+    const anyInvoice = rows.some(r => r.some(c => toStr(c)?.toLowerCase() === 'invoice'))
+    console.error('Does the file contain the word "Invoice" anywhere?', anyInvoice)
+  }
+
+  return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARSER — Simple sales list (product, quantity, invoice_number, customer, location, date)
+//
+// This is the format the user had (not a classic QuickBooks export).
+// We auto-detect the header and map the obvious columns.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function parseSimpleSales(buffer: ArrayBuffer): ParsedSalesRow[] {
+  let { rows } = readSheetAsRows(buffer)
+  const out: ParsedSalesRow[] = []
+
+  // --- Handle the very common case where user pasted CSV text into Excel column A ---
+  // In this case every row has only 1 cell containing the full "product,quantity,invoice..." line
+  const looksLikePastedCsv = rows.length > 1 &&
+    rows[1] &&
+    rows[1].length <= 2 &&
+    typeof rows[1][0] === 'string' &&
+    (rows[1][0] as string).includes(',');
+
+  if (looksLikePastedCsv) {
+    const rebuilt: unknown[][] = [];
+    for (const row of rows) {
+      const cell = toStr(getCell(row, 0)) || '';
+      if (cell.includes(',')) {
+        // Split by comma, but be careful with commas inside product names (they usually have parentheses)
+        const parts = cell.split(',').map(s => s.trim());
+        rebuilt.push(parts);
+      } else {
+        rebuilt.push(row);
+      }
+    }
+    rows = rebuilt;
+  }
+
+  // Find a header row that contains "product" + "quantity" (or "qty")
+  let headerRow = -1
+  let col: Record<string, number> = {}
+
+  for (let r = 0; r < Math.min(6, rows.length); r++) {
+    const norm = rows[r].map((c) => toStr(c)?.toLowerCase() ?? '')
+    const iProduct = norm.findIndex((c) => c.includes('product'))
+    const iQty = norm.findIndex((c) => c.includes('quantity') || c.includes('qty'))
+    const iInvoice = norm.findIndex((c) => c.includes('invoice'))
+    const iCustomer = norm.findIndex((c) => c.includes('customer'))
+    const iLocation = norm.findIndex((c) => c.includes('location') || c.includes('branch'))
+    const iDate = norm.findIndex((c) => c.includes('date'))
+
+    if (iProduct >= 0 && iQty >= 0) {
+      headerRow = r
+      col = {
+        product: iProduct,
+        qty: iQty,
+        invoice: iInvoice,
+        customer: iCustomer,
+        location: iLocation,
+        date: iDate,
+      }
+      break
+    }
+  }
+
+  if (headerRow < 0) {
+    // Last-resort assumption based on the exact file the user uploaded
+    headerRow = 0
+    col = { product: 0, qty: 1, invoice: 2, customer: 3, location: 4, date: 5 }
+  }
+
+  for (let i = headerRow + 1; i < rows.length; i++) {
+    const row = rows[i]
+    const rawProduct = toStr(getCell(row, col.product))
+    const qty = toNumber(getCell(row, col.qty))
+    if (!rawProduct || qty === null) continue
+
+    const loc = toStr(getCell(row, col.location))
+    const branch = normaliseBranch(loc) ?? 'nairobi'
+
+    out.push({
+      source_row: i + 1,
+      movement_date: toDate(getCell(row, col.date)),
+      order_number: toStr(getCell(row, col.invoice)),
+      raw_product_name: rawProduct,
+      customer_name: toStr(getCell(row, col.customer)),
+      branch,
+      qty: Math.abs(Math.round(qty)),
+      unit_price: null,
+      amount: null,
+      notes: null,
+    })
+  }
+
+  // Final safety net: if we still got nothing, try the classic 6-column layout
+  // (product | quantity | invoice | customer | location | date)
+  // This helps when the user pasted CSV text into Excel without splitting columns.
+  if (out.length === 0) {
+    const fallbackCol = { product: 0, qty: 1, invoice: 2, customer: 3, location: 4, date: 5 }
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i]
+      const rawProduct = toStr(getCell(row, fallbackCol.product))
+      const qty = toNumber(getCell(row, fallbackCol.qty))
+      if (!rawProduct || qty === null) continue
+
+      const loc = toStr(getCell(row, fallbackCol.location))
+      const branch = normaliseBranch(loc) ?? 'nairobi'
+
+      out.push({
+        source_row: i + 1,
+        movement_date: toDate(getCell(row, fallbackCol.date)),
+        order_number: toStr(getCell(row, fallbackCol.invoice)),
+        raw_product_name: rawProduct,
+        customer_name: toStr(getCell(row, fallbackCol.customer)),
+        branch,
+        qty: Math.abs(Math.round(qty)),
+        unit_price: null,
+        amount: null,
+        notes: null,
+      })
+    }
   }
 
   return out
