@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       design: true,
       StageLog: {
         include: {
-          stage: true,
+          Stage: true,
           User: true,
         },
       },
@@ -42,13 +42,13 @@ export async function GET(request: Request) {
   })
 
   const rows = orders.map((order) => {
-    const totalKgIn = order.StageLog.reduce((sum, log) => sum + log.kgIn, 0)
-    const totalKgOut = order.StageLog.reduce((sum, log) => sum + log.kgOut, 0)
-    const totalScrap = order.StageLog.reduce((sum, log) => sum + log.kgScrap, 0)
+    const totalKgIn = order.StageLog.reduce((sum: number, log: { kgIn: number | string | { toNumber?: () => number } }) => sum + Number(log.kgIn), 0)
+    const totalKgOut = order.StageLog.reduce((sum: number, log: { kgOut: number | string | { toNumber?: () => number } }) => sum + Number(log.kgOut), 0)
+    const totalScrap = order.StageLog.reduce((sum: number, log: { kgScrap: number | string | { toNumber?: () => number } }) => sum + Number(log.kgScrap), 0)
 
     return {
       order_number: order.orderNumber,
-      design: order.Design?.name || 'Unknown',
+      design: order.design?.name || 'Unknown',
       quantity: order.quantity,
       target_kg: order.targetKg,
       completed_at: order.completedAt?.toISOString().slice(0, 10) || '',

@@ -7,7 +7,7 @@ export default async function RawmaterialsPage() {
   const materials = await prisma.rawMaterial.findMany();
   
   const receipts = await prisma.materialReceipt.findMany({
-    include: { material: true },
+    include: { RawMaterial: true },
     orderBy: { createdAt: 'desc' },
     take: 20
   }).catch(() => []); // Temporary fallback if schema is out of sync
@@ -47,7 +47,7 @@ export default async function RawmaterialsPage() {
             {receipts.map(r => (
               <tr key={r.id}>
                 <td>{r.createdAt.toLocaleDateString()}</td>
-                <td>{r.material.materialName}</td>
+                <td>{r.RawMaterial.materialName}</td>
                 <td><span className="job-kg">{r.kgReceived.toNumber().toFixed(2)} kg</span></td>
                 <td>{r.reference || '—'}</td>
                 <td>{r.loggedBy || 'System'}</td>

@@ -12,9 +12,9 @@ export default async function TransferPage() {
   if (!user) throw new Error('Unauthorized')
 
   // Get user branches based on role or permissions
-  const userBranches = user.role === 'admin'
+  const userBranches = ['ADMIN', 'MANAGER'].includes(user.role)
     ? ALL_BRANCHES
-    : ['mombasa', 'nairobi', 'bonje'] as Branch[] // For now, assume all branches
+    : (['mombasa', 'nairobi', 'bonje'] as Branch[]) // For now, assume all branches for other roles
 
   // Get products with stock in any branch
   const productRecords = await prisma.product.findMany({
@@ -55,6 +55,10 @@ export default async function TransferPage() {
           products={productsWithStock}
           userBranches={userBranches}
         />
+      </div>
+
+      <div className="mt-4 text-xs text-muted">
+        Note: Stock is tracked globally. Transfers create movement logs (transfer_out / transfer_in) for audit purposes.
       </div>
     </div>
   )

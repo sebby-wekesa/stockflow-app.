@@ -26,7 +26,7 @@ async function getYieldData() {
         currentDept: true,
         targetKg: true,
         id: true,
-        logs: {
+        StageLog: {
           select: { kgOut: true },
           orderBy: { completedAt: 'desc' },
           take: 1
@@ -37,7 +37,7 @@ async function getYieldData() {
     const wipMap: Record<string, { kgRemaining: number; orderCount: number }> = {};
     for (const order of wipOrders) {
       const dept = order.currentDept || "Awaiting Start";
-      const lastLog = order.logs[0];
+      const lastLog = order.StageLog[0];
       const kgRemaining = lastLog ? lastLog.kgOut.toNumber() : order.targetKg.toNumber();
       if (!wipMap[dept]) wipMap[dept] = { kgRemaining: 0, orderCount: 0 };
       wipMap[dept].kgRemaining += Math.max(0, kgRemaining);

@@ -33,7 +33,7 @@ import type { User, Organization } from '@prisma/client'
 
 export type TenantContext = {
   user: User
-  organization: Pick<Organization, 'id' | 'name' | 'status'>
+  organization: Pick<Organization, 'id' | 'name' | 'slug' | 'status'>
   organizationId: string
   role: User['role']
 }

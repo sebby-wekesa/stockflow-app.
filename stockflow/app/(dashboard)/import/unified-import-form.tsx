@@ -33,7 +33,7 @@ export function UnifiedImportForm() {
 
     startTransition(async () => {
       try {
-        const res = (await runUnifiedImport(fd)) as UnifiedImportResult
+        const res = (await runUnifiedImport(fd) as unknown) as UnifiedImportResult
         setResult(res)
       } catch (err) {
         setError((err as Error).message)

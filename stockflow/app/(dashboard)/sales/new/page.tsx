@@ -20,9 +20,21 @@ export default async function NewSalesPage() {
 
   const allowedBranches = (user.role === 'ADMIN' || user.role === 'MANAGER')
     ? (['mombasa', 'nairobi', 'bonje'] as Branch[])
-    : (userWithBranches.Branch ? [userWithBranches.Branch.id as Branch] : [])
+    : (userWithBranches.Branch?.code ? [userWithBranches.Branch.code as Branch] : [])
 
   const defaultBranch = allowedBranches[0]
+
+  // Guard: user has no branch assigned
+  if (!defaultBranch) {
+    return (
+      <div className="card p-8 text-center">
+        <h1 className="text-xl font-semibold mb-2">No branch assigned</h1>
+        <p className="text-muted">
+          Your account is not linked to any branch. Please contact an administrator to assign you a branch before creating sales orders.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div>

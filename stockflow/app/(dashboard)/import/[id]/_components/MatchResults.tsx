@@ -2,12 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { resolveConflict, approveAndSyncImport } from '../../actions'
-import type { ImportBatch, ImportRow } from '@prisma/client'
 
 interface MatchResultsProps {
-  batch: ImportBatch & {
-    rows: ImportRow[]
-  }
+  batch: any
 }
 
 export function MatchResults({ batch }: MatchResultsProps) {
@@ -27,7 +24,7 @@ export function MatchResults({ batch }: MatchResultsProps) {
 
   function handleResolve(rowId: string, productId: string) {
     startTransition(async () => {
-      await resolveConflict(batch.id, rowId, productId)
+      await resolveConflict(rowId, productId)
       setSelectedRow(null)
     })
   }
@@ -69,9 +66,9 @@ export function MatchResults({ batch }: MatchResultsProps) {
             return (
               <div key={row.id} className="flex items-center justify-between p-3 bg-surface2 rounded-md">
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{mappedData.raw_product_name}</div>
+                  <div className="text-sm font-medium">{String(mappedData.raw_product_name ?? '')}</div>
                   <div className="text-xs text-muted">
-                    {mappedData.qty} × {mappedData.unit_price} = {(row.qty || 0) * (row.unit_price || 0)}
+                    {String(mappedData.qty ?? '')} × {String(mappedData.unit_price ?? '')} = {(row.qty || 0) * (row.unit_price || 0)}
                   </div>
                 </div>
                 <div className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-600">
@@ -96,9 +93,9 @@ export function MatchResults({ batch }: MatchResultsProps) {
                 <div key={row.id} className="p-4 border border-orange-500/30 rounded-md">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <div className="font-medium text-sm">{mappedData.raw_product_name}</div>
+                      <div className="font-medium text-sm">{String(mappedData.raw_product_name ?? '')}</div>
                       <div className="text-xs text-muted mt-1">
-                        Row {row.row_number} · {mappedData.qty} units
+                        Row {row.row_number} · {String(mappedData.qty ?? '')} units
                       </div>
                     </div>
                     <span className="text-xs px-2 py-1 rounded-full bg-orange-500/10 text-orange-600">

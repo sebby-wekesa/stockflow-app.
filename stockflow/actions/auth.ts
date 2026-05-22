@@ -149,7 +149,11 @@ export async function signIn(formData: FormData) {
       let org = await prisma.organization.findFirst();
       if (!org) {
         org = await prisma.organization.create({
-          data: { name: "Default Org", code: "DEFAULT" }
+          data: { 
+            name: "Default Org", 
+            code: "DEFAULT",
+            slug: "default-org"
+          }
         });
       }
       await prisma.user.update({

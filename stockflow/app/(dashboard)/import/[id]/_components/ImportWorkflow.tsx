@@ -4,13 +4,8 @@ import { ColumnMapper } from './ColumnMapper'
 import { MatchResults } from './MatchResults'
 import { SpecializedPreview } from './SpecializedPreview'
 import { SuccessView } from './SuccessView'
-import type { ImportBatch, ImportRow } from '@prisma/client'
-
 interface ImportWorkflowProps {
-  batch: ImportBatch & {
-    created_by_user: { name: string }
-    rows: ImportRow[]
-  }
+  batch: any
 }
 
 export function ImportWorkflow({ batch }: ImportWorkflowProps) {

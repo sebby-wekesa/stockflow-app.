@@ -3,31 +3,21 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { requireActiveAuth } from '@/lib/auth'
+import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { nextInvoiceNumber } from '@/lib/sales'
-import type { BranchCode as Branch } from '@/lib/branches'
-
-async function requireUser() {
-  const supabase = await createServerSupabase()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-  if (!authUser) throw new Error('Not authenticated')
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user) throw new Error('User not provisioned')
-  return user
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CREATE & INVOICE
+// SALES SCHEMA NOTES
 //
-// Schema mapping:
-//   SaleOrder (id, customerId, customerName, totalAmount, status, createdBy)
-//     -> SaleItem (saleOrderId, finishedGoodsId, quantity, unitPrice, totalPrice)
-//   SaleItem links to FinishedGoods, not Product directly. For each picked
-//   product we ensure a FinishedGoods shadow record exists (with sku = product.sku).
-//   Stock decrement happens on Product.currentStock.
+// SaleOrder (id, customerId, customerName, totalAmount, status, createdBy)
+//   -> SaleItem (saleOrderId, finishedGoodsId, quantity, unitPrice, totalPrice)
+// SaleItem links to FinishedGoods, not Product directly. For each picked
+// product we ensure a FinishedGoods shadow record exists.
+// Stock decrement happens on Product.currentStock.
+//
+// In multitenant mode, branch codes are per-org. The form sends a string
+// code (e.g. 'mombasa') and we resolve it against THIS org's Branch table.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const lineSchema = z.object({
@@ -38,7 +28,7 @@ const lineSchema = z.object({
 })
 
 const orderSchema = z.object({
-  branch: z.enum(['mombasa', 'nairobi', 'bonje']),
+  branch: z.string().min(1, 'Branch is required'),
   customer_id: z.string().optional().nullable(),
   customer_name: z.string().min(1).max(200),
   invoice_date: z.coerce.date(),
@@ -81,17 +71,32 @@ export async function createSalesOrder(formData: FormData) {
   }
 
   const data = parsed.data
-  const user = await requireUser()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
   const action = data.action
 
+  // Resolve the branch code against our org's branches
+  const branchRow = await db.branch.findFirst({
+    where: {
+      OR: [
+        { code: { equals: data.branch, mode: 'insensitive' } },
+        { name: { equals: data.branch, mode: 'insensitive' } },
+      ],
+    },
+  })
+  if (!branchRow) {
+    throw new Error(`Branch "${data.branch}" not found in your organization. Add it under Settings > Branches.`)
+  }
+
+  // Fetch all products on this order in one query, scoped to our org
   const productIds = data.lines.map((l) => l.product_id)
-  const products = await prisma.product.findMany({
+  const products = await db.product.findMany({
     where: { id: { in: productIds } },
     select: { id: true, sku: true, name: true, uom: true, currentStock: true },
   })
 
   if (products.length !== data.lines.length) {
-    throw new Error('One or more products not found')
+    throw new Error('One or more products not found in your organization')
   }
 
   const productMap = new Map(products.map((p) => [p.id, p]))
@@ -100,7 +105,7 @@ export async function createSalesOrder(formData: FormData) {
   if (action === 'invoice') {
     for (const line of data.lines) {
       const product = productMap.get(line.product_id)!
-      if (product.currentStock < line.qty) {
+      if (product.currentStock < Number(line.qty)) {
         throw new Error(
           `Insufficient stock for ${product.sku ?? product.name}: have ${product.currentStock}, need ${line.qty}`
         )
@@ -110,97 +115,97 @@ export async function createSalesOrder(formData: FormData) {
 
   const orderNumber =
     action === 'invoice'
-      ? await nextInvoiceNumber(data.branch as Branch)
+      ? await nextInvoiceNumber(user.organizationId, branchRow.code as any)
       : `DRAFT-${Date.now().toString(36).toUpperCase()}`
 
-  // Ensure the import-placeholder Design exists for FG shadow records
+  // Ensure the "IMPORTED" placeholder Design exists for FG shadow records
   let placeholderDesignId: string
-  const existingDesign = await prisma.design.findUnique({
+  const existingDesign = await db.design.findFirst({
     where: { code: 'IMPORTED' },
   })
   if (existingDesign) {
     placeholderDesignId = existingDesign.id
   } else {
-    const d = await prisma.design.create({
+    const d = await db.design.create({
       data: {
         name: 'Manual sale placeholder',
         code: 'IMPORTED',
         description: 'Placeholder design used when recording manual sales.',
+        organizationId: user.organizationId,
       },
     })
     placeholderDesignId = d.id
   }
 
   const totalAmount = data.lines.reduce(
-    (sum, l) => sum + parseFloat(String(l.unit_price)) * parseFloat(String(l.qty)),
+    (sum, l) => sum + Number(l.unit_price) * Number(l.qty),
     0
   )
 
-  const result = await prisma.$transaction(
-    async (tx) => {
-      const order = await tx.saleOrder.create({
+  // Atomic write: order + items + movements + stock decrement
+  const result = await withTenantTransaction(user.organizationId, async (tx) => {
+    const order = await tx.saleOrder.create({
+      data: {
+        id: orderNumber,
+        customerId: data.customer_id || null,
+        customerName: data.customer_name,
+        totalAmount,
+        status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
+        createdBy: user.id,
+      },
+    })
+
+    for (const line of data.lines) {
+      const product = productMap.get(line.product_id)!
+      const qty = Number(line.qty)
+      const unitPrice = Number(line.unit_price)
+
+      // Ensure FinishedGoods shadow exists for this org
+      const fgSku = product.sku || product.id
+      let fg = await tx.finishedGoods.findFirst({ where: { sku: fgSku } })
+      if (!fg) {
+        fg = await tx.finishedGoods.create({
+          data: {
+            sku: fgSku,
+            designId: placeholderDesignId,
+            quantity: 0,
+            kgProduced: 0,
+            unitCost: unitPrice,
+          },
+        })
+      }
+
+      await tx.saleItem.create({
         data: {
-          id: orderNumber,
-          customerId: data.customer_id || null,
-          customerName: data.customer_name,
-          totalAmount,
-          status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
-          createdBy: user.id,
+          saleOrderId: order.id,
+          finishedGoodsId: fg.id,
+          quantity: qty,
+          unitPrice,
+          totalPrice: qty * unitPrice,
         },
       })
 
-      for (const line of data.lines) {
-        const product = productMap.get(line.product_id)!
-        const qty = Number(line.qty)
-        const unitPrice = Number(line.unit_price)
-
-        // Ensure FinishedGoods shadow exists
-        const fgSku = product.sku || product.id
-        let fg = await tx.finishedGoods.findUnique({ where: { sku: fgSku } })
-        if (!fg) {
-          fg = await tx.finishedGoods.create({
-            data: {
-              sku: fgSku,
-              designId: placeholderDesignId,
-              quantity: 0,
-              kgProduced: 0,
-              unitCost: unitPrice,
-            },
-          })
-        }
-
-        await tx.saleItem.create({
+      if (action === 'invoice') {
+        await tx.stockMovement.create({
           data: {
-            saleOrderId: order.id,
-            finishedGoodsId: fg.id,
-            quantity: qty,
-            unitPrice,
-            totalPrice: qty * unitPrice,
+            productId: line.product_id,
+            branchId: branchRow.id,
+            movementType: 'sale',
+            quantity: -qty,
+            reference: orderNumber,
+            notes: line.notes ?? `Sale to ${data.customer_name}`,
           },
         })
 
-        if (action === 'invoice') {
-          await tx.stockMovement.create({
-            data: {
-              productId: line.product_id,
-              movementType: 'sale',
-              quantity: -qty,
-              reference: orderNumber,
-              notes: line.notes ?? `Sale to ${data.customer_name}`,
-            },
-          })
-
-          await tx.product.update({
-            where: { id: line.product_id },
-            data: { currentStock: { decrement: qty } },
-          })
-        }
+        await tx.product.update({
+          where: { id: line.product_id },
+          data: { currentStock: { decrement: qty } },
+        })
       }
+    }
 
-      return order
-    },
-    { maxWait: 10000, timeout: 30000 }
-  )
+    return order
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/sales')
   revalidatePath('/stock')
@@ -212,9 +217,10 @@ export async function createSalesOrder(formData: FormData) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function confirmDraft(orderId: string) {
-  const user = await requireUser()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
 
-  const order = await prisma.saleOrder.findUnique({
+  const order = await db.saleOrder.findFirst({
     where: { id: orderId },
     include: { SaleItem: { include: { FinishedGoods: true } } },
   })
@@ -223,51 +229,46 @@ export async function confirmDraft(orderId: string) {
     throw new Error('Only pending orders can be confirmed')
   }
 
-  // Verify stock by checking Product.currentStock (look up Product by FG sku)
+  // Verify stock by looking up Product by FG sku
   for (const line of order.SaleItem) {
-    const product = await prisma.product.findUnique({
+    const product = await db.product.findFirst({
       where: { sku: line.FinishedGoods.sku },
     })
     if (!product || product.currentStock < line.quantity) {
       throw new Error(
-        `Insufficient stock for ${line.FinishedGoods.sku}: have ${
-          product?.currentStock ?? 0
-        }, need ${line.quantity}`
+        `Insufficient stock for ${line.FinishedGoods.sku}: have ${product?.currentStock ?? 0}, need ${line.quantity}`
       )
     }
   }
 
-  await prisma.$transaction(
-    async (tx) => {
-      await tx.saleOrder.update({
-        where: { id: orderId },
-        data: { status: 'CONFIRMED' },
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    await tx.saleOrder.update({
+      where: { id: orderId },
+      data: { status: 'CONFIRMED' },
+    })
+
+    for (const line of order.SaleItem) {
+      const product = await tx.product.findFirst({
+        where: { sku: line.FinishedGoods.sku },
+      })
+      if (!product) continue
+
+      await tx.stockMovement.create({
+        data: {
+          productId: product.id,
+          movementType: 'sale',
+          quantity: -line.quantity,
+          reference: order.id,
+          notes: `Sale confirmed for ${order.customerName}`,
+        },
       })
 
-      for (const line of order.SaleItem) {
-        const product = await tx.product.findUnique({
-          where: { sku: line.FinishedGoods.sku },
-        })
-        if (!product) continue
-
-        await tx.stockMovement.create({
-          data: {
-            productId: product.id,
-            movementType: 'sale',
-            quantity: -line.quantity,
-            reference: order.id,
-            notes: `Sale confirmed for ${order.customerName}`,
-          },
-        })
-
-        await tx.product.update({
-          where: { id: product.id },
-          data: { currentStock: { decrement: line.quantity } },
-        })
-      }
-    },
-    { maxWait: 10000, timeout: 30000 }
-  )
+      await tx.product.update({
+        where: { id: product.id },
+        data: { currentStock: { decrement: line.quantity } },
+      })
+    }
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/sales')
   revalidatePath(`/sales/${orderId}`)
@@ -283,9 +284,10 @@ export async function cancelOrder(orderId: string, reason: string) {
     throw new Error('Cancellation reason is required (at least 3 characters)')
   }
 
-  const user = await requireUser()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
 
-  const order = await prisma.saleOrder.findUnique({
+  const order = await db.saleOrder.findFirst({
     where: { id: orderId },
     include: { SaleItem: { include: { FinishedGoods: true } } },
   })
@@ -297,40 +299,37 @@ export async function cancelOrder(orderId: string, reason: string) {
 
   const wasConfirmed = order.status === 'CONFIRMED'
 
-  await prisma.$transaction(
-    async (tx) => {
-      // If confirmed, return stock
-      if (wasConfirmed) {
-        for (const line of order.SaleItem) {
-          const product = await tx.product.findUnique({
-            where: { sku: line.FinishedGoods.sku },
-          })
-          if (!product) continue
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    if (wasConfirmed) {
+      // Return stock for confirmed orders
+      for (const line of order.SaleItem) {
+        const product = await tx.product.findFirst({
+          where: { sku: line.FinishedGoods.sku },
+        })
+        if (!product) continue
 
-          await tx.stockMovement.create({
-            data: {
-              productId: product.id,
-              movementType: 'return',
-              quantity: line.quantity,
-              reference: order.id,
-              notes: `Sale cancelled: ${reason}`,
-            },
-          })
+        await tx.stockMovement.create({
+          data: {
+            productId: product.id,
+            movementType: 'return',
+            quantity: line.quantity,
+            reference: order.id,
+            notes: `Sale cancelled: ${reason}`,
+          },
+        })
 
-          await tx.product.update({
-            where: { id: product.id },
-            data: { currentStock: { increment: line.quantity } },
-          })
-        }
+        await tx.product.update({
+          where: { id: product.id },
+          data: { currentStock: { increment: line.quantity } },
+        })
       }
+    }
 
-      await tx.saleOrder.update({
-        where: { id: orderId },
-        data: { status: 'CANCELLED' },
-      })
-    },
-    { maxWait: 10000, timeout: 30000 }
-  )
+    await tx.saleOrder.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
+    })
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/sales')
   revalidatePath(`/sales/${orderId}`)
@@ -341,11 +340,16 @@ export async function cancelOrder(orderId: string, reason: string) {
 // SEARCH for product picker
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function searchProductsForSale(query: string, branch: Branch) {
-  await requireUser()
+export async function searchProductsForSale(query: string, branch: string) {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   if (!query || query.length < 2) return []
 
-  const products = await prisma.product.findMany({
+  // branch param accepted for backward-compat; stock is global in this schema
+  void branch
+
+  const products = await db.product.findMany({
     where: {
       OR: [
         { sku: { contains: query, mode: 'insensitive' } },

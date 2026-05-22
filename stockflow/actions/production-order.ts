@@ -1,14 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireRole, getUser } from "@/lib/auth";
 import { productionOrderSchema, ProductionOrderInput } from "@/lib/validations";
-import type { PrismaClient } from "@prisma/client";
-type TransactionClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 
 export async function createProductionOrder(formData: FormData) {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
+  const db = getTenantPrisma(user.organizationId);
 
   const designId = formData.get("designId") as string;
   const quantity = parseInt(formData.get("quantity") as string);
@@ -16,7 +15,7 @@ export async function createProductionOrder(formData: FormData) {
 
   // Generate order number (ORD-YYYY-NNNN)
   const currentYear = new Date().getFullYear();
-  const lastOrder = await prisma.productionOrder.findFirst({
+  const lastOrder = await db.productionOrder.findFirst({
     orderBy: { createdAt: 'desc' },
     select: { orderNumber: true },
   });
@@ -40,7 +39,7 @@ export async function createProductionOrder(formData: FormData) {
 
   productionOrderSchema.parse(input);
 
-  const design = await prisma.design.findUnique({
+  const design = await db.design.findUnique({
     where: { id: designId },
     include: { stages: { orderBy: { sequence: "asc" } } },
   });
@@ -54,7 +53,7 @@ export async function createProductionOrder(formData: FormData) {
   }
   const initialStage = design.stages[0];
 
-  const order = await prisma.productionOrder.create({
+  const order = await db.productionOrder.create({
     data: {
       orderNumber: input.orderNumber,
       designId: input.designId,
@@ -62,6 +61,7 @@ export async function createProductionOrder(formData: FormData) {
       targetKg: input.targetKg,
       status: "PENDING",
       currentStage: initialStage.sequence,
+      organizationId: user.organizationId,
     },
   });
 
@@ -69,12 +69,10 @@ export async function createProductionOrder(formData: FormData) {
 }
 
 export async function approveProductionOrder(orderId: string) {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
+  const db = getTenantPrisma(user.organizationId);
 
-  const user = await getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const order = await prisma.productionOrder.findUnique({
+  const order = await db.productionOrder.findUnique({
     where: { id: orderId },
     include: {
       design: {
@@ -102,7 +100,7 @@ export async function approveProductionOrder(orderId: string) {
   }
 
   // Perform the transaction to approve order and consume materials
-  await prisma.$transaction(async (tx: TransactionClient) => {
+  await db.$transaction(async (tx) => {
     // 1. Consume materials from BOM
     const consumptionLogs = [];
 
@@ -139,7 +137,8 @@ export async function approveProductionOrder(orderId: string) {
           productionOrderId: orderId,
           rawMaterialId: bomItem.rawMaterialId,
           quantityConsumed: requiredQuantity,
-          notes: "Auto-consumed on order approval"
+          notes: "Auto-consumed on order approval",
+          organizationId: user.organizationId,
         }
       });
 
@@ -161,12 +160,10 @@ export async function approveProductionOrder(orderId: string) {
 }
 
 export async function releaseProductionOrder(orderId: string) {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
+  const db = getTenantPrisma(user.organizationId);
 
-  const user = await getUser();
-  if (!user) throw new Error("Unauthorized");
-
-  const order = await prisma.productionOrder.findUnique({
+  const order = await db.productionOrder.findUnique({
     where: { id: orderId },
     include: {
       design: {
@@ -194,7 +191,7 @@ export async function releaseProductionOrder(orderId: string) {
   const firstStage = order.design.stages[0];
 
   // Update order to IN_PRODUCTION status and set initial stage
-  await prisma.productionOrder.update({
+  await db.productionOrder.update({
     where: { id: orderId },
     data: {
       status: "IN_PRODUCTION",
@@ -207,9 +204,10 @@ export async function releaseProductionOrder(orderId: string) {
 }
 
 export async function rejectProductionOrder(orderId: string) {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
+  const db = getTenantPrisma(user.organizationId);
 
-  const order = await prisma.productionOrder.findUnique({
+  const order = await db.productionOrder.findUnique({
     where: { id: orderId },
   });
 
@@ -221,7 +219,7 @@ export async function rejectProductionOrder(orderId: string) {
     throw new Error("Order is not pending approval");
   }
 
-  await prisma.productionOrder.update({
+  await db.productionOrder.update({
     where: { id: orderId },
     data: { status: "CANCELLED" },
   });

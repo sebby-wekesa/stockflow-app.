@@ -2,48 +2,21 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
-import type { BranchCode as Branch } from '@/lib/branches'
-
-async function requireUser() {
-  const supabase = await createServerSupabase()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-  if (!authUser) throw new Error('Not authenticated')
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user) throw new Error('User not provisioned')
-  return user
-}
-
-async function resolveBranchId(code: string): Promise<string | null> {
-  const branch = await prisma.branch.findFirst({
-    where: {
-      OR: [
-        { name: { equals: code, mode: 'insensitive' } },
-        { code: { equals: code, mode: 'insensitive' } },
-        { name: { contains: code, mode: 'insensitive' } },
-      ],
-    },
-    select: { id: true },
-  })
-  return branch?.id ?? null
-}
+import { requireActiveAuth } from '@/lib/auth'
+import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STOCK TRANSFER
 //
-// Note: in this schema stock is tracked on Product.currentStock globally,
-// not per-branch. The "transfer" therefore only logs movements and audit
-// entries — it doesn't change Product.currentStock because stock doesn't
-// belong to a branch in the current data model.
+// Note: stock is tracked on Product.currentStock globally, not per-branch.
+// The "transfer" logs movements + audit entries but doesn't change
+// Product.currentStock.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const transferSchema = z.object({
   product_id: z.string().min(1),
-  source_branch: z.enum(['mombasa', 'nairobi', 'bonje']),
-  dest_branch: z.enum(['mombasa', 'nairobi', 'bonje']),
+  source_branch: z.string().min(1),
+  dest_branch: z.string().min(1),
   qty: z.coerce.number().int().positive(),
   notes: z.string().max(500).optional().nullable(),
 })
@@ -65,9 +38,37 @@ export async function dispatchTransfer(formData: FormData) {
     throw new Error('Source and destination branches must be different')
   }
 
-  const user = await requireUser()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
 
-  const product = await prisma.product.findUnique({
+  // Resolve branches in our org
+  const [sourceBranch, destBranch] = await Promise.all([
+    db.branch.findFirst({
+      where: {
+        OR: [
+          { code: { equals: data.source_branch, mode: 'insensitive' } },
+          { name: { equals: data.source_branch, mode: 'insensitive' } },
+        ],
+      },
+    }),
+    db.branch.findFirst({
+      where: {
+        OR: [
+          { code: { equals: data.dest_branch, mode: 'insensitive' } },
+          { name: { equals: data.dest_branch, mode: 'insensitive' } },
+        ],
+      },
+    }),
+  ])
+
+  if (!sourceBranch) {
+    throw new Error(`Source branch "${data.source_branch}" not found`)
+  }
+  if (!destBranch) {
+    throw new Error(`Destination branch "${data.dest_branch}" not found`)
+  }
+
+  const product = await db.product.findFirst({
     where: { id: data.product_id },
     select: { id: true, sku: true, name: true, currentStock: true },
   })
@@ -78,49 +79,41 @@ export async function dispatchTransfer(formData: FormData) {
     )
   }
 
-  const sourceBranchId = await resolveBranchId(data.source_branch)
-  const destBranchId = await resolveBranchId(data.dest_branch)
   const reference = `TRANSFER-${Date.now().toString(36).toUpperCase()}`
 
-  await prisma.$transaction(
-    async (tx) => {
-      // Log the OUT movement
-      await tx.stockMovement.create({
-        data: {
-          productId: data.product_id,
-          branchId: sourceBranchId,
-          movementType: 'transfer_out',
-          quantity: -data.qty,
-          reference,
-          notes: data.notes ?? `Transfer to ${data.dest_branch}`,
-        },
-      })
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    await tx.stockMovement.create({
+      data: {
+        productId: data.product_id,
+        branchId: sourceBranch.id,
+        movementType: 'transfer_out',
+        quantity: -data.qty,
+        reference,
+        notes: data.notes ?? `Transfer to ${destBranch.name}`,
+      },
+    })
 
-      // Log the IN movement
-      await tx.stockMovement.create({
-        data: {
-          productId: data.product_id,
-          branchId: destBranchId,
-          movementType: 'transfer_in',
-          quantity: data.qty,
-          reference,
-          notes: data.notes ?? `Transfer from ${data.source_branch}`,
-        },
-      })
+    await tx.stockMovement.create({
+      data: {
+        productId: data.product_id,
+        branchId: destBranch.id,
+        movementType: 'transfer_in',
+        quantity: data.qty,
+        reference,
+        notes: data.notes ?? `Transfer from ${sourceBranch.name}`,
+      },
+    })
 
-      // Audit log
-      await tx.auditLog.create({
-        data: {
-          userId: user.id,
-          action: 'STOCK_TRANSFER',
-          entityType: 'Product',
-          entityId: data.product_id,
-          details: `Transferred ${data.qty} ${product.sku ?? product.name} from ${data.source_branch} to ${data.dest_branch}. ${data.notes ?? ''}`,
-        },
-      })
-    },
-    { maxWait: 10000, timeout: 30000 }
-  )
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'STOCK_TRANSFER',
+        entityType: 'Product',
+        entityId: data.product_id,
+        details: `Transferred ${data.qty} ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}. ${data.notes ?? ''}`,
+      },
+    })
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/stock')
   revalidatePath('/stock/transfer')
@@ -130,11 +123,16 @@ export async function dispatchTransfer(formData: FormData) {
 // SEARCH PRODUCTS WITH STOCK
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function searchProductsWithStock(query: string, _branch: Branch) {
-  await requireUser()
+export async function searchProductsWithStock(query: string, _branch: string) {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   if (!query || query.length < 2) return []
 
-  const products = await prisma.product.findMany({
+  // _branch param accepted for backward-compat; stock is global in this schema
+  void _branch
+
+  const products = await db.product.findMany({
     where: {
       OR: [
         { sku: { contains: query, mode: 'insensitive' } },

@@ -1,6 +1,7 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+  binaryTargets   = ["native"]
 }
 
 datasource db {
@@ -8,8 +9,79 @@ datasource db {
   schemas  = ["public"]
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+
 model AuditLog {
   id         String   @id @default(uuid())
+  organizationId       String
   userId     String
   action     String
   entityType String?
@@ -20,35 +92,42 @@ model AuditLog {
   createdAt  DateTime @default(now())
   User       User     @relation(fields: [userId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model BillOfMaterials {
   id            String      @id @default(uuid())
+  organizationId       String
   designId      String
   rawMaterialId String
   quantity      Decimal     @db.Decimal(10, 4)
   unitOfMeasure String      @default("kg")
   createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  updatedAt     DateTime              @updatedAt
   design        Design      @relation(fields: [designId], references: [id], onDelete: Cascade)
   RawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
 
   @@unique([designId, rawMaterialId])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model Branch {
   id                     String                   @id @default(uuid())
   organizationId         String
-  name                   String                   @unique
+  name                   String
   location               String?
-  code                   String                   @unique
+  code                   String
   address                String?
   phone                  String?
   managerId              String?
   createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
+  updatedAt              DateTime              @updatedAt
   Organization           Organization             @relation(fields: [organizationId], references: [id])
   InventoryFinishedGoods InventoryFinishedGoods[]
   InventoryRawMaterial   InventoryRawMaterial[]
@@ -58,13 +137,17 @@ model Branch {
   StockMovement          StockMovement[]
   User                   User[]
 
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  Invitation Invitation[]
   @@schema("public")
 }
 
 model Customer {
   id                   String                @id @default(uuid())
+  organizationId       String
   name                 String
-  code                 String                @unique
+  code                 String
   contactName          String?
   email                String?
   phone                String?
@@ -75,11 +158,16 @@ model Customer {
   CustomerPortalAccess CustomerPortalAccess?
   SaleOrder            SaleOrder[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, code])
   @@schema("public")
 }
 
 model CustomerPortalAccess {
   id         String    @id @default(uuid())
+  organizationId       String
   customerId String    @unique
   accessCode String    @unique
   isActive   Boolean   @default(true)
@@ -87,11 +175,15 @@ model CustomerPortalAccess {
   lastLogin  DateTime?
   Customer   Customer  @relation(fields: [customerId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model DemandForecast {
   id               String      @id @default(uuid())
+  organizationId       String
   rawMaterialId    String
   forecastDate     DateTime
   forecastedDemand Decimal     @db.Decimal(10, 4)
@@ -101,13 +193,17 @@ model DemandForecast {
   RawMaterial      RawMaterial @relation(fields: [rawMaterialId], references: [id])
 
   @@unique([rawMaterialId, forecastDate])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model Design {
   id               String            @id @default(uuid())
+  organizationId       String
   name             String
-  code             String            @unique
+  code             String
   description      String?
   targetDimensions String?
   targetWeight     Decimal?          @db.Decimal(10, 4)
@@ -118,16 +214,21 @@ model Design {
   productionOrders ProductionOrder[]
   stages           Stage[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, code])
   @@schema("public")
 }
 
 model FinishedGoods {
   id                     String                   @id @default(uuid())
-  sku                    String                   @unique
+  organizationId       String
+  sku                    String
   designId               String
   quantity               Int
   kgProduced             Decimal                  @db.Decimal(10, 4)
-  barcode                String?                  @unique
+  barcode                String?
   batchNumber            String?
   unitCost               Float?
   createdAt              DateTime                 @default(now())
@@ -135,19 +236,25 @@ model FinishedGoods {
   InventoryFinishedGoods InventoryFinishedGoods[]
   SaleItem               SaleItem[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
   @@schema("public")
 }
 
 model ImportBatch {
   id             String       @id @default(uuid())
+  organizationId       String
   file_name      String
-  file_url       String?
+  file_url       String?      // base64 buffer for re-parsing on commit (cleared after success)
   sheet_type     String
   import_mode    ImportMode   @default(update)
   target_branch  String?
   status         ImportStatus @default(uploaded)
   row_count      Int
-  mapping_config Json?
+  mapping_config Json?        // specialized import metadata (preview rows, source label)
   imported_at    DateTime?
   ok_count       Int?
   skipped_count  Int?
@@ -159,11 +266,15 @@ model ImportBatch {
   User           User         @relation(fields: [created_by], references: [id])
   ImportRow      ImportRow[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model ImportRow {
   id               String      @id @default(uuid())
+  organizationId       String
   batch_id         String
   row_number       Int
   raw_data         Json
@@ -183,41 +294,53 @@ model ImportRow {
   ImportBatch      ImportBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
 
   @@index([batch_id])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model InventoryFinishedGoods {
   id              String        @id @default(uuid())
+  organizationId       String
   branchId        String
   finishedGoodsId String
   availableQty    Int           @default(0)
   reservedQty     Int           @default(0)
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  updatedAt       DateTime              @updatedAt
   Branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
   FinishedGoods   FinishedGoods @relation(fields: [finishedGoodsId], references: [id], onDelete: Cascade)
 
   @@unique([branchId, finishedGoodsId])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model InventoryRawMaterial {
   id            String      @id @default(uuid())
+  organizationId       String
   branchId      String
   rawMaterialId String
   availableKg   Decimal     @default(0) @db.Decimal(10, 4)
   reservedKg    Decimal     @default(0) @db.Decimal(10, 4)
   createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  updatedAt     DateTime              @updatedAt
   Branch        Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
   RawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
 
   @@unique([branchId, rawMaterialId])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model MaterialConsumptionLog {
   id                String          @id @default(uuid())
+  organizationId       String
   productionOrderId String
   rawMaterialId     String
   quantityConsumed  Decimal         @db.Decimal(10, 4)
@@ -228,11 +351,15 @@ model MaterialConsumptionLog {
   RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
   Stage             Stage?          @relation(fields: [stageId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model MaterialReceipt {
   id          String      @id @default(uuid())
+  organizationId       String
   materialId  String
   kgReceived  Decimal     @db.Decimal(10, 4)
   reference   String?
@@ -244,11 +371,15 @@ model MaterialReceipt {
   RawMaterial RawMaterial @relation(fields: [materialId], references: [id])
   Supplier    Supplier?   @relation(fields: [supplierId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model NotificationSettings {
   id              String   @id @default(uuid())
+  organizationId       String
   userId          String   @unique
   emailEnabled    Boolean  @default(true)
   whatsappEnabled Boolean  @default(false)
@@ -257,31 +388,72 @@ model NotificationSettings {
   highScrapAlert  Boolean  @default(true)
   stockoutAlert   Boolean  @default(true)
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime              @updatedAt
   User            User     @relation(fields: [userId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model Organization {
   id        String   @id @default(uuid())
   name      String
+  slug                String       @unique   // url-safe identifier, e.g. "acme-springs"
+  status              OrgStatus    @default(PENDING_APPROVAL)
+  ownerUserId         String?      @unique
+  approvedAt          DateTime?
+  disabledAt          DateTime?
+  disabledReason      String?
   code      String   @unique
   address   String?
   phone     String?
   email     String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Branch    Branch[]
-  User      User[]
+  updatedAt DateTime              @updatedAt
+  Branch                 Branch[]
+  User                   User[]
+  Invitation             Invitation[]
+
+  // Inverse relations for all models with organizationId (required by Prisma for the @relation)
+  auditLogs              AuditLog[]
+  billOfMaterials        BillOfMaterials[]
+  customers              Customer[]
+  customerPortalAccesses CustomerPortalAccess[]
+  demandForecasts        DemandForecast[]
+  designs                Design[]
+  finishedGoods          FinishedGoods[]
+  importBatches          ImportBatch[]
+  importRows             ImportRow[]
+  inventoryFinishedGoods InventoryFinishedGoods[]
+  inventoryRawMaterials  InventoryRawMaterial[]
+  materialConsumptionLogs MaterialConsumptionLog[]
+  materialReceipts       MaterialReceipt[]
+  notificationSettings   NotificationSettings[]
+  products               Product[]
+  productAliases         ProductAlias[]
+  productReceipts        ProductReceipt[]
+  productionOrders       ProductionOrder[]
+  purchaseOrders         PurchaseOrder[]
+  purchaseOrderItems     PurchaseOrderItem[]
+  rawMaterials           RawMaterial[]
+  saleItems              SaleItem[]
+  saleOrders             SaleOrder[]
+  stages                 Stage[]
+  stageLogs              StageLog[]
+  stockMovements         StockMovement[]
+  suppliers              Supplier[]
+  unitOfMeasures         UnitOfMeasure[]
 
   @@schema("public")
 }
 
 model Product {
   id             String           @id @default(uuid())
+  organizationId       String
   name           String
-  sku            String?          @unique
+  sku            String?
   category       ProductCategory  @default(manufactured_spring)
   origin         StockOrigin      @default(FACTORY_MADE)
   uom            String           @default("PCS")
@@ -290,20 +462,25 @@ model Product {
   landingCost    Float?
   vendor         String?
   branchId       String?
-  reorderLevel   Int?
+  reorderLevel   Int?             // Minimum stock level before reorder
   stockStatus    StockStatus?     @default(AVAILABLE)
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  updatedAt      DateTime              @updatedAt
   Branch         Branch?          @relation(fields: [branchId], references: [id])
   ProductAlias   ProductAlias[]
   ProductReceipt ProductReceipt[]
   StockMovement  StockMovement[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, sku])
   @@schema("public")
 }
 
 model ProductAlias {
   id         String   @id @default(uuid())
+  organizationId       String
   product_id String
   alias      String
   created_at DateTime @default(now())
@@ -311,11 +488,15 @@ model ProductAlias {
 
   @@unique([product_id, alias])
   @@index([alias])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model ProductReceipt {
   id          String   @id @default(uuid())
+  organizationId       String
   productId   String
   qtyReceived Float
   unitCost    Float?
@@ -328,12 +509,16 @@ model ProductReceipt {
   Branch      Branch?  @relation(fields: [branchId], references: [id])
   Product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model ProductionOrder {
   id                     String                   @id @default(uuid())
-  orderNumber            String                   @unique
+  organizationId       String
+  orderNumber            String
   designId               String
   quantity               Int                      @default(1)
   targetKg               Decimal                  @db.Decimal(10, 4)
@@ -346,22 +531,27 @@ model ProductionOrder {
   approvedAt             DateTime?
   completedAt            DateTime?
   createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
+  updatedAt              DateTime              @updatedAt
   MaterialConsumptionLog MaterialConsumptionLog[]
   design                 Design                   @relation(fields: [designId], references: [id])
   StageLog               StageLog[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, orderNumber])
   @@schema("public")
 }
 
 model PurchaseOrder {
   id                String              @id @default(uuid())
-  poNumber          String              @unique
+  organizationId       String
+  poNumber          String
   supplierId        String
   status            PurchaseStatus      @default(DRAFT)
   totalAmount       Decimal             @db.Decimal(10, 2)
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  updatedAt         DateTime              @updatedAt
   approvedBy        String?
   approvedAt        DateTime?
   expectedDelivery  DateTime?
@@ -369,11 +559,16 @@ model PurchaseOrder {
   Supplier          Supplier            @relation(fields: [supplierId], references: [id])
   PurchaseOrderItem PurchaseOrderItem[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, poNumber])
   @@schema("public")
 }
 
 model PurchaseOrderItem {
   id              String        @id @default(uuid())
+  organizationId       String
   purchaseOrderId String
   rawMaterialId   String
   quantity        Decimal       @db.Decimal(10, 4)
@@ -382,22 +577,26 @@ model PurchaseOrderItem {
   PurchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   RawMaterial     RawMaterial   @relation(fields: [rawMaterialId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model RawMaterial {
   id                     String                   @id @default(uuid())
-  sku                    String                   @unique
+  organizationId       String
+  sku                    String
   materialName           String
   diameter               String
   supplierId             String?
-  barcode                String?                  @unique
+  barcode                String?
   batchNumber            String?
   availableKg            Decimal                  @default(0) @db.Decimal(10, 4)
   reservedKg             Decimal                  @default(0) @db.Decimal(10, 4)
-  costPerKg              Float?
+  costPerKg             Float?
   createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
+  updatedAt              DateTime              @updatedAt
   BillOfMaterials        BillOfMaterials[]
   DemandForecast         DemandForecast[]
   InventoryRawMaterial   InventoryRawMaterial[]
@@ -406,11 +605,17 @@ model RawMaterial {
   PurchaseOrderItem      PurchaseOrderItem[]
   Supplier               Supplier?                @relation(fields: [supplierId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
   @@schema("public")
 }
 
 model SaleItem {
   id              String        @id @default(uuid())
+  organizationId       String
   saleOrderId     String
   finishedGoodsId String
   quantity        Int
@@ -419,27 +624,35 @@ model SaleItem {
   FinishedGoods   FinishedGoods @relation(fields: [finishedGoodsId], references: [id])
   SaleOrder       SaleOrder     @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model SaleOrder {
-  id            String     @id @default(uuid())
-  customerId    String?
-  customerName  String
-  totalAmount   Decimal    @db.Decimal(10, 2)
-  status        SaleStatus @default(PENDING)
-  createdBy     String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  SaleItem      SaleItem[]
-  createdByUser User?      @relation(fields: [createdBy], references: [id])
-  Customer      Customer?  @relation(fields: [customerId], references: [id])
+  id           String     @id @default(uuid())
+  organizationId       String
+  customerId   String?
+  customerName String
+  totalAmount  Decimal    @db.Decimal(10, 2)
+  status       SaleStatus @default(PENDING)
+  createdBy    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime              @updatedAt
+  SaleItem     SaleItem[]
+  Customer     Customer?  @relation(fields: [customerId], references: [id])
+  createdByUser User?     @relation(fields: [createdBy], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model Stage {
   id                     String                   @id @default(uuid())
+  organizationId       String
   name                   String
   department             String
   sequence               Int
@@ -451,11 +664,15 @@ model Stage {
   StageLog               StageLog[]
 
   @@unique([designId, sequence])
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model StageLog {
   id              String          @id @default(uuid())
+  organizationId       String
   orderId         String
   stageId         String?
   stageName       String
@@ -472,35 +689,47 @@ model StageLog {
   ProductionOrder ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   Stage           Stage?          @relation(fields: [stageId], references: [id])
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
 model Supplier {
   id              String            @id @default(uuid())
+  organizationId       String
   name            String
-  code            String            @unique
+  code            String
   contactName     String?
   email           String?
   phone           String?
   address         String?
   taxId           String?
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  updatedAt       DateTime              @updatedAt
   MaterialReceipt MaterialReceipt[]
   PurchaseOrder   PurchaseOrder[]
   RawMaterial     RawMaterial[]
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, code])
   @@schema("public")
 }
 
 model UnitOfMeasure {
   id        String   @id @default(uuid())
+  organizationId       String
   name      String
   symbol    String
   category  String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime              @updatedAt
 
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }
 
@@ -518,83 +747,34 @@ model User {
   AuditLog             AuditLog[]
   ImportBatch          ImportBatch[]
   NotificationSettings NotificationSettings?
-  SaleOrderCreated     SaleOrder[]
   StageLog             StageLog[]
   Branch               Branch?               @relation(fields: [branchId], references: [id])
   Organization         Organization?         @relation(fields: [organizationId], references: [id])
+  SaleOrderCreated     SaleOrder[]
 
+  SentInvitations Invitation[] @relation("Inviter")
   @@schema("public")
 }
 
-model StockMovement {
-  id           String   @id @default(uuid())
-  productId    String
-  branchId     String?
-  movementType String
-  quantity     Float
-  reference    String?
-  notes        String?
-  createdAt    DateTime @default(now())
-  Branch       Branch?  @relation(fields: [branchId], references: [id])
-  Product      Product  @relation(fields: [productId], references: [id])
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 
-  @@schema("public")
-}
 
-model ProductMaster {
-  name          String
-  location      String
-  category      String
-  opening_stock Decimal  @default(0) @db.Decimal(12, 2)
-  current_stock Decimal  @default(0) @db.Decimal(12, 2)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
 
-  @@id([name, location])
-  @@index([location])
-  @@schema("public")
-}
 
-model SalesTransaction {
-  id               String   @id @default(uuid())
-  product_name     String
-  quantity         Decimal  @db.Decimal(12, 2)
-  transaction_date DateTime
-  invoice_number   String?
-  customer_name    String?
-  location         String
-  created_at       DateTime @default(now())
 
-  @@index([location])
-  @@index([transaction_date])
-  @@schema("public")
-}
 
-model StockReceipt {
-  id               String   @id @default(uuid())
-  product_name     String
-  quantity         Decimal  @db.Decimal(12, 2)
-  transaction_date DateTime
-  reference_memo   String?
-  location         String
-  created_at       DateTime @default(now())
 
-  @@index([location])
-  @@index([transaction_date])
-  @@schema("public")
-}
 
-model inventory_transactions {
-  id               String   @id
-  product_name     String
-  quantity         Float
-  transaction_date DateTime @db.Timestamp(6)
-  reference_memo   String?
-  location         String?
-  created_at       DateTime @db.Timestamp(6)
 
-  @@schema("public")
-}
+
+
+
+
+
+
+
+
+
 
 enum ImportMode {
   update
@@ -654,6 +834,15 @@ enum Role {
   WAREHOUSE
   SALES
   PACKAGING
+
+  @@schema("public")
+}
+
+enum OrgStatus {
+  PENDING_APPROVAL  // signed up, awaiting manual approval
+  ACTIVE            // approved, can use the app
+  SUSPENDED         // soft-disabled (logins blocked, data preserved)
+  CLOSED            // long-term disabled, may be deleted later
 
   @@schema("public")
 }
@@ -727,5 +916,47 @@ enum StockStatus {
   OUT_OF_STOCK
   REORDER_NEEDED
 
+  @@schema("public")
+}
+
+model Invitation {
+  id              String       @id @default(uuid())
+  organizationId  String
+  email           String
+  role            Role         @default(OPERATOR)
+  branchId        String?
+  token           String       @unique
+  invitedBy       String
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  Organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  Branch          Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  InvitedByUser   User         @relation("Inviter", fields: [invitedBy], references: [id])
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([token])
+  @@schema("public")
+}
+
+model StockMovement {
+  id            String      @id @default(uuid())
+  organizationId       String
+  productId     String
+  branchId      String?
+  movementType  String      // 'stock_in', 'stock_out', 'adjustment', 'sale', 'return'
+  quantity      Float
+  reference     String?     // Order number, import batch, etc.
+  notes         String?
+  createdAt     DateTime    @default(now())
+  Product       Product     @relation(fields: [productId], references: [id])
+  Branch        Branch?     @relation(fields: [branchId], references: [id])
+
+  Organization         Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@schema("public")
 }

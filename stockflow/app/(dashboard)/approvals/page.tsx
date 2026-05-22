@@ -20,7 +20,7 @@ export default async function OrderApprovalPage() {
   const pendingOrders = await prisma.productionOrder.findMany({
     where: { status: "PENDING" },
     include: {
-      Design: true,
+      design: true,
     },
     orderBy: { createdAt: "desc" },
   });

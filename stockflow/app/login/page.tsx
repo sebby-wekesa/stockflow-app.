@@ -167,25 +167,21 @@ export default function LoginPage() {
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '16px' }}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError(null);
-              setMessage(null);
-            }}
+          <a
+            href="/signup"
             className="btn btn-secondary"
             style={{
               background: 'transparent',
               border: 'none',
               padding: '8px 16px',
-              fontSize: '14px'
+              fontSize: '14px',
+              color: 'var(--text-muted)',
+              textDecoration: 'none',
+              display: 'inline-block',
             }}
           >
-            {isLogin
-              ? "Don't have an account? Sign up"
-              : "Already have an account? Sign in"}
-          </button>
+            Don&apos;t have an account? Sign up
+          </a>
         </div>
       </div>
     </div>

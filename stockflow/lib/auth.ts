@@ -40,7 +40,8 @@ export type AuthUser = {
   organization: {
     id: string;
     name: string;
-    status: string;
+    slug: string;
+    status: OrgStatus;
   };
 };
 
@@ -61,7 +62,7 @@ export async function getUser(): Promise<AuthUser | null> {
       include: {
         Branch: true,
         Organization: {
-          select: { id: true, name: true },
+          select: { id: true, name: true, slug: true, status: true },
         },
       },
     });
@@ -76,6 +77,13 @@ export async function getUser(): Promise<AuthUser | null> {
       return null;
     }
 
+    // Hard gate: SUSPENDED and CLOSED orgs cannot access the app at all
+    if (user.Organization.status === 'SUSPENDED' || user.Organization.status === 'CLOSED') {
+      return null;
+    }
+    // PENDING_APPROVAL users CAN be returned (so pages can show the
+    // waiting screen), but most actions will check status === 'ACTIVE'
+
     return {
       id: user.id,
       email: user.email,
@@ -87,6 +95,8 @@ export async function getUser(): Promise<AuthUser | null> {
       organization: {
         id: user.Organization.id,
         name: user.Organization.name,
+        slug: user.Organization.slug,
+        status: user.Organization.status,
       },
     };
   } catch (error) {
@@ -100,11 +110,23 @@ export async function requireAuth(): Promise<AuthUser> {
   if (!user) {
     throw new Error("Unauthorized");
   }
-  return user as AuthUser;
+  return user;
+}
+
+/**
+ * Requires the user to have ACTIVE org status (not pending, suspended, or closed).
+ * Most server actions should use this.
+ */
+export async function requireActiveAuth(): Promise<AuthUser> {
+  const user = await requireAuth();
+  if (user.organization.status !== 'ACTIVE') {
+    throw new Error(`Organization is ${user.organization.status.toLowerCase().replace('_', ' ')}`);
+  }
+  return user;
 }
 
 export async function requireRole(...roles: Role[]): Promise<AuthUser> {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
   if (!roles.includes(user.role)) {
     throw new Error("Forbidden: Insufficient permissions");
   }

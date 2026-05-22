@@ -27,7 +27,7 @@ export function SpecializedPreview({ batch }: SpecializedPreviewProps) {
             setPreviewData(springsData.slice(0, 10))
             break
           case 'consumables':
-            const consumablesData = parseConsumablesStock(workbook, batch.target_branch)
+            const consumablesData = parseConsumablesStock(workbook, batch.target_branch ?? undefined)
             setPreviewData(consumablesData.slice(0, 10))
             break
           case 'sales_quickbooks':

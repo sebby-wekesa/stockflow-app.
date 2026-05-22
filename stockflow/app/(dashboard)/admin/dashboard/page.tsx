@@ -54,14 +54,8 @@ async function getAdminStats() {
     take: 4,
     where: {},
     orderBy: { createdAt: "desc" },
-    include: { Design: true },
+    include: { design: true },
   });
-
-  // Department scrap (simplified)
-  const departmentScrap = []; // Would need complex aggregation
-
-  // Throughput (simplified)
-  const throughput = []; // Would need complex aggregation
 
   return {
     totalOrders,
@@ -79,14 +73,12 @@ async function getAdminStats() {
     scrapThisWeek,
     recentOrders: recentOrders.map(o => ({
       id: o.orderNumber,
-      design: o.Design.name,
+      design: o.design.name,
       kg: o.targetKg?.toNumber() ?? 0,
       status: o.status === "PENDING" ? "Pending approval" :
               o.status === "APPROVED" || o.status === "IN_PRODUCTION" ? "In production" : "Complete",
       dept: o.currentDept,
     })),
-    departmentScrap,
-    throughput,
   };
 }
 
@@ -107,7 +99,7 @@ export default async function AdminDashboardPage() {
         <div className="stat-card amber">
           <div className="stat-label">Raw material stock</div>
           <div className="stat-value">{stats.rawMaterialStock.toFixed(0)}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-          <div className="stat-sub">{inventory.length} materials · <span>+200 kg today</span></div>
+           <div className="stat-sub">{stats.inventory.length} materials · <span>+200 kg today</span></div>
         </div>
         <div className="stat-card teal">
           <div className="stat-label">Active production orders</div>

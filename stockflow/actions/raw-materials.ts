@@ -2,23 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
 import { Prisma } from '@prisma/client'
+import { requireActiveAuth, type AuthUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 
-async function requireUser() {
-  const supabase = await createServerSupabase()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-  if (!authUser) throw new Error('Not authenticated')
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user) throw new Error('User not provisioned')
-  return user
-}
-
-async function requireWarehouseAccess() {
-  const user = await requireUser()
+async function requireWarehouseAccess(): Promise<AuthUser> {
+  const user = await requireActiveAuth()
   if (!['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(user.role)) {
     throw new Error('Only admins, managers, and warehouse staff can manage raw materials')
   }
@@ -41,7 +30,8 @@ const createRMSchema = z.object({
 })
 
 export async function createRawMaterial(formData: FormData) {
-  await requireWarehouseAccess()
+  const user = await requireWarehouseAccess()
+  const db = getTenantPrisma(user.organizationId)
 
   const raw = {
     sku: formData.get('sku'),
@@ -54,18 +44,19 @@ export async function createRawMaterial(formData: FormData) {
   const parsed = createRMSchema.safeParse(raw)
   if (!parsed.success) throw new Error(parsed.error.issues[0].message)
 
-  const existing = await prisma.rawMaterial.findUnique({
+  const existing = await db.rawMaterial.findFirst({
     where: { sku: parsed.data.sku },
   })
   if (existing) throw new Error(`SKU "${parsed.data.sku}" already exists`)
 
-  await prisma.rawMaterial.create({
+  await db.rawMaterial.create({
     data: {
       sku: parsed.data.sku,
       materialName: parsed.data.materialName,
       diameter: parsed.data.diameter,
-      supplierId: parsed.data.supplierId,
+      supplierId: parsed.data.supplierId ?? null,
       costPerKg: parsed.data.costPerKg ?? undefined,
+      organizationId: user.organizationId,
     },
   })
 
@@ -99,8 +90,8 @@ export async function receiveRawMaterial(formData: FormData) {
   if (!parsed.success) throw new Error(parsed.error.issues[0].message)
   const data = parsed.data
 
-  await prisma.$transaction(
-    async (tx) => {
+  const { withTenantTransaction } = await import('@/lib/tenant-prisma')
+  await withTenantTransaction(user.organizationId, async (tx) => {
       await tx.materialReceipt.create({
         data: {
           id: crypto.randomUUID(),
@@ -117,9 +108,7 @@ export async function receiveRawMaterial(formData: FormData) {
         where: { id: data.rawMaterialId },
         data: { availableKg: { increment: new Prisma.Decimal(data.kgReceived) } },
       })
-    },
-    { maxWait: 10000, timeout: 30000 }
-  )
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/raw-materials')
 }
@@ -156,6 +145,7 @@ export async function receiveRawMaterialsBatch(
     return { success: false, error: 'No rows to process' }
   }
 
+  const { withTenantTransaction } = await import('@/lib/tenant-prisma')
   let successCount = 0
   const errors: string[] = []
 
@@ -196,8 +186,7 @@ export async function receiveRawMaterialsBatch(
         continue
       }
 
-      await prisma.$transaction(
-        async (tx) => {
+      await withTenantTransaction(user.organizationId, async (tx) => {
           let material = await tx.rawMaterial.findUnique({ where: { sku } })
 
           if (!material) {
@@ -226,9 +215,7 @@ export async function receiveRawMaterialsBatch(
               loggedBy: user.id,
             },
           })
-        },
-        { maxWait: 10000, timeout: 30000 }
-      )
+      }, { maxWait: 10000, timeout: 30000 })
 
       successCount++
     } catch (err) {
@@ -253,15 +240,16 @@ export async function receiveRawMaterialsBatch(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function searchRawMaterials(query: string) {
-  await requireUser()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
   if (!query || query.length < 1) {
-    return prisma.rawMaterial.findMany({
+    return db.rawMaterial.findMany({
       orderBy: { sku: 'asc' },
       take: 20,
     })
   }
 
-  return prisma.rawMaterial.findMany({
+  return db.rawMaterial.findMany({
     where: {
       OR: [
         { sku: { contains: query, mode: 'insensitive' } },

@@ -6,10 +6,10 @@ export default async function PackQueuePage() {
   const orders = await prisma.saleOrder.findMany({
     where: { status: 'PENDING' },
     include: {
-      items: {
+      SaleItem: {
         include: {
-          finishedGoods: {
-            include: { Design: true }
+          FinishedGoods: {
+            include: { design: true }
           }
         }
       }
@@ -23,10 +23,10 @@ export default async function PackQueuePage() {
         <div><div className="section-title">Packaging queue</div><div className="section-sub">Sale orders awaiting fulfilment</div></div>
       </div>
       {orders.map(o => {
-        const productSummary = o.items.map(i => i.finishedGoods.Design.name).join(", ");
-        const totalUnits = o.items.reduce((acc, i) => acc + i.quantity, 0);
-        const totalKg = o.items.reduce((acc, i) => {
-          const kgPerUnit = i.finishedGoods.quantity > 0 ? (i.finishedGoods.kgProduced.toNumber() / i.finishedGoods.quantity) : 0;
+        const productSummary = o.SaleItem.map((i: any) => i.FinishedGoods.design.name).join(", ");
+        const totalUnits = o.SaleItem.reduce((acc: number, i: any) => acc + i.quantity, 0);
+        const totalKg = o.SaleItem.reduce((acc: number, i: any) => {
+          const kgPerUnit = i.FinishedGoods.quantity > 0 ? (i.FinishedGoods.kgProduced.toNumber() / i.FinishedGoods.quantity) : 0;
           return acc + (i.quantity * kgPerUnit);
         }, 0);
 

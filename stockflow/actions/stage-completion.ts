@@ -6,7 +6,7 @@ import { stageCompletionSchema, StageCompletionInput } from "@/lib/validations";
 import { requireRole } from "@/lib/auth";
 
 export async function completeStage(input: StageCompletionInput) {
-  await requireRole("OPERATOR", "ADMIN");
+  const user = await requireRole("OPERATOR", "ADMIN");
 
   const validated = stageCompletionSchema.parse(input);
 
@@ -36,7 +36,7 @@ export async function completeStage(input: StageCompletionInput) {
       throw new Error("Invalid stage sequence");
     }
 
-    const expectedSequence = order.logs.length > 0 ? order.logs[0].sequence + 1 : 1;
+    const expectedSequence = order.StageLog.length > 0 ? order.StageLog[0].sequence + 1 : 1;
     if (validated.sequence !== expectedSequence) {
       throw new Error(`Must complete stages in order. Expected sequence ${expectedSequence}, got ${validated.sequence}`);
     }
@@ -60,6 +60,7 @@ export async function completeStage(input: StageCompletionInput) {
         kgScrap: validated.kgScrap,
         operatorId: validated.operatorId,
         notes: validated.notes,
+        organizationId: user.organizationId,
       },
     });
 
@@ -102,6 +103,7 @@ export async function completeStage(input: StageCompletionInput) {
           designId: order.designId,
           quantity: order.quantity,
           kgProduced: validated.kgOut,
+          organizationId: user.organizationId,
         },
       });
     }

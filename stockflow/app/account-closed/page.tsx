@@ -1,20 +1,28 @@
+import { signOut } from '@/actions/auth'
+
 export default function AccountClosedPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="max-w-md text-center p-8">
-        <div className="mx-auto mb-6 w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6h12v12" />
-          </svg>
-        </div>
-        <h1 className="text-2xl font-bold mb-4">Account Closed</h1>
-        <p className="text-muted mb-6">
-          This organization has been permanently closed. If you believe this is an error, please contact support.
+    <div className="min-h-screen flex items-center justify-center bg-bg px-4">
+      <div className="card p-8 max-w-md w-full text-center">
+        <div className="text-4xl mb-4">📁</div>
+        <h1 className="font-head text-2xl font-bold mb-3">Account closed</h1>
+        <p className="text-muted text-sm mb-6 leading-relaxed">
+          This account has been closed. The data is retained for compliance
+          purposes but the app is no longer accessible from this account.
         </p>
-        <a href="/login" className="btn btn-primary">
-          Return to Login
-        </a>
+        <p className="text-xs text-muted mb-8">
+          If you believe this is in error, contact{' '}
+          <a href="mailto:support@springtech.co.ke" className="text-accent hover:underline">
+            support@springtech.co.ke
+          </a>
+        </p>
+
+        <form action={signOut}>
+          <button type="submit" className="btn btn-ghost w-full">
+            Sign out
+          </button>
+        </form>
       </div>
     </div>
-  );
+  )
 }

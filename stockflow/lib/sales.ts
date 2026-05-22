@@ -1,32 +1,38 @@
-import type { BranchCode as Branch } from '@/lib/branches'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 export { STATUS_LABELS, STATUS_BADGE_CLASS, formatKES } from './sales-utils'
 
-// Branch invoice prefixes — matches existing Springtech numbering convention
-const INVOICE_PREFIX: Record<Branch, string> = {
-  mombasa: '',    // Mombasa uses pure numeric: 107372
-  nairobi: 'NBI', // NBI25228
-  bonje: 'BNJ',   // BNJ633
+// Springtech's invoice prefix convention. Other orgs will get the default
+// '' prefix until we add a tenant-level "branch prefix" config.
+const SPRINGTECH_INVOICE_PREFIX: Record<string, string> = {
+  mombasa: '',
+  nairobi: 'NBI',
+  bonje: 'BNJ',
 }
 
 /**
- * Generate the next invoice number for a branch.
+ * Generate the next invoice number for a given org+branch.
  *
- * Scans recent SaleOrder rows whose id starts with the branch prefix (or
- * any numeric id for Mombasa), finds the highest numeric portion, and
- * returns prefix + (max + 1). Falls back to 100000 (Mombasa) or 1 (branches)
- * if no prior invoices exist.
+ * Scans recent SaleOrder rows in THIS org whose id starts with the branch
+ * prefix, finds the highest numeric portion, returns prefix + (max + 1).
+ * Falls back to a sensible starting point if no prior invoices exist.
  *
- * Note: SaleOrder.id is the invoice number in this schema. There's no
- * separate order_number column.
+ * Notes for multitenancy:
+ *   - Org-scoped via getTenantPrisma()
+ *   - Different orgs can use the same prefixes (composite uniqueness in DB)
+ *   - For non-Springtech orgs, prefix defaults to '' (numeric only).
+ *     Stage 6 will add a tenant settings UI to configure prefixes.
  */
-export async function nextInvoiceNumber(branch: Branch): Promise<string> {
-  const prefix = INVOICE_PREFIX[branch]
+export async function nextInvoiceNumber(
+  organizationId: string,
+  branch: string
+): Promise<string> {
+  const db = getTenantPrisma(organizationId)
+  const prefix = SPRINGTECH_INVOICE_PREFIX[branch.toLowerCase()] ?? ''
 
-  const existing = await prisma.saleOrder.findMany({
+  const existing = await db.saleOrder.findMany({
     where: prefix
       ? { id: { startsWith: prefix } }
-      : { id: { not: { startsWith: 'NBI' } } }, // Mombasa: any id that isn't a branch one
+      : { NOT: { id: { startsWith: 'NBI' } } },
     select: { id: true },
     orderBy: { createdAt: 'desc' },
     take: 200,
@@ -35,15 +41,17 @@ export async function nextInvoiceNumber(branch: Branch): Promise<string> {
   let maxNum = 0
   for (const e of existing) {
     if (!e.id) continue
-    // Skip drafts and other branch prefixes for mombasa
-    if (!prefix && (e.id.startsWith('NBI') || e.id.startsWith('BNJ') || e.id.startsWith('DRAFT'))) {
-      continue
+    // For Mombasa, skip rows that belong to other branches
+    if (!prefix) {
+      if (e.id.startsWith('NBI') || e.id.startsWith('BNJ') || e.id.startsWith('DRAFT')) {
+        continue
+      }
     }
     const numPart = prefix ? e.id.replace(prefix, '') : e.id
     const parsed = parseInt(numPart.replace(/\D/g, ''), 10)
     if (!isNaN(parsed) && parsed > maxNum) maxNum = parsed
   }
 
-  const next = maxNum > 0 ? maxNum + 1 : branch === 'mombasa' ? 100000 : 1
+  const next = maxNum > 0 ? maxNum + 1 : branch.toLowerCase() === 'mombasa' ? 100000 : 1
   return `${prefix}${next}`
 }

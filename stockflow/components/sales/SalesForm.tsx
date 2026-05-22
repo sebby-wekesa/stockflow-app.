@@ -41,7 +41,10 @@ export function SalesForm({
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [branch, setBranch] = useState<Branch>(defaultBranch)
+  const [branch, setBranch] = useState<Branch>(() => {
+    // Ensure we always start with a valid branch if provided
+    return (allowedBranches.includes(defaultBranch) ? defaultBranch : allowedBranches[0]) as Branch
+  })
   const [customer, setCustomer] = useState<CustomerHit | null>(null)
   const [customerName, setCustomerName] = useState('Walk-in customer')
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
@@ -96,6 +99,11 @@ export function SalesForm({
 
   function handleSubmit(action: 'draft' | 'invoice') {
     setError(null)
+
+    if (!branch) {
+      setError('Please select a branch')
+      return
+    }
 
     // Validate
     const validLines = lines.filter((l) => l.product)
@@ -450,7 +458,7 @@ function ProductSearch({
   }
 
   return (
-    <div className="bg-surface2 rounded-md p-3 border border-border">
+    <div>
       <div className="flex gap-2 mb-2">
         <input
           type="search"
@@ -458,42 +466,48 @@ function ProductSearch({
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search product by code or name..."
-          className="input text-sm flex-1"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-1"
         />
         {onCancel && (
-          <button onClick={onCancel} className="btn btn-ghost btn-sm">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 text-sm text-muted hover:text-foreground"
+          >
             Cancel
           </button>
         )}
       </div>
-      <div className="max-h-48 overflow-y-auto">
+
+      <div className="border rounded-lg max-h-52 overflow-auto bg-white">
         {searching ? (
-          <div className="text-xs text-muted px-2 py-2">Searching...</div>
+          <div className="text-sm text-muted px-3 py-3">Searching...</div>
         ) : query.length < 2 ? (
-          <div className="text-xs text-muted px-2 py-2">
+          <div className="text-sm text-muted px-3 py-3">
             Type at least 2 characters to search...
           </div>
         ) : results.length === 0 ? (
-          <div className="text-xs text-muted px-2 py-2">No products found</div>
+          <div className="text-sm text-muted px-3 py-3">No products found</div>
         ) : (
-          results.map((r) => (
+          results.map((r, index) => (
             <button
               key={r.id}
               type="button"
               onClick={() => onPick(r)}
-              className="w-full text-left px-2 py-2 rounded-md hover:bg-bg text-xs flex items-center justify-between"
+              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-gray-50 text-sm border-b last:border-b-0 ${
+                index === 0 ? 'rounded-t-lg' : ''
+              }`}
             >
-              <div className="min-w-0 flex-1">
-                <div className="font-mono text-accent">{r.product_code}</div>
-                <div className="text-muted truncate">{r.canonical_name}</div>
+              <div className="min-w-0 flex-1 pr-3">
+                <div className="font-mono text-[13px] text-amber-600">{r.product_code}</div>
+                <div className="text-foreground truncate">{r.canonical_name}</div>
               </div>
-              <div className="text-right flex-shrink-0 ml-2">
-                <div className="font-mono text-sm">{formatKES(r.selling_price)}</div>
+
+              <div className="text-right flex-shrink-0 text-sm">
+                <div className="font-medium tabular-nums">{formatKES(r.selling_price)}</div>
                 {r.category !== 'service' && (
-                  <div className={`text-[10px] ${
-                    (r.stock_at_branch ?? 0) > 0 ? 'text-teal' : 'text-red'
-                  }`}>
-                    {r.stock_at_branch} avail
+                  <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {r.stock_at_branch ?? 0} in stock
                   </div>
                 )}
               </div>
@@ -534,7 +548,7 @@ function CustomerSearch({
   }
 
   return (
-    <div className="bg-surface2 rounded-md p-2 border border-border">
+    <div>
       <div className="flex gap-2 mb-2">
         <input
           type="search"
@@ -542,30 +556,35 @@ function CustomerSearch({
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search by name or phone..."
-          className="input text-sm flex-1"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-1"
         />
-        <button onClick={onCancel} className="text-xs text-muted hover:text-text px-2">
-          ✕
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 text-sm text-muted hover:text-foreground"
+        >
+          Cancel
         </button>
       </div>
-      <div className="max-h-40 overflow-y-auto">
+
+      <div className="border rounded-lg max-h-44 overflow-auto bg-white">
         {searching ? (
-          <div className="text-xs text-muted px-2 py-1">Searching...</div>
+          <div className="text-sm text-muted px-3 py-2.5">Searching...</div>
         ) : query.length < 2 ? (
-          <div className="text-xs text-muted px-2 py-1">Type to search...</div>
+          <div className="text-sm text-muted px-3 py-2.5">Type to search...</div>
         ) : results.length === 0 ? (
-          <div className="text-xs text-muted px-2 py-1">No customers found</div>
+          <div className="text-sm text-muted px-3 py-2.5">No customers found</div>
         ) : (
           results.map((c) => (
             <button
               key={c.id}
               type="button"
               onClick={() => onPick(c)}
-              className="w-full text-left px-2 py-1.5 rounded-md hover:bg-bg text-xs"
+              className="w-full text-left px-3 py-2.5 border-b last:border-b-0 hover:bg-gray-50 text-sm"
             >
-              <div className="font-medium truncate">{c.name}</div>
+              <div className="font-medium">{c.name}</div>
               {c.phone && (
-                <div className="text-muted font-mono text-[10px]">{c.phone}</div>
+                <div className="text-xs text-muted font-mono">{c.phone}</div>
               )}
             </button>
           ))

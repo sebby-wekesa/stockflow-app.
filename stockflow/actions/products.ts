@@ -3,22 +3,13 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
-import { normaliseForMatching } from '@/lib/import/alias-matcher'
+import { requireActiveAuth, type AuthUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 import type { ProductCategory } from '@prisma/client'
 
-async function requireUser() {
-  const supabase = await createServerSupabase()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-
-  if (!authUser) throw new Error('Not authenticated')
-
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user) throw new Error('User not provisioned')
-
+/** Returns the auth user if role is ADMIN or MANAGER, else throws. */
+async function requireProductManager(): Promise<AuthUser> {
+  const user = await requireActiveAuth()
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Insufficient permissions')
   }
@@ -41,8 +32,6 @@ const createSchema = z.object({
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
   reorder_point: z.coerce.number().int().nonnegative().optional().nullable(),
   vendor: z.string().max(200).optional().nullable(),
-  current_stock: z.coerce.number().optional().nullable(),
-  adjustment_reason: z.string().max(500).optional().nullable(),
   // Fields below are not in the schema — accepted but ignored so existing forms don't crash:
   product_type: z.string().optional().nullable(),
   description: z.string().max(500).optional().nullable(),
@@ -64,8 +53,6 @@ function extractForm(formData: FormData) {
     selling_price: formData.get('selling_price') || null,
     reorder_point: formData.get('reorder_point') || null,
     vendor: formData.get('vendor') || null,
-    current_stock: formData.get('current_stock') ?? null,
-    adjustment_reason: formData.get('adjustment_reason') || null,
     product_type: formData.get('product_type') || null,
     description: formData.get('description') || null,
     vehicle_make: formData.get('vehicle_make') || null,
@@ -82,7 +69,8 @@ function extractForm(formData: FormData) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function createProduct(formData: FormData) {
-  await requireUser()
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
 
   const parsed = createSchema.safeParse(extractForm(formData))
   if (!parsed.success) {
@@ -90,14 +78,16 @@ export async function createProduct(formData: FormData) {
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
   }
 
-  const existing = await prisma.product.findUnique({
+  // Uniqueness is now per-org (sku), so we look up scoped to our org
+  const existing = await db.product.findFirst({
     where: { sku: parsed.data.product_code },
   })
   if (existing) {
     throw new Error(`Product code "${parsed.data.product_code}" already exists`)
   }
 
-  const product = await prisma.product.create({
+  // organizationId auto-injected by db extension
+  const product = await db.product.create({
     data: {
       sku: parsed.data.product_code,
       name: parsed.data.canonical_name,
@@ -107,11 +97,12 @@ export async function createProduct(formData: FormData) {
       vendor: parsed.data.vendor ?? null,
       reorderLevel: parsed.data.reorder_point ?? null,
       currentStock: 0,
+      organizationId: user.organizationId,
     },
   })
 
   // The canonical name itself is automatically a self-alias
-  await prisma.productAlias.upsert({
+  await db.productAlias.upsert({
     where: {
       product_id_alias: {
         product_id: product.id,
@@ -122,6 +113,7 @@ export async function createProduct(formData: FormData) {
     create: {
       product_id: product.id,
       alias: parsed.data.canonical_name,
+      organizationId: user.organizationId,
     },
   })
 
@@ -134,7 +126,8 @@ export async function createProduct(formData: FormData) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function updateProduct(productId: string, formData: FormData) {
-  await requireUser()
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
 
   const parsed = createSchema.safeParse(extractForm(formData))
   if (!parsed.success) {
@@ -142,28 +135,21 @@ export async function updateProduct(productId: string, formData: FormData) {
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
   }
 
-  const existing = await prisma.product.findUnique({ where: { id: productId } })
+  // findFirst guarantees this product belongs to OUR org (extension adds the filter)
+  const existing = await db.product.findFirst({ where: { id: productId } })
   if (!existing) throw new Error('Product not found')
 
+  // If the user is changing the sku, check no other product in this org has it
   if (existing.sku !== parsed.data.product_code) {
-    const conflict = await prisma.product.findUnique({
-      where: { sku: parsed.data.product_code },
+    const conflict = await db.product.findFirst({
+      where: { sku: parsed.data.product_code, id: { not: productId } },
     })
     if (conflict) {
       throw new Error(`Product code "${parsed.data.product_code}" already exists`)
     }
   }
 
-  const oldStock = existing.currentStock ?? 0
-  const newStock = parsed.data.current_stock != null ? Number(parsed.data.current_stock) : oldStock
-  const stockChanged = Math.abs(newStock - oldStock) > 0.0001
-  const reason = parsed.data.adjustment_reason?.trim() || null
-
-  if (stockChanged && !reason) {
-    throw new Error('Adjustment reason is required when changing stock')
-  }
-
-  await prisma.product.update({
+  await db.product.update({
     where: { id: productId },
     data: {
       sku: parsed.data.product_code,
@@ -173,50 +159,41 @@ export async function updateProduct(productId: string, formData: FormData) {
       unitCost: parsed.data.cost_price ?? null,
       vendor: parsed.data.vendor ?? null,
       reorderLevel: parsed.data.reorder_point ?? null,
-      currentStock: newStock,
     },
   })
-
-  if (stockChanged) {
-    const delta = newStock - oldStock
-    await prisma.stockMovement.create({
-      data: {
-        productId,
-        movementType: 'adjustment',
-        quantity: delta,
-        reference: 'Manual edit via UI',
-        notes: reason,
-      },
-    })
-  }
 
   revalidatePath('/products')
   revalidatePath(`/products/${productId}`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DELETE — only allowed if no stock movements or sale items exist
+// DELETE — only allowed if no stock movements or receipts exist
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function deleteProduct(productId: string) {
-  const user = await requireUser()
+  const user = await requireProductManager()
   if (user.role !== 'ADMIN') {
     throw new Error('Only admins can delete products')
   }
+  const db = getTenantPrisma(user.organizationId)
 
-  const [movementCount, productReceiptCount] = await Promise.all([
-    prisma.stockMovement.count({ where: { productId } }),
-    prisma.productReceipt.count({ where: { productId } }),
+  // Existence + tenant check
+  const product = await db.product.findFirst({ where: { id: productId } })
+  if (!product) throw new Error('Product not found')
+
+  const [movementCount, receiptCount] = await Promise.all([
+    db.stockMovement.count({ where: { productId } }),
+    db.productReceipt.count({ where: { productId } }),
   ])
 
-  if (movementCount + productReceiptCount > 0) {
+  if (movementCount + receiptCount > 0) {
     throw new Error(
-      `Cannot delete: product has ${movementCount} stock movements and ${productReceiptCount} receipts. Remove history first.`
+      `Cannot delete: product has ${movementCount} stock movements and ${receiptCount} receipts. Remove history first.`
     )
   }
 
-  await prisma.productAlias.deleteMany({ where: { product_id: productId } })
-  await prisma.product.delete({ where: { id: productId } })
+  await db.productAlias.deleteMany({ where: { product_id: productId } })
+  await db.product.delete({ where: { id: productId } })
 
   revalidatePath('/products')
   redirect('/products')
@@ -227,19 +204,23 @@ export async function deleteProduct(productId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function addAlias(productId: string, formData: FormData) {
-  await requireUser()
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
   const alias = String(formData.get('alias') ?? '').trim()
   if (!alias) throw new Error('Alias cannot be empty')
 
-  // Check if this alias already maps to a different product
-  const existing = await prisma.productAlias.findFirst({
-    where: { alias },
-  })
+  // Confirm the product is ours
+  const product = await db.product.findFirst({ where: { id: productId } })
+  if (!product) throw new Error('Product not found')
+
+  // Check this alias doesn't already exist in our org (across all products)
+  const existing = await db.productAlias.findFirst({ where: { alias } })
   if (existing) {
     if (existing.product_id === productId) {
       throw new Error('This alias already exists for this product')
     }
-    const otherProduct = await prisma.product.findUnique({
+    const otherProduct = await db.product.findFirst({
       where: { id: existing.product_id },
       select: { sku: true, name: true },
     })
@@ -248,10 +229,11 @@ export async function addAlias(productId: string, formData: FormData) {
     )
   }
 
-  await prisma.productAlias.create({
+  await db.productAlias.create({
     data: {
       product_id: productId,
       alias,
+      organizationId: user.organizationId,
     },
   })
 
@@ -259,12 +241,16 @@ export async function addAlias(productId: string, formData: FormData) {
 }
 
 export async function removeAlias(productId: string, aliasId: string) {
-  await requireUser()
-  const aliasRow = await prisma.productAlias.findUnique({ where: { id: aliasId } })
-  if (!aliasRow) throw new Error('Alias not found')
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
 
-  // Don't allow removing the canonical alias (one matching the product's name)
-  const product = await prisma.product.findUnique({
+  const aliasRow = await db.productAlias.findFirst({ where: { id: aliasId } })
+  if (!aliasRow) throw new Error('Alias not found')
+  if (aliasRow.product_id !== productId) {
+    throw new Error('Alias does not belong to this product')
+  }
+
+  const product = await db.product.findFirst({
     where: { id: productId },
     select: { name: true },
   })
@@ -274,6 +260,6 @@ export async function removeAlias(productId: string, aliasId: string) {
     )
   }
 
-  await prisma.productAlias.delete({ where: { id: aliasId } })
+  await db.productAlias.delete({ where: { id: aliasId } })
   revalidatePath(`/products/${productId}`)
 }

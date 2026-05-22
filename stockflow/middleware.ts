@@ -1,23 +1,81 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from '@supabase/ssr'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeUserRole } from '@/lib/types'
 import { getRoleHomePage } from '@/lib/auth-session'
 
+/**
+ * Routes that don't need a session.
+ *
+ * Includes the new multitenancy signup/approval routes added in Stage 2.
+ */
+const PUBLIC_ROUTES = [
+  '/login',
+  '/signup',
+  '/auth/callback',
+  '/auth/auth-code-error',
+  '/forgot-password',
+  '/reset-password',
+]
+
+/**
+ * Routes a logged-in user can visit regardless of their org status.
+ * Used for status-pending users to see the waiting screen, etc.
+ */
+const STATUS_ROUTES = [
+  '/awaiting-approval',
+  '/account-suspended',
+  '/account-closed',
+  '/signup',
+]
+
+async function resolveUserContext(userId: string, fallbackRole?: string) {
+  const supabaseAdmin = getSupabaseAdmin()
+  if (!supabaseAdmin) {
+    return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
+  }
+
+  try {
+    // Look up the user's role AND their org's status in one query.
+    // We hit the Prisma User + Organization tables here instead of profiles.
+    const { data, error } = await supabaseAdmin
+      .from('User')
+      .select('role, Organization (status)')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('User context lookup failed:', error)
+      return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
+    }
+
+    const orgStatus = (data as any)?.Organization?.status ?? 'ACTIVE'
+    return {
+      role: normalizeUserRole((data as any)?.role ?? fallbackRole),
+      orgStatus: orgStatus as 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED',
+    }
+  } catch (error) {
+    console.error('User context lookup error:', error)
+    return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
+  }
+}
+
 export default async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname } = request.nextUrl
 
-  console.log('Middleware - Pathname:', pathname);
-
-  // Public routes
-  const publicRoutes = ['/login', '/auth/callback', '/auth/auth-code-error']
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
-
-  // Skip middleware for API, static, auth routes
-  if (pathname.startsWith('/api/') || pathname.startsWith('/_next/') || pathname.includes('.') || isPublicRoute) {
+  // Skip middleware for API routes, static assets, and Next.js internals
+  if (
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/') ||
+    pathname.includes('.')
+  ) {
     return NextResponse.next()
   }
 
-  // Create Supabase client
+  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+  const isStatusRoute = STATUS_ROUTES.some(route => pathname.startsWith(route))
+
+  // Create Supabase client to read session cookies
   const response = NextResponse.next()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,59 +95,69 @@ export default async function middleware(request: NextRequest) {
     }
   )
 
-  // Get session
   const { data: { session } } = await supabase.auth.getSession()
 
-  console.log('Middleware - Session exists:', !!session);
-
-  // If no session, redirect to login
+  // No session
   if (!session) {
-    console.log('Middleware - No session, redirecting to login');
+    if (isPublicRoute) {
+      return response // allow access
+    }
+    // Redirect to login, preserving the intended destination
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Get role from session metadata (already in JWT, no DB query needed)
-  const role = normalizeUserRole(session.user.user_metadata?.role)
+  // Has a session — look up role and org status
+  const ctx = await resolveUserContext(
+    session.user.id,
+    session.user.user_metadata?.role
+  )
 
-  // If session exists and on login page, redirect based on role
-  if (session && pathname === '/login') {
-    console.log('Middleware - On login page, resolved role from session:', role);
-    const homePage = getRoleHomePage(role)
-    console.log('Middleware - Redirecting to:', homePage);
+  // Hard blocks: SUSPENDED or CLOSED orgs cannot do anything except see the
+  // explanation page and log out
+  if (ctx.orgStatus === 'SUSPENDED') {
+    if (pathname === '/account-suspended' || pathname === '/login') {
+      return response
+    }
+    return NextResponse.redirect(new URL('/account-suspended', request.url))
+  }
+  if (ctx.orgStatus === 'CLOSED') {
+    if (pathname === '/account-closed' || pathname === '/login') {
+      return response
+    }
+    return NextResponse.redirect(new URL('/account-closed', request.url))
+  }
 
-    // Prevent redirect loop - don't redirect to same path
+  // PENDING_APPROVAL users can only see the waiting screen and log out
+  if (ctx.orgStatus === 'PENDING_APPROVAL') {
+    if (pathname === '/awaiting-approval' || pathname === '/login') {
+      return response
+    }
+    return NextResponse.redirect(new URL('/awaiting-approval', request.url))
+  }
+
+  // ACTIVE org from here on
+
+  // On /login while logged in → bounce to their home page
+  if (pathname === '/login') {
+    const homePage = getRoleHomePage(ctx.role)
     if (homePage !== pathname) {
       return NextResponse.redirect(new URL(homePage, request.url))
     }
   }
 
-  // For protected admin routes, check role access (using cached session data)
-  if (session && pathname.startsWith('/admin')) {
-    console.log('Middleware - Admin route, user role from session:', role);
-    if (role !== 'ADMIN') {
-      const homePage = getRoleHomePage(role)
-      console.log('Middleware - Non-admin, redirecting to:', homePage);
-      return NextResponse.redirect(new URL(homePage, request.url))
-    }
+  // On status routes while ACTIVE → no need, send to dashboard
+  if (isStatusRoute && pathname !== '/signup') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Stage 2: Org status gating
-  const orgStatus = session.user.user_metadata?.orgStatus as string | undefined;
-  if (orgStatus) {
-    if (orgStatus === 'SUSPENDED' && !pathname.startsWith('/account-suspended')) {
-      return NextResponse.redirect(new URL('/account-suspended', request.url));
-    }
-    if (orgStatus === 'CLOSED' && !pathname.startsWith('/account-closed')) {
-      return NextResponse.redirect(new URL('/account-closed', request.url));
-    }
-    if (orgStatus === 'PENDING_APPROVAL' && !pathname.startsWith('/awaiting-approval')) {
-      return NextResponse.redirect(new URL('/awaiting-approval', request.url));
-    }
+  // Admin route protection
+  if (pathname.startsWith('/admin') && ctx.role !== 'ADMIN') {
+    const homePage = getRoleHomePage(ctx.role)
+    return NextResponse.redirect(new URL(homePage, request.url))
   }
 
-  console.log('Middleware - Allowing access');
   return response
 }
 
@@ -97,4 +165,4 @@ export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
-};
+}

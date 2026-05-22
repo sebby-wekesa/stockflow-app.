@@ -9,7 +9,7 @@ async function getSaleOrders() {
         include: {
           FinishedGoods: {
             include: {
-              Design: true
+              design: true
             }
           }
         }
@@ -23,7 +23,7 @@ async function getAvailableStock() {
   return await prisma.finishedGoods.findMany({
     where: { quantity: { gt: 0 } },
     include: {
-      Design: {
+      design: {
         select: {
           name: true,
           code: true,
@@ -71,8 +71,8 @@ export default async function SalesOrdersPage() {
   // Manufactured / Design items (current FinishedGoods with design info)
   const manufactured = stock.map(item => ({
     id: item.id,
-    name: item.Design.name,
-    code: item.Design.code,
+    name: item.design.name,
+    code: item.design.code,
     availableQty: item.quantity,
     kgProduced: Number(item.kgProduced),
     price: item.unitCost ? Number(item.unitCost) : undefined,

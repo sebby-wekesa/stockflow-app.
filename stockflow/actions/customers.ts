@@ -1,22 +1,15 @@
 'use server'
 
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
-
-async function requireUser() {
-  const supabase = await createServerSupabase()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  if (!authUser) throw new Error('Not authenticated')
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user) throw new Error('User not provisioned')
-  return user
-}
+import { requireActiveAuth } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 
 export async function searchCustomers(query: string) {
-  await requireUser()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   if (!query || query.length < 2) return []
 
-  const customers = await prisma.customer.findMany({
+  const customers = await db.customer.findMany({
     where: {
       OR: [
         { name: { contains: query, mode: 'insensitive' } },

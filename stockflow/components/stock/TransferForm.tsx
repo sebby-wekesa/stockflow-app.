@@ -31,6 +31,7 @@ export function TransferForm({
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [picked, setPicked] = useState<PickedProduct | null>(null)
   const [sourceBranch, setSourceBranch] = useState<Branch>('mombasa')
   const [destBranch, setDestBranch] = useState<Branch>('nairobi')
@@ -72,11 +73,15 @@ export function TransferForm({
     startTransition(async () => {
       try {
         await dispatchTransfer(fd)
+        setSuccess(`Successfully transferred ${qty} units from ${sourceBranch} to ${destBranch}`)
         // Reset form
         setPicked(null)
         setQty('')
         setNotes('')
         setError(null)
+
+        // Clear success after a few seconds
+        setTimeout(() => setSuccess(null), 4000)
       } catch (err) {
         setError((err as Error).message)
       }
@@ -101,6 +106,12 @@ export function TransferForm({
       {error && (
         <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
           {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
+          {success}
         </div>
       )}
 

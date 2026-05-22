@@ -14,8 +14,16 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const order = await prisma.productionOrder.findUnique({
     where: { id },
     include: {
-      Design: { include: { stages: { orderBy: { sequence: "asc" } } } },
-      logs: { orderBy: { sequence: "desc" } },
+      design: {
+        include: {
+          stages: {
+            orderBy: { sequence: "asc" }
+          }
+        }
+      },
+      StageLog: {
+        orderBy: { sequence: "desc" }
+      },
     },
   });
 
@@ -23,8 +31,8 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
     return <div>Order not found</div>;
   }
 
-  const currentStage = order.Design.stages.find((s) => s.sequence === order.currentStage);
-  const lastLog = order.logs[0];
+  const currentStage = order.design.stages.find((s) => s.sequence === order.currentStage);
+  const lastLog = order.StageLog[0];
 
   const statusColors: Record<string, string> = {
     PENDING: "bg-amber-100 text-amber-800",
@@ -38,7 +46,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">{order.Design.name}</h1>
+          <h1 className="text-2xl font-bold text-zinc-900">{order.design.name}</h1>
           <p className="text-zinc-500">Order #{order.id.slice(0, 8)}</p>
         </div>
         <span className={`px-3 py-1 text-sm font-medium rounded ${statusColors[order.status]}`}>
@@ -64,7 +72,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
         <div className="bg-white p-4 rounded-lg border border-zinc-200">
           <p className="text-xs font-medium text-zinc-500 uppercase">Progress</p>
           <p className="text-xl font-bold text-zinc-900">
-            {order.currentStage}/{order.Design.stages.length}
+            {order.currentStage}/{order.design.stages.length}
           </p>
         </div>
       </div>
@@ -81,14 +89,14 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             orderId={order.id}
             stageName={currentStage.name}
             sequence={order.currentStage}
-            stageCount={order.Design.stages.length}
+            stageCount={order.design.stages.length}
             operatorId={user.id}
             previousKgOut={lastLog?.kgOut?.toNumber()}
           />
         </div>
       )}
 
-      {order.logs.length > 0 && (
+      {order.StageLog.length > 0 && (
         <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
           <h2 className="text-lg font-semibold text-zinc-900 p-4 border-b border-zinc-200">
             Production History
@@ -105,7 +113,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
-              {order.logs.map((log) => {
+              {order.StageLog.map((log) => {
                 const kgInNum = log.kgIn.toNumber();
                 const kgOutNum = log.kgOut.toNumber();
                 const kgScrapNum = log.kgScrap.toNumber();

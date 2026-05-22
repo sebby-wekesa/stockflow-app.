@@ -20,7 +20,7 @@ function hashPassword(password: string): string {
   return `${salt}:${hash}`;
 }
 
-async function seedDesigns() {
+async function seedDesigns(organizationId: string) {
   const designs = [
     {
       id: "design-sg-001",
@@ -46,10 +46,11 @@ async function seedDesigns() {
 
   for (const design of designs) {
     await prisma.design.upsert({
-      where: { code: design.code },
-      update: {}, // Don't change if it already exists
+      where: { id: design.id },
+      update: {},
       create: {
         ...design,
+        organizationId,
         updatedAt: new Date(),
       },
     });
@@ -69,6 +70,7 @@ async function main() {
       id: 'org-stockflow-001',
       name: 'StockFlow Manufacturing',
       code: 'SF',
+      slug: 'stockflow-manufacturing',
       updatedAt: new Date(),
     }
   });
@@ -83,7 +85,7 @@ async function main() {
   const seededBranches = [];
   for (const branch of branches) {
     const b = await prisma.branch.upsert({
-      where: { code: branch.code },
+      where: { id: branch.id },
       update: { location: branch.location },
       create: {
         ...branch,
@@ -184,7 +186,7 @@ async function main() {
 
   console.log('📝 Default password: password123');
 
-  await seedDesigns()
+  await seedDesigns(org.id)
   console.log('--- Seed Finished Successfully ---')
 }
 

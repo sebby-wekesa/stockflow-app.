@@ -43,7 +43,7 @@ export default async function SpecializedBatchPage({
         <h1 className="font-head text-2xl font-bold mt-2">{batch.file_name}</h1>
         <p className="text-muted text-sm mt-1">
           {SHEET_TYPE_LABELS[sheetType] ?? sheetType} · {batch.row_count} rows parsed
-          {batch.branch && ` · ${batch.branch}`}
+          {batch.target_branch && ` · ${batch.target_branch}`}
         </p>
       </div>
 
@@ -52,10 +52,10 @@ export default async function SpecializedBatchPage({
         <div className="card p-5 mb-6 border-teal/30 bg-teal/5">
           <div className="font-head font-bold text-teal mb-1">✓ Import complete</div>
           <div className="text-sm text-muted">
-            {batch.ok_count} rows written · {batch.skipped_count} skipped · {batch.error_count}{' '}
+            {batch.ok_count} rows written · {batch.skipped_count} skipped · {(batch.error_count ?? 0)}{' '}
             errors
           </div>
-          {batch.error_summary && batch.error_count > 0 && (
+          {batch.error_summary && (batch.error_count ?? 0) > 0 && (
             <details className="mt-3">
               <summary className="text-xs text-muted cursor-pointer hover:text-text">
                 View error log
