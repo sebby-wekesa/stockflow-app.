@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
+import { getUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { redirect } from 'next/navigation'
 import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 
@@ -12,6 +14,11 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<Record<string, string>>
 }) {
+  const user = await getUser()
+  if (!user) redirect('/login')
+
+  const db = getTenantPrisma(user.organizationId)
+
   const params = await searchParams
   const origin = params.origin as 'FACTORY_MADE' | 'LOCAL_PURCHASE' | 'IMPORTED' | undefined
   const q = params.q?.trim() ?? ''
@@ -29,11 +36,11 @@ export default async function ProductsPage({
 
   // Fetch in parallel: category counts, the page of products, total
   const [counts, products, total] = await Promise.all([
-    prisma.product.groupBy({
+    db.product.groupBy({
       by: ['origin'],
       _count: { _all: true },
     }),
-    prisma.product.findMany({
+    db.product.findMany({
       where,
       orderBy: { sku: 'asc' },
       take: PAGE_SIZE,
@@ -42,7 +49,7 @@ export default async function ProductsPage({
         _count: { select: { ProductAlias: true } },
       },
     }),
-    prisma.product.count({ where }),
+    db.product.count({ where }),
   ])
 
   const totalAll = counts.reduce((sum, c) => sum + c._count._all, 0)

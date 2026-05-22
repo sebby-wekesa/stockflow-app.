@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
+import { getUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { redirect } from 'next/navigation'
 import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES } from '@/lib/branches'
 import ExportStockButton from './_components/ExportStockButton'
 import { CATEGORY_BADGE_CLASS, CATEGORY_SHORT } from '@/lib/products'
@@ -38,6 +40,11 @@ export default async function BranchStockPage({
 }: {
   searchParams: Promise<{ branch?: string; page?: string; search?: string; category?: string; status?: string }>
 }) {
+  const user = await getUser()
+  if (!user) redirect('/login')
+
+  const db = getTenantPrisma(user.organizationId)
+
   const params = await searchParams;
   const focusedBranch = params.branch as Branch | undefined
   const page = Math.max(1, Number(params.page ?? 1))
@@ -65,24 +72,24 @@ export default async function BranchStockPage({
 
     // Fetch all the dashboard data in parallel
     const [products, total, branchSummaries, lowStockCount, allRawStock, allFinishedStock] = await Promise.all([
-      prisma.product.findMany({
+      db.product.findMany({
         where: productWhere,
         orderBy: { sku: 'asc' },
         take: PAGE_SIZE,
         skip: (page - 1) * PAGE_SIZE,
       }),
-      prisma.product.count({ where: productWhere }),
+      db.product.count({ where: productWhere }),
 
       // Branch summaries
       Promise.all(
         ALL_BRANCHES.map(async (branch) => {
           const [rawAgg, finishedAgg] = await Promise.all([
-            prisma.inventoryRawMaterial.aggregate({
+            db.inventoryRawMaterial.aggregate({
               where: { branchId: branch, availableKg: { gt: 0 } },
               _sum: { availableKg: true },
               _count: { _all: true },
             }),
-            prisma.inventoryFinishedGoods.aggregate({
+            db.inventoryFinishedGoods.aggregate({
               where: { branchId: branch, availableQty: { gt: 0 } },
               _sum: { availableQty: true },
               _count: { _all: true },
@@ -90,16 +97,16 @@ export default async function BranchStockPage({
           ])
 
           const [rawLowStock, finishedLowStock] = await Promise.all([
-            prisma.inventoryRawMaterial.count({ where: { branchId: branch, availableKg: { gt: 0, lt: 5 } } }),
-            prisma.inventoryFinishedGoods.count({ where: { branchId: branch, availableQty: { gt: 0, lt: 5 } } }),
+            db.inventoryRawMaterial.count({ where: { branchId: branch, availableKg: { gt: 0, lt: 5 } } }),
+            db.inventoryFinishedGoods.count({ where: { branchId: branch, availableQty: { gt: 0, lt: 5 } } }),
           ])
 
           const [valuedRaw, valuedFinished] = await Promise.all([
-            prisma.inventoryRawMaterial.findMany({
+            db.inventoryRawMaterial.findMany({
               where: { branchId: branch, availableKg: { gt: 0 } },
               include: { RawMaterial: { select: { costPerKg: true } } },
             }),
-            prisma.inventoryFinishedGoods.findMany({
+            db.inventoryFinishedGoods.findMany({
               where: { branchId: branch, availableQty: { gt: 0 } },
               include: { FinishedGoods: { select: { unitCost: true } } },
             }),
@@ -120,16 +127,16 @@ export default async function BranchStockPage({
 
       // Global low stock count
       Promise.all([
-        prisma.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5 } } }),
-        prisma.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5 } } }),
+        db.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5 } } }),
+        db.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5 } } }),
       ]).then(([r, f]) => r + f),
 
       // All raw + finished stock (for per-product branch breakdown)
-      prisma.inventoryRawMaterial.findMany({
+      db.inventoryRawMaterial.findMany({
         where: { availableKg: { gt: 0 } },
         include: { RawMaterial: { select: { id: true } } },
       }),
-      prisma.inventoryFinishedGoods.findMany({
+      db.inventoryFinishedGoods.findMany({
         where: { availableQty: { gt: 0 } },
         include: { FinishedGoods: { select: { id: true } } },
       }),
