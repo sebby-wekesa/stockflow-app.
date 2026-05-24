@@ -1,11 +1,18 @@
 import Link from 'next/link'
+import type { ImportBatch, ImportRow } from '@prisma/client'
 import { ImportStepper } from './ImportStepper'
 import { ColumnMapper } from './ColumnMapper'
 import { MatchResults } from './MatchResults'
 import { SpecializedPreview } from './SpecializedPreview'
 import { SuccessView } from './SuccessView'
+
+type BatchWithIncludes = ImportBatch & {
+  User: { name: string | null } | null
+  ImportRow: ImportRow[]
+}
+
 interface ImportWorkflowProps {
-  batch: any
+  batch: BatchWithIncludes
 }
 
 export function ImportWorkflow({ batch }: ImportWorkflowProps) {
@@ -46,7 +53,7 @@ export function ImportWorkflow({ batch }: ImportWorkflowProps) {
           </div>
           <h1 className="font-head text-2xl font-bold">{batch.file_name}</h1>
           <p className="text-muted text-sm mt-1">
-            {batch.row_count} rows · {batch.sheet_type} ·             Uploaded by {batch.created_by_user.name}
+            {batch.row_count} rows · {batch.sheet_type} ·             Uploaded by {batch.User?.name}
           </p>
         </div>
       </div>

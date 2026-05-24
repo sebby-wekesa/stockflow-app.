@@ -143,7 +143,7 @@ function UserTable({ users }: UserTableProps) {
                   </span>
                 </td>
                  <td>
-                  {user.Branch?.name || (
+                   {user.branchId || (
                     <span className="text-gray-400 text-xs">
                       No branch
                     </span>
@@ -179,7 +179,7 @@ function UserTable({ users }: UserTableProps) {
               mode="edit"
               initial={{
                 ...users.find((u) => u.id === editingId),
-                branchId: users.find((u) => u.id === editingId)?.branchId
+                branchId: users.find((u) => u.id === editingId)?.branchId ?? undefined
               }}
               action={async (formData) => {
                 formData.append('userId', editingId!)

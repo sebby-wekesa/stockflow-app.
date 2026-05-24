@@ -25,12 +25,12 @@ export async function getLowStockAlerts(): Promise<LowStockAlert[]> {
   // Get all raw materials with BOM consumption data
   const materials = await prisma.rawMaterial.findMany({
     include: {
-      consumptionLogs: {
+      MaterialConsumptionLog: {
         where: {
           consumedAt: { gte: thirtyDaysAgo }
         }
       },
-      bomItems: {
+      BillOfMaterials: {
         include: {
           design: {
             include: {
@@ -49,12 +49,12 @@ export async function getLowStockAlerts(): Promise<LowStockAlert[]> {
 
   for (const material of materials) {
     // Calculate daily consumption rate from BOM consumption logs
-    const totalConsumedKg = material.consumptionLogs.reduce((sum, log) => {
+    const totalConsumedKg = material.MaterialConsumptionLog.reduce((sum, log) => {
       return sum + Number(log.quantityConsumed);
     }, 0);
 
     // Also consider pending/approved orders that will consume materials
-    const pendingConsumption = material.bomItems.reduce((sum, bomItem) => {
+    const pendingConsumption = material.BillOfMaterials.reduce((sum, bomItem) => {
       const pendingOrders = bomItem.design.productionOrders.length;
       return sum + (Number(bomItem.quantity) * pendingOrders);
     }, 0);
@@ -123,7 +123,7 @@ export async function getStockLevelHistory(materialId: string, days: number = 30
   const material = await prisma.rawMaterial.findUnique({
     where: { id: materialId },
     include: {
-      receipts: {
+      MaterialReceipt: {
         where: { createdAt: { gte: startDate } },
         orderBy: { createdAt: 'asc' }
       }
@@ -145,7 +145,7 @@ export async function getStockLevelHistory(materialId: string, days: number = 30
   });
 
   // Work backwards through receipts to show stock trend
-  const sortedReceipts = material.receipts.sort((a, b) =>
+  const sortedReceipts = material.MaterialReceipt.sort((a, b) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
@@ -183,11 +183,11 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
   // Get all raw materials with consumption and sales data
   const materials = await prisma.rawMaterial.findMany({
     include: {
-      supplier: true,
-      consumptionLogs: {
+      Supplier: true,
+      MaterialConsumptionLog: {
         where: { consumedAt: { gte: thirtyDaysAgo } }
       },
-      bomItems: {
+      BillOfMaterials: {
         include: {
           design: {
             include: {
@@ -198,12 +198,12 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
               },
               finishedGoods: {
                 include: {
-                  saleItems: {
+                  SaleItem: {
                     include: {
-                      saleOrder: true
+                      SaleOrder: true
                     },
                     where: {
-                      saleOrder: {
+                      SaleOrder: {
                         status: 'CONFIRMED',
                         createdAt: { gte: thirtyDaysAgo }
                       }
@@ -222,16 +222,16 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
     const availableStock = Number(material.availableKg);
 
     // Calculate production consumption rate
-    const totalConsumedKg = material.consumptionLogs.reduce((sum, log) => {
+    const totalConsumedKg = material.MaterialConsumptionLog.reduce((sum, log) => {
       return sum + Number(log.quantityConsumed);
     }, 0);
     const productionConsumptionRate = totalConsumedKg / 30;
 
     // Calculate sales rate from finished goods
     let totalSoldKg = 0;
-    for (const bomItem of material.bomItems) {
+    for (const bomItem of material.BillOfMaterials) {
       for (const finishedGood of bomItem.design.finishedGoods) {
-        for (const saleItem of finishedGood.saleItems) {
+        for (const saleItem of finishedGood.SaleItem) {
           totalSoldKg += Number(bomItem.quantity) * saleItem.quantity;
         }
       }
@@ -240,17 +240,16 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
 
     // Calculate current production demand
     let productionDemand = 0;
-    for (const bomItem of material.bomItems) {
+    for (const bomItem of material.BillOfMaterials) {
       for (const order of bomItem.design.productionOrders) {
         productionDemand += Number(bomItem.quantity) * order.quantity;
       }
     }
-
     // Calculate combined demand rate
     const combinedDemandRate = productionConsumptionRate + salesRate;
 
     // Calculate reorder point (demand during lead time + safety stock)
-    const leadTimeDays = material.supplier ? 7 : 14; // Default lead times
+    const leadTimeDays = material.Supplier ? 7 : 14; // Default lead times
     const safetyStockDays = 5;
     const reorderPoint = combinedDemandRate * (leadTimeDays + safetyStockDays);
 
@@ -272,7 +271,7 @@ export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
       suggestions.push({
         materialId: material.id,
         materialName: material.materialName,
-        supplierName: material.supplier?.name,
+        supplierName: material.Supplier?.name,
         currentStock: availableStock,
         dailyConsumptionRate: productionConsumptionRate,
         dailySalesRate: salesRate,

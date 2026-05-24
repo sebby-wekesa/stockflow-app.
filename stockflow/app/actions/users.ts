@@ -17,7 +17,7 @@ async function assertAdminAccess() {
   }
 }
 
-export async function inviteUser(formData: FormData) {
+export async function inviteUser(_prevState: unknown, formData: FormData) {
   try {
     await assertAdminAccess();
 
@@ -120,7 +120,7 @@ export async function deleteUser(userId: string) {
   }
 }
 
-export async function updateUser(formData: FormData) {
+export async function updateUser(_prevState: unknown, formData: FormData) {
   try {
     await assertAdminAccess();
 

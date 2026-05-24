@@ -33,9 +33,14 @@ export async function createDesign(data: {
   // Validate input data
   const validatedData = designSchema.parse(data);
 
-  // Check if design code already exists
+  // Check if design code already exists (tenant-scoped)
   const existingDesign = await prisma.design.findUnique({
-    where: { code: validatedData.code }
+    where: {
+      organizationId_code: {
+        organizationId: user.organizationId,
+        code: validatedData.code,
+      },
+    },
   });
 
   if (existingDesign) {
@@ -51,33 +56,36 @@ export async function createDesign(data: {
         code: validatedData.code,
         description: validatedData.description,
         targetDimensions: validatedData.targetDimensions,
-        targetWeight: validatedData.targetWeight
+        targetWeight: validatedData.targetWeight,
+        organizationId: user.organizationId
       }
     });
 
     // Create the stages
     for (const stageData of validatedData.stages) {
-      await tx.stage.create({
-        data: {
-          name: stageData.name,
-          department: stageData.department,
-          sequence: stageData.sequence,
-          designId: design.id
-        }
-      });
+        await tx.stage.create({
+          data: {
+            name: stageData.name,
+            department: stageData.department,
+            sequence: stageData.sequence,
+            designId: design.id,
+            organizationId: user.organizationId
+          }
+        });
     }
 
     // Create BOM items if provided
     if (data.bomItems && data.bomItems.length > 0) {
       for (const bomData of data.bomItems) {
-        await tx.billOfMaterials.create({
-          data: {
-            designId: design.id,
-            rawMaterialId: bomData.rawMaterialId,
-            quantity: bomData.quantity,
-            unitOfMeasure: bomData.unitOfMeasure
-          }
-        });
+            await tx.billOfMaterials.create({
+              data: {
+                designId: design.id,
+                rawMaterialId: bomData.rawMaterialId,
+                quantity: bomData.quantity,
+                unitOfMeasure: bomData.unitOfMeasure,
+                organizationId: user.organizationId
+              }
+            });
       }
     }
 
@@ -88,12 +96,12 @@ export async function createDesign(data: {
         stages: {
           orderBy: { sequence: 'asc' }
         },
-        billOfMaterials: {
-          include: {
-            RawMaterial: true
-          }
-        }
-      }
+            billOfMaterials: {
+              include: {
+                RawMaterial: true
+              }
+            }
+      },
     });
 
     revalidatePath('/designs');
@@ -121,13 +129,11 @@ export async function updateDesign(id: string, data: {
 }) {
   const user = await requireAuth();
 
-  // Validate user permissions
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only admins and managers can update design templates');
   }
 
   return await prisma.$transaction(async (tx) => {
-    // Update the design
     const design = await tx.design.update({
       where: { id },
       data: {
@@ -139,34 +145,23 @@ export async function updateDesign(id: string, data: {
       }
     });
 
-    // Update stages if provided
     if (data.stages) {
-      // Delete existing stages
-      await tx.stage.deleteMany({
-        where: { designId: id }
-      });
-
-      // Create new stages
+      await tx.stage.deleteMany({ where: { designId: id } });
       for (const stageData of data.stages) {
         await tx.stage.create({
           data: {
             name: stageData.name,
             department: stageData.department,
             sequence: stageData.sequence,
-            designId: id
+            designId: id,
+            organizationId: user.organizationId
           }
         });
       }
     }
 
-    // Update BOM items if provided
     if (data.bomItems !== undefined) {
-      // Delete existing BOM items
-      await tx.billOfMaterials.deleteMany({
-        where: { designId: id }
-      });
-
-      // Create new BOM items
+      await tx.billOfMaterials.deleteMany({ where: { designId: id } });
       if (data.bomItems.length > 0) {
         for (const bomData of data.bomItems) {
           await tx.billOfMaterials.create({
@@ -174,30 +169,25 @@ export async function updateDesign(id: string, data: {
               designId: id,
               rawMaterialId: bomData.rawMaterialId,
               quantity: bomData.quantity,
-              unitOfMeasure: bomData.unitOfMeasure
+              unitOfMeasure: bomData.unitOfMeasure,
+              organizationId: user.organizationId
             }
           });
         }
       }
     }
 
-    // Fetch the updated design with stages and BOM
     const updatedDesign = await tx.design.findUnique({
       where: { id },
       include: {
-        stages: {
-          orderBy: { sequence: 'asc' }
-        },
+        stages: { orderBy: { sequence: 'asc' } },
         billOfMaterials: {
-          include: {
-            RawMaterial: true
-          }
+          include: { RawMaterial: true }
         }
       }
     });
 
     revalidatePath('/designs');
-
     return updatedDesign;
   });
 }

@@ -17,7 +17,7 @@ export async function authenticateCustomer(accessCode: string, customerCode: str
       customerId: accessCode // This should be a unique identifier
     },
     include: {
-      customer: true
+      Customer: true
     }
   });
 
@@ -26,7 +26,7 @@ export async function authenticateCustomer(accessCode: string, customerCode: str
   }
 
   // Verify customer code matches
-  if (portalAccess.customer.code !== validatedData.customerCode) {
+  if (portalAccess.Customer.code !== validatedData.customerCode) {
     throw new Error('Invalid access credentials');
   }
 
@@ -37,8 +37,8 @@ export async function authenticateCustomer(accessCode: string, customerCode: str
   });
 
   return {
-    customerId: portalAccess.customer.id,
-    customerName: portalAccess.customer.name,
+    customerId: portalAccess.Customer.id,
+    customerName: portalAccess.Customer.name,
     accessId: portalAccess.id
   };
 }
@@ -56,11 +56,11 @@ export async function getCustomerOrders(customerId: string, accessId: string) {
   const orders = await prisma.saleOrder.findMany({
     where: { customerId },
     include: {
-      items: {
+      SaleItem: {
         include: {
-          finishedGoods: {
+          FinishedGoods: {
             include: {
-              Design: true
+              design: true
             }
           }
         }
@@ -76,14 +76,14 @@ export async function getCustomerOrders(customerId: string, accessId: string) {
     totalAmount: Number(order.totalAmount),
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
-    items: order.items.map(item => ({
+    items: order.SaleItem.map(item => ({
       id: item.id,
-      designName: item.finishedGoods.design.name,
-      designCode: item.finishedGoods.design.code,
+      designName: item.FinishedGoods.design.name,
+      designCode: item.FinishedGoods.design.code,
       quantity: item.quantity,
       unitPrice: Number(item.unitPrice),
       totalPrice: Number(item.totalPrice),
-      barcode: item.finishedGoods.barcode
+      barcode: item.FinishedGoods.barcode
     }))
   }));
 }
@@ -104,11 +104,11 @@ export async function getCustomerOrderTracking(customerId: string, accessId: str
       customerId
     },
     include: {
-      items: {
+      SaleItem: {
         include: {
-          finishedGoods: {
+          FinishedGoods: {
             include: {
-              Design: true
+              design: true
             }
           }
         }
@@ -129,13 +129,13 @@ export async function getCustomerOrderTracking(customerId: string, accessId: str
     totalAmount: Number(order.totalAmount),
     createdAt: order.createdAt,
     estimatedDelivery: new Date(order.createdAt.getTime() + 14 * 24 * 60 * 60 * 1000), // 14 days from order
-    items: order.items.map(item => ({
+    items: order.SaleItem.map(item => ({
       id: item.id,
-      designName: item.finishedGoods.design.name,
-      designCode: item.finishedGoods.design.code,
+      designName: item.FinishedGoods.design.name,
+      designCode: item.FinishedGoods.design.code,
       quantity: item.quantity,
       status: 'Ready for shipment', // Simplified status
-      trackingNumber: item.finishedGoods.barcode ? `TN-${item.finishedGoods.barcode.slice(-8)}` : null
+      trackingNumber: item.FinishedGoods.barcode ? `TN-${item.FinishedGoods.barcode.slice(-8)}` : null
     })),
     timeline: [
       {
@@ -186,7 +186,8 @@ export async function createCustomerPortalAccess(customerId: string) {
   const portalAccess = await prisma.customerPortalAccess.create({
     data: {
       customerId,
-      accessCode
+      accessCode,
+      organizationId: customer.organizationId
     }
   });
 

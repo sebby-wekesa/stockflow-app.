@@ -47,12 +47,20 @@ export async function createSalesOrder(data: {
   return await prisma.$transaction(async (tx) => {
     // Ensure placeholder design exists for non-manufactured product shadows
     let placeholderDesignId: string
-    const existingDesign = await tx.design.findUnique({ where: { code: 'IMPORTED' } })
+    const existingDesign = await tx.design.findUnique({
+      where: {
+        organizationId_code: {
+          organizationId: user.organizationId,
+          code: 'IMPORTED',
+        },
+      },
+    })
     if (existingDesign) {
       placeholderDesignId = existingDesign.id
     } else {
       const d = await tx.design.create({
         data: {
+          organizationId: user.organizationId,
           name: 'Manual sale placeholder',
           code: 'IMPORTED',
           description: 'Placeholder design used when recording sales of non-manufactured items.',
@@ -75,11 +83,19 @@ export async function createSalesOrder(data: {
           if (!product) throw new Error('Referenced product not found')
 
           const fgSku = product.sku || `PROD-${product.id.slice(0, 8)}`
-          let fg = await tx.finishedGoods.findUnique({ where: { sku: fgSku } })
+          let fg = await tx.finishedGoods.findUnique({
+            where: {
+              organizationId_sku: {
+                organizationId: user.organizationId,
+                sku: fgSku,
+              },
+            },
+          })
 
           if (!fg) {
             fg = await tx.finishedGoods.create({
               data: {
+                organizationId: user.organizationId,
                 sku: fgSku,
                 designId: placeholderDesignId,
                 quantity: 0,
@@ -97,10 +113,10 @@ export async function createSalesOrder(data: {
         if (item.source !== 'product') {
           const fg = await tx.finishedGoods.findUnique({
             where: { id: fgId },
-            include: { Design: true },
+            include: { design: true },
           })
           if (!fg || fg.quantity < item.quantity) {
-            throw new Error(`Insufficient stock for ${fg?.Design?.name || 'item'}`)
+            throw new Error(`Insufficient stock for ${fg?.design?.name || 'item'}`)
           }
         }
 
@@ -118,12 +134,14 @@ export async function createSalesOrder(data: {
     // Create the sales order
     const salesOrder = await tx.saleOrder.create({
       data: {
+        organizationId: user.organizationId,
         customerId: data.customerId,
         customerName: data.customerName,
         totalAmount,
         status: 'PENDING',
         SaleItem: {
           create: resolvedItems.map(item => ({
+            organizationId: user.organizationId,
             finishedGoodsId: item.finishedGoodsId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -134,11 +152,11 @@ export async function createSalesOrder(data: {
         include: {
           SaleItem: {
             include: {
-              FinishedGoods: {
-                include: {
-                  Design: true
-                }
-              }
+          FinishedGoods: {
+            include: {
+              design: true
+            }
+          }
             }
           }
         }

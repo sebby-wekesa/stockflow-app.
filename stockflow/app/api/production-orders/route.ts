@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         currentStage: 1         // Default first stage
       },
       include: {
-        Design: true,
+        design: true,
       },
     })
 
@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
           quantity: true,
           priority: true,
           status: true,
-          Design: {
+          design: {
             select: {
               name: true,
               targetDimensions: true,

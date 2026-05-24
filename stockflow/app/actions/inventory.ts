@@ -10,7 +10,7 @@ export async function getRawMaterials() {
   await requireAuth();
 
   const materials = await prisma.rawMaterial.findMany({
-    include: { supplier: true },
+    include: { Supplier: true },
     orderBy: { materialName: "asc" },
   });
 
@@ -20,7 +20,7 @@ export async function getRawMaterials() {
     diameter: m.diameter,
     availableKg: m.availableKg,
     reservedKg: m.reservedKg,
-    supplier: m.supplier,
+    supplier: m.Supplier,
     createdAt: m.createdAt,
   }));
 }
@@ -51,6 +51,7 @@ export async function addRawMaterial(formData: FormData) {
         data: {
           name: supplierName,
           code: `SUP-${Date.now().toString().slice(-6)}`,
+          organizationId: user.organizationId,
         },
         select: { id: true },
       });
@@ -61,7 +62,12 @@ export async function addRawMaterial(formData: FormData) {
   const sku = `RAW-${materialName.replace(/\s+/g, "-").toUpperCase()}-${diameter.replace(/\s+/g, "").toUpperCase()}`;
 
   const material = await prisma.rawMaterial.upsert({
-    where: { sku },
+    where: {
+      organizationId_sku: {
+        organizationId: user.organizationId,
+        sku,
+      },
+    },
     update: {
       materialName,
       diameter,
@@ -69,6 +75,7 @@ export async function addRawMaterial(formData: FormData) {
       availableKg: { increment: kg },
     },
     create: {
+      organizationId: user.organizationId,
       sku,
       materialName,
       diameter,
@@ -80,6 +87,7 @@ export async function addRawMaterial(formData: FormData) {
 
   await prisma.materialReceipt.create({
     data: {
+      organizationId: user.organizationId,
       materialId: material.id,
       kgReceived: kg,
       supplierId,
@@ -150,6 +158,7 @@ export async function addProductStock(input: AddProductStockInput) {
 
     product = await prisma.product.create({
       data: {
+        organizationId: user.organizationId,
         name,
         sku,
         origin,
@@ -166,6 +175,7 @@ export async function addProductStock(input: AddProductStockInput) {
   // Audit receipt
   await prisma.productReceipt.create({
     data: {
+      organizationId: user.organizationId,
       productId: product.id,
       qtyReceived: quantity,
       unitCost: unitCost ?? null,
@@ -190,7 +200,7 @@ export async function getProducts(origin?: "LOCAL_PURCHASE" | "IMPORTED" | "FACT
     where: origin ? { origin } : undefined,
     include: {
       Branch: { select: { name: true } },
-      receipts: { orderBy: { createdAt: "desc" }, take: 50 },
+      ProductReceipt: { orderBy: { createdAt: "desc" }, take: 50 },
     },
     orderBy: { createdAt: "desc" },
   });

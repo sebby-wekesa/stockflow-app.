@@ -16,34 +16,35 @@ export default async function CataloguePage() {
     })
   ]);
 
-  // Manufactured items
-  const manufactured = finishedGoods.map(p => ({
-    id: p.id,
-    design: {
-      name: p.design.name,
-      code: p.design.code,
-      description: p.design.description,
-    },
-    quantity: p.quantity,
-    kgProduced: Number(p.kgProduced),
-    price: p.unitCost,
-    createdAt: p.createdAt.toISOString(),
-    source: 'manufactured' as const,
-  }));
+   // Manufactured items
+   const manufactured = finishedGoods.map(p => ({
+     id: p.id,
+     design: {
+       name: p.design.name,
+       code: p.design.code,
+       description: p.design.description ?? undefined,
+     },
+     quantity: p.quantity,
+     kgProduced: Number(p.kgProduced),
+     price: p.unitCost,
+     createdAt: p.createdAt.toISOString(),
+     source: 'manufactured' as const,
+   }));
 
-  // Other sellable products from the main catalog
-  const others = generalProducts.map(p => ({
-    id: p.id,
-    design: {
-      name: p.name,
-      code: p.sku || p.id.slice(0, 8),
-    },
-    quantity: Math.floor(p.currentStock),
-    kgProduced: 0,
-    price: p.unitCost,
-    createdAt: p.createdAt.toISOString(),
-    source: 'product' as const,
-  }));
+   // Other sellable products from the main catalog
+   const others = generalProducts.map(p => ({
+     id: p.id,
+     design: {
+       name: p.name,
+       code: p.sku || p.id.slice(0, 8),
+       description: undefined,
+     },
+     quantity: Math.floor(p.currentStock),
+     kgProduced: 0,
+     price: p.unitCost,
+     createdAt: p.createdAt.toISOString(),
+     source: 'product' as const,
+   }));
 
   const catalogueProducts = [...manufactured, ...others];
 

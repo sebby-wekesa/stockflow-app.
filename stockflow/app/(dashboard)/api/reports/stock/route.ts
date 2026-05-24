@@ -49,9 +49,9 @@ export async function GET(request: Request) {
       sku: material.sku,
       name: material.materialName,
       branch: inv.Branch?.name || 'Unknown',
-      available_qty: inv.availableKg,
-      reserved_qty: inv.reservedKg,
-      total_qty: inv.availableKg + inv.reservedKg,
+       available_qty: inv.availableKg?.toNumber() ?? 0,
+       reserved_qty: inv.reservedKg?.toNumber() ?? 0,
+       total_qty: (inv.availableKg?.toNumber() ?? 0) + (inv.reservedKg?.toNumber() ?? 0),
       uom: 'kg',
       last_updated: inv.updatedAt.toISOString().slice(0, 10),
     }))

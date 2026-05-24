@@ -9,8 +9,8 @@ export async function getRawMaterials() {
   // All authenticated users can view raw materials
   return await prisma.rawMaterial.findMany({
     include: {
-      supplier: true,
-      receipts: {
+      Supplier: true,
+      MaterialReceipt: {
         orderBy: { createdAt: 'desc' },
         take: 1 // Get latest receipt for stock info
       }
@@ -25,13 +25,13 @@ export async function getRawMaterial(id: string) {
   const material = await prisma.rawMaterial.findUnique({
     where: { id },
     include: {
-      supplier: true,
-      receipts: {
+      Supplier: true,
+      MaterialReceipt: {
         orderBy: { createdAt: 'desc' }
       },
-      bomItems: {
+      BillOfMaterials: {
         include: {
-          Design: true
+          design: true
         }
       }
     }
@@ -61,6 +61,7 @@ export async function createRawMaterial(data: {
 
   return await prisma.rawMaterial.create({
     data: {
+      organizationId: user.organizationId,
       sku,
       materialName: data.materialName,
       diameter: data.diameter,
@@ -81,6 +82,7 @@ export async function updateRawMaterialStock(id: string, kgReceived: number, ref
     // Create receipt record
     await tx.materialReceipt.create({
       data: {
+        organizationId: user.organizationId,
         materialId: id,
         kgReceived,
         reference,

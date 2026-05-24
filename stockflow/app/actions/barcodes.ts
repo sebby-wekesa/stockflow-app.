@@ -26,7 +26,7 @@ export async function generateRawMaterialBarcode(materialId: string) {
 
   // Check if barcode already exists (very unlikely but good practice)
   const existing = await prisma.rawMaterial.findUnique({
-    where: { barcode }
+    where: { organizationId_barcode: { organizationId: user.organizationId, barcode } }
   });
 
   if (existing) {
@@ -59,7 +59,7 @@ export async function generateFinishedGoodsBarcode(finishedGoodsId: string) {
 
   const finishedGoods = await prisma.finishedGoods.findUnique({
     where: { id: finishedGoodsId },
-    include: { Design: true }
+    include: { design: true }
   });
 
   if (!finishedGoods) {
@@ -73,7 +73,7 @@ export async function generateFinishedGoodsBarcode(finishedGoodsId: string) {
 
   // Check if barcode already exists
   const existing = await prisma.finishedGoods.findUnique({
-    where: { barcode }
+    where: { organizationId_barcode: { organizationId: user.organizationId, barcode } }
   });
 
   if (existing) {
@@ -100,45 +100,49 @@ export async function generateFinishedGoodsBarcode(finishedGoodsId: string) {
 export async function getBarcodeData(barcode: string) {
   const user = await requireAuth();
 
-  // Define a union type that encompasses both potential database results
-  let item:
-    | (Awaited<ReturnType<typeof prisma.rawMaterial.findUnique>> & { supplier: any })
-    | (Awaited<ReturnType<typeof prisma.finishedGoods.findUnique>> & { design: any })
-    | null = null;
-
-  // Try raw material first
-  item = await prisma.rawMaterial.findUnique({
-    where: { barcode },
-    include: { supplier: true }
+  // Try raw material first (tenant-scoped)
+  const rawMaterial = await prisma.rawMaterial.findUnique({
+    where: {
+      organizationId_barcode: {
+        organizationId: user.organizationId,
+        barcode,
+      },
+    },
+    include: { Supplier: true },
   });
 
-  if (item) {
+  if (rawMaterial) {
     return {
-      type: 'raw_material',
+      type: 'raw_material' as const,
       barcode,
-      batchNumber: item.batchNumber,
-      name: item.materialName,
-      details: `${item.diameter} - ${item.availableKg}kg available`,
-      supplier: item.supplier?.name || 'Unknown',
-      createdAt: item.createdAt
+      batchNumber: rawMaterial.batchNumber,
+      name: rawMaterial.materialName,
+      details: `${rawMaterial.diameter} - ${rawMaterial.availableKg}kg available`,
+      supplier: rawMaterial.Supplier?.name || 'Unknown',
+      createdAt: rawMaterial.createdAt,
     };
   }
 
-  // Try finished goods
-  item = await prisma.finishedGoods.findUnique({
-    where: { barcode },
-    include: { Design: true }
+  // Try finished goods (tenant-scoped)
+  const finishedGood = await prisma.finishedGoods.findUnique({
+    where: {
+      organizationId_barcode: {
+        organizationId: user.organizationId,
+        barcode,
+      },
+    },
+    include: { design: true },
   });
 
-  if (item) {
+  if (finishedGood) {
     return {
-      type: 'finished_goods',
+      type: 'finished_goods' as const,
       barcode,
-      batchNumber: item.batchNumber,
-      name: item.design.name,
-      details: `${item.quantity} units - ${item.kgProduced}kg produced`,
-      designCode: item.design.code,
-      createdAt: item.createdAt
+      batchNumber: finishedGood.batchNumber,
+      name: finishedGood.design.name,
+      details: `${finishedGood.quantity} units - ${finishedGood.kgProduced}kg produced`,
+      designCode: finishedGood.design.code,
+      createdAt: finishedGood.createdAt,
     };
   }
 

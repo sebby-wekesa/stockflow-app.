@@ -1,4 +1,4 @@
-import type { ProductCategory, ProductType } from '@prisma/client'
+import type { ProductCategory, ProductType, StockOrigin } from '@prisma/client'
 
 // Display labels for the 5 categories
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
@@ -25,6 +25,27 @@ export const CATEGORY_BADGE_CLASS: Record<ProductCategory, string> = {
   imported: 'bg-surface2 text-muted',
   local_purchase: 'bg-teal/15 text-teal',
   service: 'bg-red/15 text-red',
+}
+
+// Display labels for stock origins
+export const ORIGIN_LABELS: Record<StockOrigin, string> = {
+  FACTORY_MADE: 'Factory Made',
+  LOCAL_PURCHASE: 'Local Purchase',
+  IMPORTED: 'Imported',
+}
+
+// Short labels for origins
+export const ORIGIN_SHORT: Record<StockOrigin, string> = {
+  FACTORY_MADE: 'Factory',
+  LOCAL_PURCHASE: 'Local',
+  IMPORTED: 'Imported',
+}
+
+// Color theme per origin
+export const ORIGIN_BADGE_CLASS: Record<StockOrigin, string> = {
+  FACTORY_MADE: 'bg-accent/15 text-accent',
+  LOCAL_PURCHASE: 'bg-teal/15 text-teal',
+  IMPORTED: 'bg-surface2 text-muted',
 }
 
 // Which product types are valid for each category

@@ -29,34 +29,46 @@ export default async function SalesPage({
     ]
   }
 
-  const [orders, total] = await Promise.all([
-    prisma.saleOrder.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: PAGE_SIZE,
-      skip: (page - 1) * PAGE_SIZE,
-      include: {
-        SaleItem: { select: { totalPrice: true } },
-        createdByUser: { select: { name: true } },
-      },
-    }),
-    prisma.saleOrder.count({ where }),
-  ])
+   const [orders, total] = await Promise.all([
+     prisma.saleOrder.findMany({
+       where,
+       orderBy: { createdAt: 'desc' },
+       take: PAGE_SIZE,
+       skip: (page - 1) * PAGE_SIZE,
+       include: {
+         SaleItem: { select: { totalPrice: true } },
+         createdByUser: { select: { name: true, branchId: true } },
+       },
+     }),
+     prisma.saleOrder.count({ where }),
+   ])
+   
+    // Calculate summary by branch
+    const branchCountMap: Record<string, number> = {}
+    for (const order of orders) {
+      const b = order.createdByUser?.branchId ?? 'unknown'
+      branchCountMap[b] = (branchCountMap[b] ?? 0) + 1
+    }
+    
+    const summaryByBranch = Object.entries(branchCountMap).map(([b, count]) => ({
+      branch: b === 'unknown' ? null : b,
+      _count: { _all: count }
+    }))
+ 
+   const totalPages = Math.ceil(total / PAGE_SIZE)
+   const branchCounts: Record<string, number> = Object.fromEntries(
+     summaryByBranch.map((s) => [s.branch ?? 'unknown', s._count._all])
+   )
 
-  const summaryByBranch = []
-
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-  const branchCounts = Object.fromEntries(
-    summaryByBranch.map((s) => [s.branch, s._count._all])
-  )
-
-  function buildHref(overrides: { status?: string; q?: string; page?: number }) {
+  function buildHref(overrides: { status?: string; q?: string; page?: number; branch?: string }) {
     const params = new URLSearchParams()
     const _status = overrides.status ?? status
     const _q = overrides.q ?? q
     const _page = overrides.page ?? page
+    const _branch = overrides.branch ?? branch
     if (_status) params.set('status', _status)
     if (_q) params.set('q', _q)
+    if (_branch) params.set('branch', _branch)
     if (_page > 1) params.set('page', String(_page))
     const qs = params.toString()
     return qs ? `/sales?${qs}` : '/sales'

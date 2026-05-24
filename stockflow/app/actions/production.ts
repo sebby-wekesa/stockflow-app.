@@ -17,7 +17,7 @@ export async function getOperatorQueue(role?: string, department?: string) {
       where: {
         status: "IN_PRODUCTION",
         ...(effectiveRole === "OPERATOR" && effectiveDept ? { currentDept: effectiveDept } : {}),
-        ...(effectiveRole !== "ADMIN" && user.branchId ? { branchId: user.branchId } : {}),
+        ...(effectiveRole !== "ADMIN" && user.branches?.[0] ? { branchId: user.branches[0].id } : {}),
       },
       include: {
         design: {
@@ -60,7 +60,7 @@ export async function getOperatorHistory() {
       include: {
         ProductionOrder: {
           include: {
-            Design: true,
+            design: true,
         },
       },
     },
@@ -101,7 +101,7 @@ export async function getOrderForLogging(id: string) {
             },
           },
         },
-        logs: {
+        StageLog: {
           orderBy: {
             sequence: "desc",
           },
@@ -117,7 +117,7 @@ export async function getOrderForLogging(id: string) {
   if (!order) throw new Error("Order not found");
 
   // Determine inheritedKg (from previous stage log or targetKg if first stage)
-  const inheritedKg = order.logs.length > 0 ? order.logs[0].kgOut : order.targetKg;
+  const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
 
   return {
     ...order,
@@ -157,7 +157,7 @@ export async function getActiveDepartments() {
     const depts = await prisma.productionOrder.findMany({
       where: {
         status: { in: ["APPROVED", "IN_PRODUCTION"] },
-        ...(user.branchId ? { branchId: user.branchId } : {}),
+        ...(user.branches?.[0] ? { branchId: user.branches[0].id } : {}),
       },
       select: { currentDept: true },
       distinct: ["currentDept"],

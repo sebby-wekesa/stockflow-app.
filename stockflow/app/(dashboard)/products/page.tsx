@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { redirect } from 'next/navigation'
-import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS } from '@/lib/products'
+import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 
 export const dynamic = 'force-dynamic';
@@ -187,12 +187,12 @@ export default async function ProductsPage({
                         {p.sku}
                       </Link>
                     </td>
-                    <td className="truncate max-w-xs">{p.name}</td>
-                    <td>
-                      <span className={`badge ${CATEGORY_BADGE_CLASS[p.origin] || 'badge-muted'}`}>
-                        {CATEGORY_SHORT[p.origin] || p.origin}
-                      </span>
-                    </td>
+                     <td className="truncate max-w-xs">{p.name}</td>
+                     <td>
+                       <span className={`badge ${ORIGIN_BADGE_CLASS[p.origin] || 'badge-muted'}`}>
+                         {ORIGIN_SHORT[p.origin] || p.origin}
+                       </span>
+                     </td>
                     <td className="text-sm uppercase">{p.uom}</td>
                     <td className="font-mono text-sm">
                       {p.currentStock.toLocaleString()}

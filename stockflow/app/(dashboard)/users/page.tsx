@@ -5,16 +5,17 @@ import { UserTable } from './_components/ClientComponents'
 export const dynamic = 'force-dynamic'
 
 export default async function UsersPage() {
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: 'asc' },
-    include: {
-      Branch: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  })
+   const users = await prisma.user.findMany({
+     orderBy: { createdAt: 'asc' },
+     include: {
+       Branch: {
+         select: {
+           id: true,
+           name: true,
+         },
+       },
+     },
+   })
 
   // Transform users for frontend compatibility
   const usersWithBranches = users.map(user => ({

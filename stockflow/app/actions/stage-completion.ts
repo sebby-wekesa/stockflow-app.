@@ -41,7 +41,7 @@ export async function completeStage(data: {
             }
           }
         },
-        logs: {
+        StageLog: {
           orderBy: { sequence: 'desc' },
           take: 1
         }
@@ -62,7 +62,7 @@ export async function completeStage(data: {
     }
 
     // Verify kg_in matches the expected input
-    const expectedKgIn = order.logs.length > 0 ? order.logs[0].kgOut : order.targetKg;
+    const expectedKgIn = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
     if (Math.abs(Number(expectedKgIn) - validatedData.kgIn) > 0.0001) {
       throw new Error(`KG input mismatch. Expected: ${expectedKgIn}, Got: ${validatedData.kgIn}`);
     }
@@ -70,6 +70,7 @@ export async function completeStage(data: {
     // Create the stage log
     const stageLog = await tx.stageLog.create({
       data: {
+        organizationId: user.organizationId,
         orderId: validatedData.orderId,
         stageId: validatedData.stageId,
         stageName: validatedData.stageName,
@@ -86,7 +87,7 @@ export async function completeStage(data: {
 
     // Determine next stage and update order
     const nextStageSequence = validatedData.sequence + 1;
-    const nextStage = order.design.stages.find(s => s.sequence === nextStageSequence);
+    const nextStage = order.design?.stages?.find(s => s.sequence === nextStageSequence);
 
     if (nextStage) {
       // Move to next stage
@@ -112,8 +113,9 @@ export async function completeStage(data: {
       const sku = `FG-${order.design.code}-${order.quantity}-${Date.now().toString().slice(-6)}`;
       await tx.finishedGoods.create({
         data: {
+          organizationId: user.organizationId,
           sku,
-          designId: order.designId,
+          designId: order.design.id,
           quantity: order.quantity,
           kgProduced: validatedData.kgOut
         }
@@ -152,7 +154,7 @@ export async function getOrderForCompletion(orderId: string) {
           }
         }
       },
-      logs: {
+      StageLog: {
         orderBy: { sequence: 'desc' },
         take: 1
       }
@@ -169,7 +171,7 @@ export async function getOrderForCompletion(orderId: string) {
   }
 
   const currentStage = order.design.stages.find(s => s.sequence === order.currentStage);
-  const inheritedKg = order.logs.length > 0 ? order.logs[0].kgOut : order.targetKg;
+  const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
 
   return {
     ...order,

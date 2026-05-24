@@ -137,43 +137,43 @@ async function getAdminStats(db: any): Promise<AdminStats> {
     select: { department: true, operatorId: true, kgIn: true, kgOut: true, kgScrap: true },
   });
 
-  const deptToday = new Map<string, { kgIn: number; kgOut: number; kgScrap: number; ops: Set<string> }>();
-  for (const log of todayLogs) {
-    const d = log.department!;
-    if (!deptToday.has(d)) deptToday.set(d, { kgIn: 0, kgOut: 0, kgScrap: 0, ops: new Set() });
-    const s = deptToday.get(d)!;
-    s.kgIn += log.kgIn?.toNumber?.() ?? Number(log.kgIn) ?? 0;
-    s.kgOut += log.kgOut?.toNumber?.() ?? Number(log.kgOut) ?? 0;
-    s.kgScrap += log.kgScrap?.toNumber?.() ?? Number(log.kgScrap) ?? 0;
-    s.ops.add(log.operatorId);
-  }
+    const deptToday = new Map<string, { kgIn: number; kgOut: number; kgScrap: number; ops: Set<string> }>();
+   for (const log of todayLogs) {
+     const d = log.department!;
+     if (!deptToday.has(d)) deptToday.set(d, { kgIn: 0, kgOut: 0, kgScrap: 0, ops: new Set() });
+     const s = deptToday.get(d)!;
+     s.kgIn += log.kgIn?.toNumber?.() ?? Number(log.kgIn) ?? 0;
+     s.kgOut += log.kgOut?.toNumber?.() ?? Number(log.kgOut) ?? 0;
+     s.kgScrap += log.kgScrap?.toNumber?.() ?? Number(log.kgScrap) ?? 0;
+     s.ops.add(log.operatorId);
+   }
 
-  const departmentThroughput = knownDepts.map(dept => {
-    let s = deptToday.get(dept);
-    if (!s) {
-      // fuzzy match (e.g. stored as "Forging" vs "Forging / chamfer")
-      const lower = dept.toLowerCase();
-      for (const [key, val] of deptToday) {
-        if (key.toLowerCase().includes(lower.split('/')[0].trim()) || lower.includes(key.toLowerCase().split('/')[0].trim())) {
-          s = val; break;
-        }
-      }
-    }
-    const kgIn = s?.kgIn ?? 0;
-    const kgOut = s?.kgOut ?? 0;
-    const kgScrap = s?.kgScrap ?? 0;
-    const yieldPct = kgIn > 0 ? Math.round((kgOut / kgIn) * 1000) / 10 : 0;
-    const jobs = activeMap.get(dept.toLowerCase()) ?? activeMap.get(dept.split('/')[0].trim().toLowerCase()) ?? 0;
-    const ops = s?.ops.size ?? 0;
-    return {
-      department: dept,
-      jobsActive: jobs,
-      kgProcessed: Math.round(kgOut || kgIn),
-      kgScrap: Math.round(kgScrap),
-      yield: yieldPct,
-      operators: ops,
-    };
-  });
+   const departmentThroughput = knownDepts.map(dept => {
+     let s = deptToday.get(dept);
+     if (!s) {
+       // fuzzy match (e.g. stored as "Forging" vs "Forging / chamfer")
+       const lower = dept.toLowerCase();
+       for (const [key, val] of deptToday) {
+         if (key.toLowerCase().includes(lower.split('/')[0].trim()) || lower.includes(key.toLowerCase().split('/')[0].trim())) {
+           s = val; break;
+         }
+       }
+     }
+     const kgIn = s?.kgIn ?? 0;
+     const kgOut = s?.kgOut ?? 0;
+     const kgScrap = s?.kgScrap ?? 0;
+     const yieldPct = kgIn > 0 ? Math.round((kgOut / kgIn) * 1000) / 10 : 0;
+     const jobs = Number(activeMap.get(dept.toLowerCase()) ?? activeMap.get(dept.split('/')[0].trim().toLowerCase()) ?? 0);
+     const ops = s?.ops.size ?? 0;
+     return {
+       department: dept,
+       jobsActive: jobs,
+       kgProcessed: Math.round(kgOut || kgIn),
+       kgScrap: Math.round(kgScrap),
+       yield: yieldPct,
+       operators: ops,
+     };
+   });
 
   // Recent orders (tenant-scoped via db)
   const recentOrders = await db.productionOrder.findMany({

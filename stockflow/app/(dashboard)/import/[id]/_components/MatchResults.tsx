@@ -2,9 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import { resolveConflict, approveAndSyncImport } from '../../actions'
+import type { ImportBatch, ImportRow } from '@prisma/client'
+
+type BatchWithRows = ImportBatch & {
+  User?: { name: string | null } | null
+  ImportRow: ImportRow[]
+}
 
 interface MatchResultsProps {
-  batch: any
+  batch: BatchWithRows
 }
 
 export function MatchResults({ batch }: MatchResultsProps) {
@@ -12,12 +18,12 @@ export function MatchResults({ batch }: MatchResultsProps) {
   const [isPending, startTransition] = useTransition()
 
   // Calculate KPIs
-  const totalRows = batch.rows.length
-  const autoResolved = batch.rows.filter(r => r.resolution === 'auto').length
-  const needsReview = batch.rows.filter(r => !r.resolved_product && r.mapped_data).length
-  const errors = batch.rows.filter(r => r.errors).length
+  const totalRows = batch.ImportRow.length
+  const autoResolved = batch.ImportRow.filter(r => r.resolution === 'auto').length
+  const needsReview = batch.ImportRow.filter(r => !r.resolved_product && r.mapped_data).length
+  const errors = batch.ImportRow.filter(r => r.errors).length
 
-  const conflicts = batch.rows.filter(r =>
+  const conflicts = batch.ImportRow.filter(r =>
     r.mapped_data &&
     (!r.resolved_product || r.match_confidence && r.match_confidence < 0.85)
   )
@@ -61,7 +67,7 @@ export function MatchResults({ batch }: MatchResultsProps) {
       <div className="card p-6">
         <h3 className="font-head text-lg font-bold mb-4">Sample Resolved Rows</h3>
         <div className="space-y-2">
-          {batch.rows.slice(0, 6).map((row) => {
+          {batch.ImportRow.slice(0, 6).map((row) => {
             const mappedData = row.mapped_data as Record<string, unknown>
             return (
               <div key={row.id} className="flex items-center justify-between p-3 bg-surface2 rounded-md">

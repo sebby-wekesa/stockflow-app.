@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth';
 
 // GET /api/inventory/products?origin=LOCAL_PURCHASE|IMPORTED|FACTORY_MADE
 export async function GET(request: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       where: origin ? { origin } : undefined,
       include: {
         Branch: { select: { name: true } },
-        receipts: {
+        ProductReceipt: {
           orderBy: { createdAt: 'desc' },
           take: 50,
         },
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
 // POST /api/inventory/products
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireRole('ADMIN', 'MANAGER', 'OPERATOR');
     const body = await request.json();
     const {
       name,
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest) {
 
       product = await prisma.product.create({
         data: {
+          organizationId: user.organizationId,
           name,
           sku,
           origin,
@@ -109,6 +112,7 @@ export async function POST(request: NextRequest) {
     // Always write a receipt record for audit trail
     const receipt = await prisma.productReceipt.create({
       data: {
+        organizationId: user.organizationId,
         productId: product.id,
         qtyReceived: Number(quantity),
         unitCost: unitCost ? Number(unitCost) : null,

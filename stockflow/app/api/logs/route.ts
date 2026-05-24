@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Get the order to find current stage
     const order = await prisma.productionOrder.findFirst({
       where: { id: orderId },
-      include: { Design: true },
+      include: { design: true },
     })
 
     if (!order) {
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     // Create stage log in database
     const stageLog = await prisma.stageLog.create({
       data: {
+        organizationId: user.organizationId,
         orderId,
         stageName: department,
         department: department, // Use the provided department
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             quantity: true,
-            Design: { select: { name: true } }
+            design: { select: { name: true } }
           },
         },
       },

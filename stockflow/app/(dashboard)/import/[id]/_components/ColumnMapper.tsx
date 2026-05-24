@@ -3,26 +3,28 @@
 import { useState, useTransition } from 'react'
 import { saveColumnMapping } from '../../actions'
 import { FIELD_LABELS, suggestMapping, type ImportField, type SheetType } from '@/lib/import/parsers'
-import type { ImportBatch } from '@prisma/client'
+import type { ImportBatch, ImportRow } from '@prisma/client'
 
 interface ColumnMapperProps {
   batch: ImportBatch & {
-    rows: Array<{ raw_data: Record<string, unknown> }>
+    ImportRow: ImportRow[]
   }
 }
 
 export function ColumnMapper({ batch }: ColumnMapperProps) {
   const [mappings, setMappings] = useState<Record<string, ImportField>>(() => {
     // Get headers from first row
-    const sampleRow = batch.rows[0]?.raw_data
-    if (!sampleRow) return {}
+    const first = batch.ImportRow[0]
+    const sampleRow = (first?.raw_data as Record<string, unknown>) || {}
+    if (!sampleRow || Object.keys(sampleRow).length === 0) return {}
     const headers = Object.keys(sampleRow)
     return suggestMapping(headers, batch.sheet_type as SheetType)
   })
 
   const [isPending, startTransition] = useTransition()
 
-  const headers = batch.rows[0] ? Object.keys(batch.rows[0].raw_data) : []
+  const firstRow = batch.ImportRow[0]
+  const headers = firstRow?.raw_data ? Object.keys(firstRow.raw_data as Record<string, unknown>) : []
 
   function handleMappingChange(header: string, field: ImportField) {
     setMappings(prev => ({ ...prev, [header]: field }))
@@ -45,7 +47,7 @@ export function ColumnMapper({ batch }: ColumnMapperProps) {
 
       <div className="space-y-4">
         {headers.map((header) => {
-          const sampleValue = batch.rows[0]?.raw_data[header]
+          const sampleValue = (batch.ImportRow[0]?.raw_data as Record<string, unknown> | undefined)?.[header]
           const currentMapping = mappings[header] || 'ignore'
 
           return (

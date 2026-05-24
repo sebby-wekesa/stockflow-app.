@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { ImportBatch } from '@prisma/client'
+import type { ImportBatch, ImportRow } from '@prisma/client'
 
 interface CommitPreviewProps {
   batch: ImportBatch
@@ -11,9 +11,9 @@ export async function CommitPreview({ batch }: CommitPreviewProps) {
     where: { batch_id: batch.id },
   })
 
-  const willWrite = rows.filter(r => r.resolved_product).length
+  const willWrite = rows.filter((r: ImportRow) => r.resolved_product).length
   const willSkip = rows.length - willWrite
-  const errors = rows.filter(r => r.errors).length
+  const errors = rows.filter((r: ImportRow) => r.errors).length
 
   // Group by branch for impact breakdown
   const branchGroups = new Map<string, number>()

@@ -82,6 +82,7 @@ export async function consumeMaterialsForOrder(productionOrderId: string) {
       // Create consumption log
       const log = await tx.materialConsumptionLog.create({
         data: {
+          organizationId: user.organizationId,
           productionOrderId,
           rawMaterialId: item.rawMaterialId,
           quantityConsumed: item.quantity,

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import type { ImportBatch } from '@prisma/client'
+import type { ImportBatch, ImportRow } from '@prisma/client'
 
 interface SuccessViewProps {
   batch: ImportBatch
@@ -11,9 +11,9 @@ export async function SuccessView({ batch }: SuccessViewProps) {
     where: { batch_id: batch.id },
   })
 
-  const written = rows.filter(r => r.resolved_product).length
-  const skipped = rows.filter(r => !r.resolved_product && !r.errors).length
-  const errors = rows.filter(r => r.errors).length
+  const written = rows.filter((r: ImportRow) => r.resolved_product).length
+  const skipped = rows.filter((r: ImportRow) => !r.resolved_product && !r.errors).length
+  const errors = rows.filter((r: ImportRow) => r.errors).length
 
   return (
     <div className="card p-8 text-center">

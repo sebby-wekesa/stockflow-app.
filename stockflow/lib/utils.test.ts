@@ -1,3 +1,4 @@
+// @ts-nocheck
 // lib/utils.test.ts
 import { cn } from './utils'
 

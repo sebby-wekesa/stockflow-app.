@@ -2,9 +2,11 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireRole } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireRole('ADMIN', 'MANAGER', 'OPERATOR')
     const body = await request.json()
     const { materialName, diameter, kgReceived, supplierId } = body
 
@@ -48,6 +50,7 @@ export async function POST(request: NextRequest) {
       const sku = `${materialName.replace(/\s+/g, '-').toUpperCase()}-${diameter.toUpperCase()}-${Date.now().toString().slice(-6)}`;
       material = await prisma.rawMaterial.create({
         data: {
+          organizationId: user.organizationId,
           sku,
           materialName,
           diameter,

@@ -105,7 +105,7 @@ export async function fulfillOrder(orderId: string) {
     // Update finished goods inventory (reduce quantities)
     for (const item of order.SaleItem) {
       await tx.finishedGoods.update({
-        where: { id: item.FinishedGoodsId },
+        where: { id: item.finishedGoodsId },
         data: {
           quantity: {
             decrement: item.quantity

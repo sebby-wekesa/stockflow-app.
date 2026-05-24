@@ -19,16 +19,16 @@ export async function GET(request: Request) {
   const range = (searchParams.get('range') as DateRangeKey) || '30d'
   const { start, end } = getDateRange(range)
 
-  const orders = await prisma.saleOrder.findMany({
-    where: {
-      status: { in: ['CONFIRMED', 'SHIPPED'] },
-      ...(start ? { createdAt: { gte: start, lte: end } } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      SaleItem: { include: { FinishedGoods: { select: { sku: true } } } },
-    },
-  })
+   const orders = await prisma.saleOrder.findMany({
+     where: {
+       status: { in: ['CONFIRMED', 'SHIPPED'] },
+       ...(start ? { createdAt: { gte: start, lte: end } } : {}),
+     },
+     orderBy: { createdAt: 'desc' },
+     include: {
+       SaleItem: { include: { FinishedGoods: { include: { design: true } } } },
+     },
+   })
 
   // Flatten to one row per line item
   const rows = orders.flatMap((order) =>

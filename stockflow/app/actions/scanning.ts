@@ -53,7 +53,12 @@ export async function processScan(data: {
     if (validatedData.type === 'raw_material') {
       // Handle raw material receipt/processing
       const material = await tx.rawMaterial.findUnique({
-        where: { barcode: validatedData.barcode }
+        where: {
+          organizationId_barcode: {
+            organizationId: user.organizationId,
+            barcode: validatedData.barcode,
+          },
+        },
       });
 
       if (!material) {
@@ -65,6 +70,7 @@ export async function processScan(data: {
         // Create material receipt
         await tx.materialReceipt.create({
           data: {
+            organizationId: user.organizationId,
             materialId: material.id,
             kgReceived: validatedData.kgIn,
             loggedBy: user.id,
@@ -89,7 +95,12 @@ export async function processScan(data: {
     } else if (validatedData.type === 'finished_goods') {
       // Handle finished goods processing (packaging role)
       const finishedGoods = await tx.finishedGoods.findUnique({
-        where: { barcode: validatedData.barcode }
+        where: {
+          organizationId_barcode: {
+            organizationId: user.organizationId,
+            barcode: validatedData.barcode,
+          },
+        },
       });
 
       if (!finishedGoods) {
@@ -104,6 +115,7 @@ export async function processScan(data: {
     // Log the scan event for audit trail
     await tx.auditLog.create({
       data: {
+        organizationId: user.organizationId,
         userId: user.id,
         action: 'BARCODE_SCAN_PROCESSED',
         entityType: validatedData.type,

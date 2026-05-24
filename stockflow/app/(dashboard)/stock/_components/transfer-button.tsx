@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { dispatchTransfer, searchProductsWithStock } from '../actions'
+import { dispatchTransfer, searchProductsWithStock } from '@/actions/stock'
 import { ALL_BRANCHES, BRANCH_LABELS } from '@/lib/branches'
 import type { BranchCode as Branch } from '@/lib/branches'
 

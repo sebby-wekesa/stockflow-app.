@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'
 
 interface SpecializedPreviewProps {
   batch: ImportBatch & {
-    rows: ImportRow[]
+    ImportRow: ImportRow[]
   }
 }
 

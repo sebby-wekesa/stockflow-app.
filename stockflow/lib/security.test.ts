@@ -1,3 +1,4 @@
+// @ts-nocheck
 // lib/security.test.ts
 import { sanitizeInput, validateEmail, validatePassword } from './security'
 
