@@ -122,65 +122,68 @@ export async function signIn(formData: FormData) {
     return { error: "Authentication failed. Please try again." };
   }
 
-  // Ensure user exists in database (public.User table)
-  try {
-    const existingUser = await withRetry(() =>
-      prisma.user.findUnique({ where: { id: data.user.id } })
-    );
-
-    if (!existingUser) {
-      await withRetry(() =>
-        prisma.user.create({
-          data: {
-            id: data.user.id,
-            email: data.user.email!,
-            name: data.user.user_metadata?.name || '',
-            role: (data.user.user_metadata?.role as any) || 'PENDING',
-            password: 'SUPABASE_AUTH',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        })
+  // Fire the DB sync work in the background — do NOT block the login response
+  // This prevents slow logins when the DB is under load or timing out.
+  void (async () => {
+    try {
+      const existingUser = await withRetry(() =>
+        prisma.user.findUnique({ where: { id: data.user.id } })
       );
-      console.log("Created new user record in database");
-    } else {
-      if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
-        await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
-          user_metadata: { 
-            name: existingUser.name,
-            role: existingUser.role
-          }
-        });
-        console.log("Updated user metadata with current role from database");
-      }
-      console.log("User record already exists in database");
-    }
 
-    // Ensure user has an organization (create default if missing)
-    const userWithOrg = await prisma.user.findUnique({
-      where: { id: data.user.id },
-      include: { Organization: true }
-    });
-    if (!userWithOrg?.Organization) {
-      let org = await prisma.organization.findFirst();
-      if (!org) {
-        org = await prisma.organization.create({
-          data: { 
-            name: "Default Org", 
-            code: "DEFAULT",
-            slug: "default-org"
-          }
-        });
+      if (!existingUser) {
+        await withRetry(() =>
+          prisma.user.create({
+            data: {
+              id: data.user.id,
+              email: data.user.email!,
+              name: data.user.user_metadata?.name || '',
+              role: (data.user.user_metadata?.role as any) || 'PENDING',
+              password: 'SUPABASE_AUTH',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          })
+        );
+        console.log("Created new user record in database");
+      } else {
+        if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
+          await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+            user_metadata: { 
+              name: existingUser.name,
+              role: existingUser.role
+            }
+          });
+          console.log("Updated user metadata with current role from database");
+        }
+        console.log("User record already exists in database");
       }
-      await prisma.user.update({
+
+      // Ensure user has an organization (create default if missing)
+      const userWithOrg = await prisma.user.findUnique({
         where: { id: data.user.id },
-        data: { organizationId: org.id }
+        include: { Organization: true }
       });
-      console.log("Linked user to organization:", org.id);
+      if (!userWithOrg?.Organization) {
+        let org = await prisma.organization.findFirst();
+        if (!org) {
+          org = await prisma.organization.create({
+            data: { 
+              name: "Default Org", 
+              code: "DEFAULT",
+              slug: "default-org"
+            }
+          });
+        }
+        await prisma.user.update({
+          where: { id: data.user.id },
+          data: { organizationId: org.id }
+        });
+        console.log("Linked user to organization:", org.id);
+      }
+    } catch (dbError) {
+      console.error("Background DB sync after login failed:", dbError);
     }
-  } catch (dbError) {
-    console.error("Database user creation failed:", dbError);
-  }
+  })();
 
   console.log("Login successful, session and database records established");
   return { success: true };

@@ -87,15 +87,45 @@ export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
 /**
- * Helper function to retry database operations on connection pool exhaustion
- * Implements exponential backoff with jitter to handle transient connection failures
+ * Helper function to retry database operations on transient connection/pool errors.
+ * Implements exponential backoff with jitter.
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  maxAttempts: number = 3,
-  baseDelayMs: number = 100
+  maxAttempts: number = 4,
+  baseDelayMs: number = 150
 ): Promise<T> {
   let lastError: any
+
+  const isRetryableError = (error: any): boolean => {
+    const msg = (error?.message || '').toLowerCase()
+    const code = error?.code || ''
+    const prismaCode = (error as any)?.code || ''
+
+    // Connection / pool / timeout errors (very common with Supabase pooler)
+    if (
+      code === 'ETIMEDOUT' ||
+      code === 'XX000' ||
+      msg.includes('etimedout') ||
+      msg.includes('timeout') ||
+      msg.includes('emaxconnsession') ||
+      msg.includes('max clients reached') ||
+      msg.includes('connection') ||
+      msg.includes('pool') ||
+      msg.includes('too many connections')
+    ) {
+      return true
+    }
+
+    // Prisma known request errors that are usually transient
+    if (error?.name === 'PrismaClientKnownRequestError') {
+      if (['P1001', 'P1002', 'P1008', 'P1017'].includes(prismaCode)) {
+        return true // connection refused / timeout / closed / etc.
+      }
+    }
+
+    return false
+  }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -103,28 +133,32 @@ export async function withRetry<T>(
     } catch (error: any) {
       lastError = error
 
-      // Check if this is a connection pool exhaustion or transient timeout error
-      const isPoolError =
-        error?.message?.includes?.('EMAXCONNSESSION') ||
-        error?.message?.includes?.('max clients reached') ||
-        error?.message?.includes?.('ETIMEDOUT') ||
-        error?.message?.includes?.('timeout') ||
-        error?.code === 'XX000' ||
-        error?.code === 'ETIMEDOUT'
-
-      // If not a pool error or this is the last attempt, throw
-      if (!isPoolError || attempt === maxAttempts) {
+      if (!isRetryableError(error) || attempt === maxAttempts) {
+        // Log full details on final failure (or non-retryable error)
+        console.error('withRetry: giving up', {
+          attempt,
+          maxAttempts,
+          name: error?.name,
+          code: error?.code,
+          prismaCode: (error as any)?.code,
+          message: error?.message?.slice(0, 300),
+        })
         throw error
       }
 
-      // Exponential backoff with jitter: delay = baseDelay * 2^(attempt-1) + random(0, baseDelay)
+      // Exponential backoff with jitter
       const exponentialDelay = baseDelayMs * Math.pow(2, attempt - 1)
       const jitter = Math.random() * baseDelayMs
       const delayMs = exponentialDelay + jitter
 
       console.warn(
-        `Database connection pool exhausted (attempt ${attempt}/${maxAttempts}). ` +
-        `Retrying in ${Math.round(delayMs)}ms...`
+        `withRetry: transient DB error (attempt ${attempt}/${maxAttempts}). ` +
+        `Retrying in ${Math.round(delayMs)}ms...`,
+        {
+          name: error?.name,
+          code: error?.code,
+          prismaCode: (error as any)?.code,
+        }
       )
 
       await new Promise(resolve => setTimeout(resolve, delayMs))
