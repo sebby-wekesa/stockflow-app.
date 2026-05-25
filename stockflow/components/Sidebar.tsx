@@ -63,9 +63,9 @@ function getRoleNavItems(role: UserRole): any[] {
     case 'OPERATOR':
       return [
         { section: "My Work" },
-        { label: "Job queue", href: "/operator/queue", badge: "3", badgeColor: "purple" },
+        { label: "Job queue", href: "/operator_queue", badge: "3", badgeColor: "purple" },
         { section: "History" },
-        { label: "Completed jobs", href: "/operator/history" },
+        { label: "Completed jobs", href: "/operator_history" },
       ];
 
     case 'SALES':

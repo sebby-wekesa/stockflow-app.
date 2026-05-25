@@ -22,7 +22,7 @@
  */
 
 import { supabaseServerComponent } from "./supabase-admin";
-import { prisma } from "./prisma";
+import { prisma, withRetry } from "./prisma";
 import { type UserRole } from "./types";
 import type { OrgStatus } from "@prisma/client";
 
@@ -57,15 +57,17 @@ export async function getUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: authUser.id },
-      include: {
-        Branch: true,
-        Organization: {
-          select: { id: true, name: true, slug: true, status: true },
+    const user = await withRetry(() =>
+      prisma.user.findUnique({
+        where: { id: authUser.id },
+        include: {
+          Branch: true,
+          Organization: {
+            select: { id: true, name: true, slug: true, status: true },
+          },
         },
-      },
-    });
+      })
+    );
 
     if (!user) {
       console.log("User not found in database for ID:", authUser.id);

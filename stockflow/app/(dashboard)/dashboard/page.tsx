@@ -3,6 +3,8 @@ import { Role } from '@/lib/auth'
 
 import { TeamRole } from '@/lib/proxy'
 import Link from 'next/link'
+import OperatorDashboard from '../operator/OperatorDashboard'
+import WarehousePage from '../warehouse/page'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,101 +50,6 @@ function PendingView({ user }: { user: any }) {
   );
 }
 
-// Operator Dashboard - Shows "My jobs" and "History"
-async function OperatorQueue({ user, role }: { user: any; role: TeamRole }) {
-  // Import the existing operator components
-  const { getOperatorQueue } = await import('@/app/actions/production')
-  const orders = await getOperatorQueue(role.toUpperCase(), user.department)
-
-  const { getOperatorHistory } = await import('@/app/actions/production')
-  const history = await getOperatorHistory()
-
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div>
-          <div className="section-title">My Jobs</div>
-          <div className="section-sub">Jobs assigned to your department</div>
-        </div>
-      </div>
-
-      {/* Active Jobs Section */}
-      <div className="card mb-16">
-        <div className="section-header mb-16">
-          <div className="section-title">Active Jobs</div>
-        </div>
-        {orders.length > 0 ? (
-          orders.map((order) => {
-            const isUrgent = order.priority === "URGENT" || order.priority === "HIGH"
-            return (
-              <div key={order.id} className={`job-card ${isUrgent ? 'urgent' : ''}`} style={{marginBottom: '16px'}}>
-                <div className="job-header">
-                  <span className="job-id">{order.orderNumber} · Stage {order.currentStage}/{order.totalStages}</span>
-                  <span className={`badge ${isUrgent ? 'badge-red' : 'badge-amber'}`}>
-                    {isUrgent ? 'Urgent' : 'In progress'}
-                  </span>
-                </div>
-                <div className="job-design">{order.designName} — {order.workDescription}</div>
-                <div className="job-meta" style={{marginTop:'8px', display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--muted)'}}>
-                  <span>Received: <span className="job-kg">{order.inheritedKg.toFixed(2)} kg</span></span>
-                  <span>Target init: {order.targetKg.toFixed(2)} kg</span>
-                </div>
-              </div>
-            )
-          })
-        ) : (
-          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
-            No jobs currently assigned to your department.
-          </div>
-        )}
-      </div>
-
-      {/* History Section */}
-      <div className="card">
-        <div className="section-header mb-16">
-          <div className="section-title">Job History</div>
-          <div className="section-sub">Recently completed jobs</div>
-        </div>
-        {history.length > 0 ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Design</th>
-                  <th>Completed</th>
-                  <th>Output</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((item: any) => (
-                  <tr key={item.id}>
-                    <td>
-                      <span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{item.orderNumber}</span>
-                    </td>
-                    <td>{item.designName}</td>
-                    <td>{new Date(item.completedAt).toLocaleDateString()}</td>
-                    <td>
-                      <span className="job-kg">{Number(item.kgOut)} kg</span>
-                    </td>
-                    <td>
-                      <span className="badge badge-green">Completed</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
-            No completed jobs yet.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // Sales Dashboard - Shows "Catalogue" and "My Orders"
 async function SalesView({ user, role }: { user: any; role: TeamRole }) {
@@ -241,77 +148,6 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
   )
 }
 
-// Warehouse Dashboard - Shows inventory and receiving
-async function WarehouseView({ user, role }: { user: any; role: TeamRole }) {
-  const { prisma } = await import('@/lib/prisma')
-
-  // Use any[] because we convert Decimal → number for rendering
-  let materials: any[] = []
-
-  try {
-    const rawMaterials = await prisma.rawMaterial.findMany({
-      orderBy: {
-        materialName: "asc",
-      },
-    })
-
-    // Convert Prisma Decimal fields to plain numbers so they can be rendered in JSX
-    materials = rawMaterials.map(m => ({
-      ...m,
-      availableKg: Number(m.availableKg),
-      reservedKg: Number(m.reservedKg),
-    }))
-  } catch (error) {
-    console.warn('Failed to fetch raw materials:', error)
-    materials = []
-  }
-
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div>
-          <div className="section-title">Warehouse Dashboard</div>
-          <div className="section-sub">Manage raw materials and receiving</div>
-        </div>
-        <Link href="/rawmaterials" className="btn btn-primary">Receive Stock</Link>
-      </div>
-
-      {/* Raw Materials Inventory */}
-      <div className="card">
-        <div className="section-header mb-16">
-          <div className="section-title">Raw Materials Inventory</div>
-          <div className="section-sub">Current stock levels</div>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Material</th>
-                <th>Diameter</th>
-                <th>Available</th>
-                <th>Reserved</th>
-                <th>Supplier</th>
-              </tr>
-            </thead>
-            <tbody>
-              {materials.map((material: any) => (
-                <tr key={material.id}>
-                  <td>{material.materialName}</td>
-                  <td>{material.diameter}</td>
-                  <td>
-                    <span className="job-kg">{Number(material.availableKg)} kg</span>
-                  </td>
-                  <td>{Number(material.reservedKg)} kg</td>
-                  <td>{material.supplier || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // Manager Dashboard - Shows production management overview
 async function ManagerOverview({ user, role }: { user: any; role: TeamRole }) {
@@ -469,11 +305,11 @@ async function TeamDashboard({ role, user }: { role: TeamRole; user: any }) {
     case 'packaging':
       return <PackagingView user={user} role={role} />;
     case 'warehouse':
-      return <WarehouseView user={user} role={role} />;
+      return <WarehousePage />;
     case 'manager':
       return <ManagerOverview user={user} role={role} />;
     case 'operator':
-      return <OperatorQueue user={user} role={role} />;
+      return <OperatorDashboard />;
     case 'admin':
       return <AdminView user={user} role={role} />;
     default:

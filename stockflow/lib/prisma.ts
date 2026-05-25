@@ -103,11 +103,14 @@ export async function withRetry<T>(
     } catch (error: any) {
       lastError = error
 
-      // Check if this is a connection pool exhaustion error
+      // Check if this is a connection pool exhaustion or transient timeout error
       const isPoolError =
         error?.message?.includes?.('EMAXCONNSESSION') ||
         error?.message?.includes?.('max clients reached') ||
-        error?.code === 'XX000'
+        error?.message?.includes?.('ETIMEDOUT') ||
+        error?.message?.includes?.('timeout') ||
+        error?.code === 'XX000' ||
+        error?.code === 'ETIMEDOUT'
 
       // If not a pool error or this is the last attempt, throw
       if (!isPoolError || attempt === maxAttempts) {

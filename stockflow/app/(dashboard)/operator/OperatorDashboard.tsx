@@ -1,39 +1,105 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { DepartmentQueue } from "@/components/DepartmentQueue";
-import { Info } from "lucide-react";
+import { getOperatorQueue, getActiveDepartments, getOperatorHistory } from "@/app/actions/production";
 
-// Good default list of shop floor departments
-const DEPARTMENTS = [
-  "Cutting",
-  "Bending",
-  "Welding",
-  "Heat Treatment",
-  "Assembly",
-  "Quality Control",
-  "Packaging",
-  "Finishing",
-];
+interface Job {
+  id: string;
+  orderNumber: string;
+  designName: string;
+  currentStage: number;
+  totalStages: number;
+  priority: string;
+  targetKg: number;
+  workDescription: string;
+  inheritedKg: number;
+}
+
+interface HistoryItem {
+  id: string;
+  orderNumber: string;
+  designName: string;
+  completedAt: string | Date;
+  kgOut: number;
+  kgScrap: number;
+  department: string;
+  stageName: string;
+}
 
 export default function OperatorDashboard() {
-  const [selectedDept, setSelectedDept] = useState<string>(DEPARTMENTS[0]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string>("");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Load departments
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const depts = await getActiveDepartments();
+        const deptList = depts.length > 0 ? depts : ["Cutting", "Bending", "Welding", "Assembly", "Packaging", "Finishing"];
+        setDepartments(deptList);
+        const initial = deptList[0] || "Cutting";
+        setSelectedDept(initial);
+      } catch {
+        const fallback = ["Cutting", "Bending", "Welding", "Assembly", "Packaging"];
+        setDepartments(fallback);
+        setSelectedDept("Cutting");
+      }
+    };
+    load();
+  }, []);
+
+  // Load queue when dept changes
+  useEffect(() => {
+    if (!selectedDept) return;
+    const loadJobs = async () => {
+      setLoading(true);
+      try {
+        const result = await getOperatorQueue(undefined, selectedDept);
+        setJobs(result || []);
+      } catch {
+        setJobs([]);
+      }
+      setLoading(false);
+    };
+    loadJobs();
+  }, [selectedDept]);
+
+  // Load history once
+  useEffect(() => {
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      try {
+        const result = await getOperatorHistory();
+        setHistory(result || []);
+      } catch {
+        setHistory([]);
+      }
+      setLoadingHistory(false);
+    };
+    loadHistory();
+  }, []);
 
   return (
-    <div>
-      <div className="section-header mb-16">
+    <div className="mb-24">
+      <div className="section-header mb-12">
         <div>
           <div className="section-title">Operator Dashboard</div>
-          <div className="section-sub">Choose your current working department below to see its active jobs</div>
+          <div className="section-sub">
+            Your station queue, logging, and completed work — all in one place
+          </div>
         </div>
       </div>
 
-      {/* Department Chooser - prominent for operators */}
+      {/* Department Chooser */}
       <div className="mb-8">
-        <div className="text-xs uppercase tracking-wider text-muted mb-2">Working in</div>
+        <div className="text-xs uppercase tracking-[1px] text-muted mb-2">Choose Department / Station</div>
         <div className="flex flex-wrap gap-2">
-          {DEPARTMENTS.map((dept) => (
+          {departments.map((dept) => (
             <button
               key={dept}
               onClick={() => setSelectedDept(dept)}
@@ -45,71 +111,93 @@ export default function OperatorDashboard() {
         </div>
       </div>
 
-      {/* Dashboard Stats */}
-      <div className="stats-grid">
-        <div className="stat-card purple">
-          <div className="stat-label">Jobs in queue</div>
-          <div className="stat-value">3</div>
-          <div className="stat-sub">Ready for processing</div>
+      {/* Active Queue (full featured, matching /operator/queue) */}
+      <div className="card mb-10">
+        <div className="section-header mb-8">
+          <div className="section-title">{selectedDept || "Loading..."} — Active Jobs</div>
+          <div className="section-sub">Jobs waiting to be processed at this station. Click to log production.</div>
         </div>
-        <div className="stat-card teal">
-                    <div className="stat-label">Today&apos;s output</div>
-          <div className="stat-value">340<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-          <div className="stat-sub">Processed so far</div>
-        </div>
+
+        {loading && (
+          <div className="p-8 text-center text-muted text-sm">Loading jobs...</div>
+        )}
+
+        {!loading && jobs.length > 0 && (
+          <div className="space-y-3">
+            {jobs.map((job) => {
+              const isUrgent = job.priority === "URGENT" || job.priority === "HIGH";
+              return (
+                <Link key={job.id} href={`/operator_log/${job.id}`} className="block">
+                  <div className={`job-card ${isUrgent ? "urgent" : "inprog"}`}>
+                    <div className="job-header">
+                      <span className="job-id">
+                        {job.orderNumber} · Stage {job.currentStage}/{job.totalStages}
+                      </span>
+                      <span className={`badge ${isUrgent ? "badge-red" : "badge-amber"}`}>
+                        {isUrgent ? "Urgent" : "Ready"}
+                      </span>
+                    </div>
+                    <div className="job-design">
+                      {job.designName} — {job.workDescription}
+                    </div>
+                    <div className="job-meta" style={{ marginTop: "6px", fontSize: "12px", color: "var(--muted)" }}>
+                      <span>
+                        Target: <span className="job-kg">{Number(job.targetKg).toFixed(1)} kg</span>
+                      </span>
+                      <span>Received: {Number(job.inheritedKg).toFixed(1)} kg</span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && jobs.length === 0 && selectedDept && (
+          <div className="p-8 text-center">
+            <p className="text-muted text-sm">
+              No active jobs currently in the <strong>{selectedDept}</strong> department.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Active Queue */}
+      {/* My History (everything from the dedicated operator history) */}
       <div className="card">
-        <div className="section-header mb-16"><div className="section-title">Job queue — {selectedDept}</div><div className="section-sub">Active jobs waiting at this station</div></div>
-        <DepartmentQueue userDept={selectedDept} />
+        <div className="section-header mb-8">
+          <div className="section-title">My Completed Work</div>
+          <div className="section-sub">Recent stages you have logged</div>
+        </div>
+
+        {loadingHistory && <div className="p-6 text-center text-muted">Loading history...</div>}
+
+        {!loadingHistory && history.length === 0 && (
+          <div className="p-8 text-center text-muted text-sm">No completed work logged yet.</div>
+        )}
+
+        {!loadingHistory && history.length > 0 && (
+          <div className="space-y-3">
+            {history.map((item) => (
+              <div key={item.id} className="job-card completed">
+                <div className="job-header">
+                  <span className="job-id">{item.orderNumber}</span>
+                  <span className="badge badge-green">Completed</span>
+                </div>
+                <div className="job-design">{item.designName} — {item.stageName} ({item.department})</div>
+                <div className="job-meta" style={{ marginTop: "6px", fontSize: "12px", color: "var(--muted)" }}>
+                  <span>Out: {Number(item.kgOut).toFixed(1)} kg</span>
+                  {item.kgScrap > 0 && <span>Scrap: {Number(item.kgScrap).toFixed(1)} kg</span>}
+                  <span>{new Date(item.completedAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Log Output */}
-      <div className="card">
-        <div className="section-header mb-16"><div className="section-title">Log output</div><Link href="/operator_log" className="btn btn-ghost btn-sm">View full log</Link></div>
-        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius)',padding:'18px'}}>
-          <div style={{fontSize:'13px',fontWeight:'600',marginBottom:'4px'}}>No active job</div>
-          <div style={{fontSize:'12px',color:'var(--muted)',marginBottom:'14px'}}>Select a job from the queue above to begin logging output</div>
-          <button className="btn btn-primary">Start new job</button>
-        </div>
-      </div>
-
-      {/* Operational Tip */}
-      <div style={{
-        background: 'rgba(74,158,255,0.1)',
-        border: '1px solid rgba(74,158,255,0.2)',
-        borderRadius: 'var(--radius)',
-        padding: '16px',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '12px'
-      }}>
-        <div style={{
-          padding: '6px',
-          background: 'rgba(74,158,255,0.2)',
-          borderRadius: 'var(--radius-sm)'
-        }}>
-          <Info style={{ color: 'var(--blue)' }} size={16} />
-        </div>
-        <div>
-          <h4 style={{
-            fontSize: '14px',
-            fontWeight: 700,
-            color: 'var(--blue)',
-            fontFamily: 'var(--font-head)',
-            marginBottom: '4px'
-          }}>
-            Station Tip
-          </h4>
-          <p style={{
-            fontSize: '13px',
-            color: 'var(--text)',
-            lineHeight: 1.5
-          }}>
-            Ensure all material weights are logged before completing a stage. Accurate &quot;Kg Out&quot; values automatically update the target weight for the next department in the sequence.
-          </p>
-        </div>
+      {/* Quick links to full logging/history if needed */}
+      <div className="mt-6 text-center text-xs text-muted">
+        Full operator tools also available at <Link href="/operator_queue" className="underline">/operator_queue</Link> and <Link href="/operator_history" className="underline">/operator_history</Link>
       </div>
     </div>
   );
