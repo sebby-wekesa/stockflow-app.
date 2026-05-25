@@ -2,6 +2,7 @@
 
 import { ShoppingCart, Search, Package, DollarSign, TrendingUp, Filter, X } from "lucide-react";
 import { useState } from "react";
+import { formatKES } from "@/lib/sales-utils";
 
 export function SalesCatalogue({ products }: { products: any[] }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -167,7 +168,7 @@ export function SalesCatalogue({ products }: { products: any[] }) {
                   </div>
                   <div className="text-right ml-4">
                     <div className="text-lg font-mono font-bold text-accent">
-                      ${price.toFixed(2)}
+                      {formatKES(price)}
                     </div>
                     <div className="text-xs text-muted">per unit</div>
                   </div>
@@ -200,9 +201,9 @@ export function SalesCatalogue({ products }: { products: any[] }) {
                       Total Value
                     </div>
                     <div className="text-2xl font-mono font-bold text-green">
-                      ${(totalValue / 1000).toFixed(1)}k
+                      {formatKES(totalValue / 1000)}k
                     </div>
-                    <div className="text-xs text-muted">${totalValue.toLocaleString()}</div>
+                    <div className="text-xs text-muted">{formatKES(totalValue)}</div>
                   </div>
                 </div>
 

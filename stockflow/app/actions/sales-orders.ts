@@ -175,7 +175,7 @@ export async function createSalesOrder(data: {
   });
 }
 
-export async function getSalesOrders(role?: string) {
+export async function getSalesOrders(role?: string, limit?: number) {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
   const effectiveRole = role || user.role;
@@ -199,7 +199,8 @@ export async function getSalesOrders(role?: string) {
         }
       }
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: limit ?? undefined
   });
 
   return orders.map(order => ({

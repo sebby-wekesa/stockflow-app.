@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import { createSalesOrder } from '@/app/actions/sales-orders'
+import { formatKES } from '@/lib/sales-utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -257,7 +258,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium">${(item.price || 0).toFixed(2)}</div>
+                      <div className="text-sm font-medium">{formatKES(item.price || 0)}</div>
                       <Button type="button" size="sm" variant="secondary" className="mt-1 h-7 text-xs">
                         Add
                       </Button>

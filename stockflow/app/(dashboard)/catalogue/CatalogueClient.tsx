@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { SalesOrderForm } from "@/components/SalesOrderForm";
+import { formatKES } from "@/lib/sales-utils";
 
 type SortOption = 'name' | 'code' | 'price' | 'quantity' | 'date';
 
@@ -58,8 +59,6 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
   const clearSelection = () => {
     setSelectedIds(new Set());
   };
-
-  const selectedProducts = formattedProducts.filter(p => selectedIds.has(p.id));
 
   const formattedProducts = products.map(p => ({
     id: p.id,
@@ -357,7 +356,7 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
                       fontWeight: 500,
                       color: 'var(--accent)'
                     }}>
-                      ${p.price?.toFixed(2) || 'TBD'}
+                      {formatKES(p.price)}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <button

@@ -5,6 +5,7 @@ import { TeamRole } from '@/lib/proxy'
 import Link from 'next/link'
 import OperatorDashboard from '../operator/OperatorDashboard'
 import WarehousePage from '../warehouse/page'
+import { formatKES } from '@/lib/sales-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +59,7 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
   const { getSalesOrders } = await import('@/app/actions/sales-orders')
 
   const products = await getCatalogue()
-  const orders = await getSalesOrders(role.toUpperCase())
+  const orders = await getSalesOrders(role.toUpperCase(), 15)
 
   return (
     <div>
@@ -73,8 +74,10 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
       {/* Catalogue Section */}
       <div className="card mb-16">
         <div className="section-header mb-16">
-          <div className="section-title">Available Catalogue</div>
-          <div className="section-sub">Products ready for ordering</div>
+          <div>
+            <div className="section-title">Available Catalogue</div>
+            <div className="section-sub">Products ready for ordering</div>
+          </div>
         </div>
         {products.length > 0 ? (
           <div className="grid-3">
@@ -85,7 +88,7 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
                 <div className="product-stock">
                   <span className="job-kg">{product.availableQty} units</span> available
                 </div>
-                <div className="product-price">${Number(product.price)}/unit</div>
+                <div className="product-price">{formatKES(Number(product.price))}/unit</div>
                 <a href="/catalogue" className="btn btn-sm">Order Now</a>
               </div>
             ))}
@@ -97,11 +100,14 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
         )}
       </div>
 
-      {/* My Orders Section */}
+      {/* My Orders Section - limited to latest 15 for better organization */}
       <div className="card">
         <div className="section-header mb-16">
-          <div className="section-title">My Orders</div>
-          <div className="section-sub">Track your order history</div>
+          <div>
+            <div className="section-title">My Orders</div>
+            <div className="section-sub">Track your order history (latest 15)</div>
+          </div>
+          <Link href="/sales" className="btn btn-ghost btn-sm">View all →</Link>
         </div>
         {orders.length > 0 ? (
           <div className="table-wrap">
@@ -123,7 +129,7 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
                     </td>
                     <td>{new Date(order.createdAt).toLocaleDateString()}</td>
                     <td>{order.itemCount} items</td>
-                    <td>${order.amount.toFixed(2)}</td>
+                    <td>{formatKES(order.amount)}</td>
                     <td>
                       <span className={`badge ${
                         order.status === 'PENDING' ? 'badge-amber' :
