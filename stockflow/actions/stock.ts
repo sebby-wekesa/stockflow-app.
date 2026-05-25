@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
+import { withRetry } from '@/lib/prisma'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STOCK TRANSFER
@@ -41,25 +42,27 @@ export async function dispatchTransfer(formData: FormData) {
   const user = await requireActiveAuth()
   const db = getTenantPrisma(user.organizationId)
 
-  // Resolve branches in our org
-  const [sourceBranch, destBranch] = await Promise.all([
-    db.branch.findFirst({
-      where: {
-        OR: [
-          { code: { equals: data.source_branch, mode: 'insensitive' } },
-          { name: { equals: data.source_branch, mode: 'insensitive' } },
-        ],
-      },
-    }),
-    db.branch.findFirst({
-      where: {
-        OR: [
-          { code: { equals: data.dest_branch, mode: 'insensitive' } },
-          { name: { equals: data.dest_branch, mode: 'insensitive' } },
-        ],
-      },
-    }),
-  ])
+  // Resolve branches in our org (wrapped for pooler resilience)
+  const [sourceBranch, destBranch] = await withRetry(() =>
+    Promise.all([
+      db.branch.findFirst({
+        where: {
+          OR: [
+            { code: { equals: data.source_branch, mode: 'insensitive' } },
+            { name: { equals: data.source_branch, mode: 'insensitive' } },
+          ],
+        },
+      }),
+      db.branch.findFirst({
+        where: {
+          OR: [
+            { code: { equals: data.dest_branch, mode: 'insensitive' } },
+            { name: { equals: data.dest_branch, mode: 'insensitive' } },
+          ],
+        },
+      }),
+    ])
+  )
 
   if (!sourceBranch) {
     throw new Error(`Source branch "${data.source_branch}" not found`)

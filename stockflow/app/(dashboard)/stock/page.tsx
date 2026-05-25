@@ -85,29 +85,29 @@ export default async function BranchStockPage({
         ALL_BRANCHES.map(async (branch) => {
           const [rawAgg, finishedAgg] = await Promise.all([
             db.inventoryRawMaterial.aggregate({
-              where: { branchId: branch, availableKg: { gt: 0 } },
+              where: { Branch: { code: branch }, availableKg: { gt: 0 } },
               _sum: { availableKg: true },
               _count: { _all: true },
             }),
             db.inventoryFinishedGoods.aggregate({
-              where: { branchId: branch, availableQty: { gt: 0 } },
+              where: { Branch: { code: branch }, availableQty: { gt: 0 } },
               _sum: { availableQty: true },
               _count: { _all: true },
             }),
           ])
 
           const [rawLowStock, finishedLowStock] = await Promise.all([
-            db.inventoryRawMaterial.count({ where: { branchId: branch, availableKg: { gt: 0, lt: 5 } } }),
-            db.inventoryFinishedGoods.count({ where: { branchId: branch, availableQty: { gt: 0, lt: 5 } } }),
+            db.inventoryRawMaterial.count({ where: { Branch: { code: branch }, availableKg: { gt: 0, lt: 5 } } }),
+            db.inventoryFinishedGoods.count({ where: { Branch: { code: branch }, availableQty: { gt: 0, lt: 5 } } }),
           ])
 
           const [valuedRaw, valuedFinished] = await Promise.all([
             db.inventoryRawMaterial.findMany({
-              where: { branchId: branch, availableKg: { gt: 0 } },
+              where: { Branch: { code: branch }, availableKg: { gt: 0 } },
               include: { RawMaterial: { select: { costPerKg: true } } },
             }),
             db.inventoryFinishedGoods.findMany({
-              where: { branchId: branch, availableQty: { gt: 0 } },
+              where: { Branch: { code: branch }, availableQty: { gt: 0 } },
               include: { FinishedGoods: { select: { unitCost: true } } },
             }),
           ])

@@ -64,7 +64,17 @@ export async function getUser(): Promise<AuthUser | null> {
     // caused by schema drift between the generated client and the actual DB.
     const [rawUser] = await withRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT id, email, name, role, department FROM "User" WHERE id = $1 LIMIT 1`,
+        `SELECT 
+           id, 
+           email, 
+           name, 
+           role, 
+           department, 
+           "organizationId", 
+           "branchId" 
+         FROM "User" 
+         WHERE id = $1 
+         LIMIT 1`,
         authUser.id
       )
     ) as any[];
