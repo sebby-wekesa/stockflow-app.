@@ -207,8 +207,9 @@ model Design {
   description      String?
   targetDimensions String?
   targetWeight     Decimal?          @db.Decimal(10, 4)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  lastSeenAt           DateTime?
   billOfMaterials  BillOfMaterials[]
   finishedGoods    FinishedGoods[]
   productionOrders ProductionOrder[]

@@ -6,6 +6,7 @@ import { getTenantPrisma } from "@/lib/tenant-prisma";
 import type { UserRole } from "@/lib/types";
 import { UserRow } from "@/components/admin/UserRow";
 import InviteUserModal from "@/components/admin/InviteUserModal";
+import { isUserOnline } from "@/lib/presence";
 
 type AdminUserRow = {
   id: string;
@@ -13,6 +14,7 @@ type AdminUserRow = {
   name: string | null;
   role: UserRole;
   department: string | null;
+  lastSeenAt: Date | null;
 };
 
 async function getUsers() {
@@ -28,7 +30,7 @@ async function getUsers() {
         name: true,
         role: true,
         department: true,
-        createdAt: true,
+        lastSeenAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -39,6 +41,7 @@ async function getUsers() {
       name: user.name,
       role: user.role,
       department: user.department,
+      lastSeenAt: user.lastSeenAt,
     })) as AdminUserRow[];
   } catch (error) {
     console.error('Failed to fetch users:', error);
@@ -98,7 +101,16 @@ export default async function AdminUsersPage() {
                   </span>
                 </td>
                 <td>{user.role === 'OPERATOR' ? (user.department || '—') : '—'}</td>
-                <td><span className="badge badge-green">Active</span></td>
+                <td>
+                  {isUserOnline(user.lastSeenAt) ? (
+                    <span className="badge badge-green flex items-center gap-1.5">
+                      <span className="w-2 h-2 bg-green-500 rounded-full inline-block" />
+                      Online
+                    </span>
+                  ) : (
+                    <span className="badge badge-muted">Offline</span>
+                  )}
+                </td>
                 <td>
                   <UserRow user={user} />
                 </td>

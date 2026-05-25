@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth';
 import { Sidebar } from "@/components/Sidebar";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // This stops the "Permission Denied" flash by catching it before render
   return (
     <div className="flex h-screen bg-zinc-950 text-white">
+      <PresenceHeartbeat />
       <Sidebar role={role} />
       <div className="flex-1 overflow-auto">
         {children}
