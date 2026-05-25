@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function GET() {
   try {
-    const recentDeliveries = await prisma.materialReceipt.findMany({
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const recentDeliveries = await db.materialReceipt.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
       include: {

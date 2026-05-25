@@ -6,7 +6,12 @@ import { redirect } from "next/navigation";
 import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { clearAuthCookies } from "@/lib/auth-session";
+// NOTE: This file contains both normal authenticated paths and critical bootstrap logic
+// (first-login user creation, default org creation). Bootstrap sections intentionally
+// use the base prisma client because no organizationId exists yet.
+// This is documented as an approved Week 2 exception.
 import { prisma, withRetry } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { loginSchema } from "@/lib/validations";
 import { ALL_BRANCHES } from "@/lib/branches";
 

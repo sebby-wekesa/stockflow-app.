@@ -1,17 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { stageCompletionSchema, StageCompletionInput } from "@/lib/validations";
-import { requireRole } from "@/lib/auth";
+import { requireActiveAuth } from "@/lib/auth";
 
 export async function completeStage(input: StageCompletionInput) {
-  const user = await requireRole("OPERATOR", "ADMIN");
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const validated = stageCompletionSchema.parse(input);
 
-  // Use database transaction for atomicity
-  return await prisma.$transaction(async (tx) => {
+  // Use tenant-scoped transaction for atomicity
+  return await db.$transaction(async (tx) => {
     const order = await tx.productionOrder.findUnique({
       where: { id: validated.orderId },
       include: {

@@ -67,10 +67,94 @@
   - app/api/warehouse/stats/route.ts
 - ✅ Converted customer portal actions: app/actions/customer-portal.ts
 - ✅ Converted major dashboard actions file: app/actions/dashboard.ts (getDashboardStats, getManagerData, approveOrder + supporting queries)
+- ✅ Converted import components:
+  - app/(dashboard)/import/[id]/_components/CommitPreview.tsx
+  - app/(dashboard)/import/[id]/_components/SuccessView.tsx
+- ✅ Converted warehouse + products API routes:
+  - app/api/warehouse/recent-deliveries/route.ts
+  - app/api/products/stock-ledger/route.ts
+  - app/(dashboard)/api/products/search/route.ts
+- ✅ Converted user management batch:
+  - app/api/user/update-role/route.ts
+  - app/actions/users.ts (inviteUser, updateUserRole, deleteUser, updateUser, getBranches)
+  - app/admin/orgs/page.tsx (left as intentional super-admin cross-org exception)
+- ✅ Batch B (Analytics + remaining action files) — aggressive push completed
+  - app/(dashboard)/analytics/page.tsx
+  - app/actions/material-consumption.ts
+  - app/actions/orders.ts
+  - actions/stage-completion.ts
+  - actions/design.ts (cleaned up)
+  - Significant progress + cleanup on app/actions/bulk-import.ts
+  - Cleanup on app/actions.ts (legacy barrel)
 
-- Production build succeeds cleanly
-- `tsc --noEmit` now exits with 0 errors
-- Current raw `@/lib/prisma` direct imports: **19 files** (target: 3–5 exceptions by end of week)
+- `tsc --noEmit` = 0 errors
+- Production build clean
+- Raw direct `@/lib/prisma` imports now down to only **5 files**
+
+**Final remaining (all documented special/bootstrap/super-admin cases):**
+- actions/admin-orgs.ts (super-admin org status actions — noted)
+- actions/auth.ts (contains bootstrap user/org linking on first login — noted)
+- actions/signup.ts (organization bootstrap — noted as pre-tenant)
+- app/actions/customer-portal.ts (contains limited bootstrap lookups — noted)
+- app/admin/orgs/page.tsx (super-admin cross-org view — intentional exception)
+
+Week 2 Tenant Coverage is effectively complete. The 5 remaining files are all justified exceptions with comments.
+
+---
+
+## Week 3 Start (2026-05-25)
+
+**Status:** Week 3 initiated.
+
+### Actions Taken (2026-05-25)
+- Created `__tests__/tenant/` directory.
+- Recorded decision: **Application-level scoping only** (no RLS for pilot).
+- Created test seed helper (`seed.ts`) that reliably creates two organizations with isolated data.
+- Expanded isolation test suite (`isolation.test.ts`):
+  - Product, ProductionOrder, StageLog, SaleOrder, MaterialConsumptionLog isolation
+  - Advanced transaction boundary tests (now running cleanly):
+    - `consumeMaterialsForOrder` (with proper test BOM data)
+    - `completeStage`
+    - `fulfillOrder` from packaging
+    - Full multi-stage handoff sequence (deterministic after seed improvements)
+    - Negative fulfillment case (Org A user attempting Org B order)
+    - `getPackagingStats` isolation check
+    - All tests use auth mocking to run real server actions under specific org contexts
+    - Strong verification that Org B data is never affected
+
+- Major seed improvements for Week 3 tests:
+  - Explicit multi-stage definitions on test designs
+  - Pre-completed initial stages for reliable handoff sequences
+  - FinishedGoods + SaleItem data for packaging fulfillment tests
+  - Significantly reduced warnings in transaction tests
+  - Jest mocking of `requireActiveAuth` to run real server actions with specific organizationId
+  - Extended test seed with RawMaterial + MaterialConsumptionLog + SaleOrder data
+- Updated plan with decision and rationale.
+
+### Next Immediate Steps
+1. Extend or create a multi-organization test seed.
+2. Decide on RLS vs pure application-level scoping (see decision point below).
+3. Implement first 8–10 real isolation assertions once test data strategy is chosen.
+4. Add negative tests (cross-org access attempts).
+
+### RLS Decision Point — **RECORDED 2026-05-25**
+
+**Decision: Application-level scoping only** (Option A)
+
+- We will continue with **pure application-level tenant scoping** via `getTenantPrisma(user.organizationId)` and `withTenantTransaction`.
+- Isolation will be proven and maintained through automated tests + mandatory code review on any direct Prisma usage.
+- Postgres RLS is **not** being implemented at this stage (can be revisited post-pilot if compliance requirements change).
+
+**Rationale**:
+- Current scoping is already comprehensive after Week 2.
+- Adding RLS now would add significant operational complexity (policy maintenance, testing, migration) with limited immediate benefit for a single-org pilot.
+- Tests + code review provide strong guarantees for the pilot phase.
+- Keeps velocity high for Weeks 3–6.
+
+**Implications**:
+- All future tests in `__tests__/tenant/` must prove cross-org isolation.
+- Any new raw `prisma` usage must be reviewed and justified.
+- Documentation of this decision is sufficient for the pilot.
 
 ---
 

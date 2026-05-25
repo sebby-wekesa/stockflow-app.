@@ -1,12 +1,16 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function updateOrderStatus(orderId: string, status: "APPROVED" | "REJECTED") {
   try {
-    await prisma.productionOrder.update({
-      where: { id: orderId },
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
+    await db.productionOrder.update({
+      where: { id: orderId, organizationId: user.organizationId },
       data: { status },
     });
     

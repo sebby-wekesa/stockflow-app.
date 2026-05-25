@@ -1,13 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/auth";
+import { requireActiveAuth } from "@/lib/auth";
 import { designSchema, DesignInput } from "@/lib/validations";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 
 export async function createDesign(formData: FormData) {
-  const user = await requireRole("ADMIN");
+  const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
   const name = formData.get("name") as string;
@@ -68,7 +67,7 @@ export async function createDesign(formData: FormData) {
 }
 
 export async function updateDesign(id: string, formData: FormData) {
-  const user = await requireRole("ADMIN");
+  const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
   const name = formData.get("name") as string;

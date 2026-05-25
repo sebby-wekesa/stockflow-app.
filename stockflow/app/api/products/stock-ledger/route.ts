@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
 
     if (productId) {
-      // Fetch specific product with stock movements
-      const product = await prisma.product.findUnique({
-        where: { id: productId },
+      // Fetch specific product with stock movements (tenant scoped)
+      const product = await db.product.findUnique({
+        where: { id: productId, organizationId: user.organizationId },
         include: {
           StockMovement: {
             orderBy: { createdAt: 'desc' },
-            take: 50, // Limit to recent movements
+            take: 50,
           },
         },
       })
@@ -24,10 +28,11 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(product)
     } else {
-      // Fetch all products with basic info for selection
-      const products = await prisma.product.findMany({
+      // Fetch all products with basic info for selection (tenant scoped)
+      const products = await db.product.findMany({
         where: {
           currentStock: { gt: 0 },
+          organizationId: user.organizationId,
         },
         select: {
           id: true,
@@ -36,7 +41,7 @@ export async function GET(request: NextRequest) {
           currentStock: true,
           StockMovement: {
             orderBy: { createdAt: 'desc' },
-            take: 10, // Just a few recent movements for preview
+            take: 10,
           },
         },
         orderBy: { name: 'asc' },

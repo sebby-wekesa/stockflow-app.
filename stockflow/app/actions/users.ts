@@ -1,25 +1,24 @@
 "use server";
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { getUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUserRole, USER_ROLES } from "@/lib/types";
 
 async function assertAdminAccess() {
-  const currentUser = await getUser();
-
-  if (!currentUser) {
-    throw new Error("Unauthorized");
-  }
+  const currentUser = await requireActiveAuth();
 
   if (currentUser.role !== "ADMIN") {
     throw new Error("Forbidden");
   }
+
+  return currentUser;
 }
 
 export async function inviteUser(_prevState: unknown, formData: FormData) {
   try {
-    await assertAdminAccess();
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
 
     const email = formData.get('email') as string;
     const name = formData.get('name') as string;
@@ -37,7 +36,7 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
     // 1. Create user in Supabase Auth
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: "tempPassword123!", // Temporary password, user should change
+      password: "tempPassword123!",
       email_confirm: true,
       user_metadata: {
         name,
@@ -52,19 +51,17 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
       throw new Error(`Auth Error: ${authError.message}`);
     }
 
-    // 2. Create user in Prisma
+    // 2. Create user in Prisma (properly tenant-scoped)
     const createData: any = {
       id: authUser.user!.id,
       email,
       name,
       role: role as typeof USER_ROLES[number],
-      organizationId: "org-1", // TODO: get from current user
+      organizationId: currentUser.organizationId,
     };
     if (branchId) createData.branchId = branchId;
 
-    await prisma.user.create({ data: createData });
-
-    // profiles table removed - Prisma User is the source of truth
+    await db.user.create({ data: createData });
 
     revalidatePath("/users");
     return { success: true };
@@ -75,7 +72,8 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
-  await assertAdminAccess();
+  const currentUser = await assertAdminAccess();
+  const db = getTenantPrisma(currentUser.organizationId);
 
   if (typeof newRole !== "string" || !USER_ROLES.includes(newRole.toUpperCase() as typeof USER_ROLES[number])) {
     throw new Error("Invalid role");
@@ -83,28 +81,30 @@ export async function updateUserRole(userId: string, newRole: string) {
 
   const normalizedRole = normalizeUserRole(newRole);
 
-  // profiles table removed - role is stored in Prisma User
+  await db.user.update({
+    where: { id: userId, organizationId: currentUser.organizationId },
+    data: { role: normalizedRole },
+  });
 
-  revalidatePath('/admin/users'); // Refresh the UI immediately
+  revalidatePath('/admin/users');
 }
 
 export async function deleteUser(userId: string) {
-  await assertAdminAccess();
+  const currentUser = await assertAdminAccess();
+  const db = getTenantPrisma(currentUser.organizationId);
 
-  // First delete related records that reference this user
-  await prisma.auditLog.deleteMany({
-    where: { userId },
+  // First delete related records that reference this user (tenant-scoped)
+  await db.auditLog.deleteMany({
+    where: { userId, organizationId: currentUser.organizationId },
   });
 
-  await prisma.stageLog.deleteMany({
-    where: { operatorId: userId },
+  await db.stageLog.deleteMany({
+    where: { operatorId: userId, organizationId: currentUser.organizationId },
   });
 
-  await prisma.notificationSettings.deleteMany({
-    where: { userId },
+  await db.notificationSettings.deleteMany({
+    where: { userId, organizationId: currentUser.organizationId },
   });
-
-  // profiles table removed - deletion handled via Prisma + Auth
 
   try {
     // Delete from Supabase Auth
@@ -122,7 +122,8 @@ export async function deleteUser(userId: string) {
 
 export async function updateUser(_prevState: unknown, formData: FormData) {
   try {
-    await assertAdminAccess();
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;
@@ -137,26 +138,23 @@ export async function updateUser(_prevState: unknown, formData: FormData) {
       throw new Error("Invalid role");
     }
 
-    // Update user in Prisma
+    // Update user in Prisma (tenant-scoped)
     const updateData: any = {
       name,
       role: role as typeof USER_ROLES[number],
     };
 
-    // Only include branchId if it looks like a valid UUID (avoid foreign key violations from old string codes)
     const isValidUuid = branchId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId);
     if (isValidUuid) {
       updateData.branchId = branchId;
     }
 
-    await prisma.user.update({
-      where: { id: userId },
+    await db.user.update({
+      where: { id: userId, organizationId: currentUser.organizationId },
       data: updateData
     });
 
-    // profiles table removed - using Prisma User model instead
-
-    // Update Supabase Auth user metadata so role changes take effect immediately
+    // Update Supabase Auth user metadata
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       user_metadata: { name, role }
     });
@@ -173,7 +171,11 @@ export async function updateUser(_prevState: unknown, formData: FormData) {
 }
 
 export async function getBranches() {
-  return await prisma.branch.findMany({
+  const currentUser = await requireActiveAuth();
+  const db = getTenantPrisma(currentUser.organizationId);
+
+  return await db.branch.findMany({
+    where: { organizationId: currentUser.organizationId },
     orderBy: { name: 'asc' }
   });
 }

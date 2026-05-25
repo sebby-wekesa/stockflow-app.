@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   const { searchParams } = new URL(request.url)
   const query = searchParams.get('q') || ''
 
@@ -9,8 +13,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json([])
   }
 
-  const products = await prisma.product.findMany({
+  const products = await db.product.findMany({
     where: {
+      organizationId: user.organizationId,
       OR: [
         { name: { contains: query, mode: 'insensitive' } },
         { sku: { contains: query, mode: 'insensitive' } },

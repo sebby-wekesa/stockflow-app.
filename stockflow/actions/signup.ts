@@ -1,5 +1,10 @@
 'use server'
 
+// SPECIAL CASE: Organization signup / bootstrap
+// This action runs before any user is authenticated to a tenant.
+// It creates the very first Organization + User for a new company.
+// It intentionally uses the raw prisma client because no organizationId yet exists.
+// This is one of the approved Week 2 exceptions.
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'

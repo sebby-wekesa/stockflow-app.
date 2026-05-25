@@ -1,20 +1,19 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUser } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireActiveAuth } from '@/lib/auth';
+import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { Role } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getUser();
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const currentUser = await requireActiveAuth();
 
     if (currentUser.role !== "ADMIN") {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const db = getTenantPrisma(currentUser.organizationId);
 
     const { userId, role } = await request.json();
 
@@ -32,9 +31,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
-    // Update role in Prisma User table
-    await prisma.user.update({
-      where: { id: userId },
+    // Update role (tenant-scoped)
+    await db.user.update({
+      where: { id: userId, organizationId: currentUser.organizationId },
       data: { role: role as Role },
     });
 

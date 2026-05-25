@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { z } from "zod";
 
 // Schema for material consumption validation
@@ -15,10 +15,11 @@ const materialConsumptionSchema = z.object({
 });
 
 export async function consumeMaterialsForOrder(productionOrderId: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  // Get the production order with BOM information
-  const order = await prisma.productionOrder.findUnique({
+  // Get the production order with BOM information (tenant scoped)
+  const order = await db.productionOrder.findUnique({
     where: { id: productionOrderId },
     include: {
       design: {
@@ -51,8 +52,8 @@ export async function consumeMaterialsForOrder(productionOrderId: string) {
   // Validate the consumption data
   materialConsumptionSchema.parse({ productionOrderId, bomItems: consumptionData });
 
-  // Use transaction for atomic material consumption
-  return await prisma.$transaction(async (tx) => {
+  // Use tenant-scoped transaction for atomic material consumption
+  return await db.$transaction(async (tx) => {
     const consumptionLogs = [];
 
     for (const item of consumptionData) {
@@ -102,10 +103,14 @@ export async function consumeMaterialsForOrder(productionOrderId: string) {
 }
 
 export async function getMaterialConsumptionLogs(orderId: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const logs = await prisma.materialConsumptionLog.findMany({
-    where: { productionOrderId: orderId },
+  const logs = await db.materialConsumptionLog.findMany({
+    where: { 
+      productionOrderId: orderId,
+      organizationId: user.organizationId 
+    },
     include: {
       RawMaterial: true,
       ProductionOrder: {

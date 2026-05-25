@@ -1,11 +1,12 @@
 'use server'
-import { prisma } from '@/lib/prisma'
 
-/**
- * Fetches all designs (mapped from 'items' in the instructions)
- * to be used as stock items.
- */
+// Legacy barrel export — prefer direct imports from specific action files.
+// Kept for backward compatibility during the tenant migration.
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
+
 export async function getStock() {
-  // Using 'design' model as 'item' is not defined in the schema
-  return await prisma.design.findMany()
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+  return await db.design.findMany({ where: { organizationId: user.organizationId } })
 }

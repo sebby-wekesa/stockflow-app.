@@ -1,4 +1,5 @@
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import type { ImportBatch, ImportRow } from '@prisma/client'
 
 interface CommitPreviewProps {
@@ -6,9 +7,15 @@ interface CommitPreviewProps {
 }
 
 export async function CommitPreview({ batch }: CommitPreviewProps) {
-  // Get summary stats
-  const rows = await prisma.importRow.findMany({
-    where: { batch_id: batch.id },
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
+  // Get summary stats (tenant scoped)
+  const rows = await db.importRow.findMany({
+    where: { 
+      batch_id: batch.id,
+      organizationId: user.organizationId 
+    },
   })
 
   const willWrite = rows.filter((r: ImportRow) => r.resolved_product).length

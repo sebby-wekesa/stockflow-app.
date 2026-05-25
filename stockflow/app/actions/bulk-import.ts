@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { createReadStream } from 'fs';
 import { unlink } from 'fs/promises';
 import ExcelJS from 'exceljs';
@@ -66,7 +66,8 @@ export interface ImportResult {
 }
 
 export async function importMasterData(filePath: string, importType: 'suppliers' | 'customers' | 'materials'): Promise<ImportResult> {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   if (user.role !== 'ADMIN') {
     throw new Error('Unauthorized: Only admins can import master data');
@@ -101,7 +102,7 @@ export async function importMasterData(filePath: string, importType: 'suppliers'
 
   result.totalRows = rows.length;
 
-  await prisma.$transaction(async (tx) => {
+  await db.$transaction(async (tx) => {
     for (const { data, rowNumber } of rows) {
       try {
         switch (importType) {
@@ -131,7 +132,8 @@ export async function importMasterData(filePath: string, importType: 'suppliers'
 }
 
 export async function importStockCounts(filePath: string): Promise<ImportResult> {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   if (!['ADMIN', 'WAREHOUSE'].includes(user.role)) {
     throw new Error('Unauthorized: Only admins and warehouse staff can import stock counts');
@@ -165,7 +167,7 @@ export async function importStockCounts(filePath: string): Promise<ImportResult>
 
   result.totalRows = rows.length;
 
-  await prisma.$transaction(async (tx) => {
+  await db.$transaction(async (tx) => {
     for (const { data, rowNumber } of rows) {
       try {
         await importStockCount(tx, data, rowNumber, result);
@@ -347,7 +349,8 @@ async function importStockCount(tx: any, data: any[], rowNumber: number, result:
 
 // Generate Excel template for import
 export async function generateImportTemplate(importType: 'suppliers' | 'customers' | 'materials' | 'stock-counts'): Promise<Buffer> {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId); // db available if needed for future scoping
 
   if (user.role !== 'ADMIN') {
     throw new Error('Unauthorized: Only admins can generate import templates');

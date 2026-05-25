@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/lib/prisma' // Intentionally raw - super-admin cross-org view
 import { getUser } from '@/lib/auth'
 import { isSuperAdmin } from '@/lib/super-admin'
 import { OrgActions } from './_components/OrgActions'

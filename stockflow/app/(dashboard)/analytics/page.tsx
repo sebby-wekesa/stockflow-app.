@@ -1,12 +1,16 @@
 export const dynamic = 'force-dynamic';
 
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import YieldCharts from "@/components/analytics/YieldCharts";
 import StatCards from "@/components/analytics/StatCards";
 import BranchSwitcher from "@/components/admin/BranchSwitcher";
 import { Suspense } from "react";
 
 export default async function AnalyticsPage(props: { searchParams: Promise<{ branchId?: string }> }) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
   const { branchId } = await props.searchParams;
   
   // Note: Branch filtering disabled until ProductionOrder.branchId is uncommented in schema
@@ -16,8 +20,9 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ bra
   //   }
   // } : {};
 
-  // 1. Fetch total stats (kgIn, kgOut, kgScrap)
-  const logs = await prisma.stageLog.aggregate({
+  // 1. Fetch total stats (kgIn, kgOut, kgScrap) - tenant scoped
+  const logs = await db.stageLog.aggregate({
+    where: { organizationId: user.organizationId },
     _sum: {
       kgIn: true,
       kgOut: true,
@@ -25,19 +30,21 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ bra
     }
   });
 
-  // 2. Fetch scrap distribution by reason
-  const scrapData = await prisma.stageLog.groupBy({
+  // 2. Fetch scrap distribution by reason - tenant scoped
+  const scrapData = await db.stageLog.groupBy({
     by: ['scrapReason'],
     _sum: { kgScrap: true },
     where: {
+      organizationId: user.organizationId,
       kgScrap: { gt: 0 }
     }
   });
 
-  // 3. Fetch yield by Stage/Department for performance visualization
-  const deptData = await prisma.stageLog.groupBy({
+  // 3. Fetch yield by Stage/Department for performance visualization - tenant scoped
+  const deptData = await db.stageLog.groupBy({
     by: ['stageName'],
-    _sum: { kgIn: true, kgOut: true }
+    _sum: { kgIn: true, kgOut: true },
+    where: { organizationId: user.organizationId }
   });
 
   // 4. Format data for the charts
