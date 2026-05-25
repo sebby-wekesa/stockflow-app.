@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 const signUpSchema = z.object({
   companyName: z.string().min(2),
@@ -17,6 +18,19 @@ const signUpSchema = z.object({
 })
 
 export async function signUpOrganization(formData: FormData) {
+  // Rate-limit: 3 signups per hour per IP. Generous enough for a legitimate
+  // user who fat-fingers their company name twice, strict enough to slow
+  // scripted spam to a crawl. Honeypot-tripped requests do NOT count toward
+  // the limit (we want bots to think they're succeeding).
+  const ip = await getClientIp();
+  const rl = checkRateLimit(`signup:${ip}`, {
+    windowMs: 60 * 60_000, // 1 hour
+    maxRequests: 3,
+  });
+  if (!rl.success) {
+    return { error: rl.error };
+  }
+
   const data = signUpSchema.parse({
     companyName: formData.get('companyName'),
     email: formData.get('email'),

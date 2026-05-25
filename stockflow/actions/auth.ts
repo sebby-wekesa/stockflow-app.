@@ -14,6 +14,7 @@ import { prisma, withRetry } from "@/lib/prisma";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { loginSchema } from "@/lib/validations";
 import { ALL_BRANCHES } from "@/lib/branches";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const ROLE_PATHS = {
   ADMIN: "/admin/dashboard",
@@ -73,6 +74,16 @@ function getAuthErrorMessage(error: unknown) {
 export async function signIn(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+
+  // Rate-limit: 5 attempts per minute per (IP, email). This stops single-source
+  // brute force without locking out a busy office where many people sign in.
+  // Check happens BEFORE input validation so even malformed requests count.
+  const ip = await getClientIp();
+  const rlKey = `signin:${ip}:${(email ?? '').toLowerCase().trim()}`;
+  const rl = checkRateLimit(rlKey, { windowMs: 60_000, maxRequests: 5 });
+  if (!rl.success) {
+    return { error: rl.error };
+  }
 
   // Validate input
   const validation = loginSchema.safeParse({ email, password });
