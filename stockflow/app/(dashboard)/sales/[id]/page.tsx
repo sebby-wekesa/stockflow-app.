@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { STATUS_BADGE_CLASS, STATUS_LABELS, formatKES } from '@/lib/sales-utils'
 import { OrderActions } from '@/components/sales/OrderActions'
 
@@ -9,7 +10,10 @@ export default async function SalesOrderDetailPage({
 }: {
   params: { id: string }
 }) {
-  const order = await prisma.saleOrder.findUnique({
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
+  const order = await db.saleOrder.findUnique({
     where: { id: params.id },
     include: {
       SaleItem: {

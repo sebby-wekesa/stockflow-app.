@@ -1,10 +1,14 @@
-import { prisma } from "@/lib/prisma"
+import { getTenantPrisma } from "@/lib/tenant-prisma"
+import { requireActiveAuth } from "@/lib/auth"
 import DesignsClient from "./DesignsClient";
 
 export const dynamic = 'force-dynamic';
 
 export default async function DesignsPage() {
-  const designs = await prisma.design.findMany({
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const designs = await db.design.findMany({
     include: {
       stages: {
         orderBy: { sequence: 'asc' }

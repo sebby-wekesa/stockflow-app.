@@ -1,15 +1,16 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 // ─── Raw Materials ──────────────────────────────────────────────────────────
 
 export async function getRawMaterials() {
-  await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const materials = await prisma.rawMaterial.findMany({
+  const materials = await db.rawMaterial.findMany({
     include: { Supplier: true },
     orderBy: { materialName: "asc" },
   });
@@ -26,7 +27,8 @@ export async function getRawMaterials() {
 }
 
 export async function addRawMaterial(formData: FormData) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const materialName = String(formData.get("materialName") || "").trim();
   const diameter = String(formData.get("diameter") || "").trim();
@@ -39,7 +41,7 @@ export async function addRawMaterial(formData: FormData) {
 
   let supplierId: string | undefined;
   if (supplierName) {
-    const existingSupplier = await prisma.supplier.findFirst({
+    const existingSupplier = await db.supplier.findFirst({
       where: { name: supplierName },
       select: { id: true },
     });
@@ -47,7 +49,7 @@ export async function addRawMaterial(formData: FormData) {
     if (existingSupplier) {
       supplierId = existingSupplier.id;
     } else {
-      const createdSupplier = await prisma.supplier.create({
+      const createdSupplier = await db.supplier.create({
         data: {
           name: supplierName,
           code: `SUP-${Date.now().toString().slice(-6)}`,
@@ -61,7 +63,7 @@ export async function addRawMaterial(formData: FormData) {
 
   const sku = `RAW-${materialName.replace(/\s+/g, "-").toUpperCase()}-${diameter.replace(/\s+/g, "").toUpperCase()}`;
 
-  const material = await prisma.rawMaterial.upsert({
+  const material = await db.rawMaterial.upsert({
     where: {
       organizationId_sku: {
         organizationId: user.organizationId,
@@ -85,7 +87,7 @@ export async function addRawMaterial(formData: FormData) {
     },
   });
 
-  await prisma.materialReceipt.create({
+  await db.materialReceipt.create({
     data: {
       organizationId: user.organizationId,
       materialId: material.id,
@@ -115,7 +117,8 @@ export type AddProductStockInput = {
 };
 
 export async function addProductStock(input: AddProductStockInput) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const {
     name,
@@ -134,13 +137,13 @@ export async function addProductStock(input: AddProductStockInput) {
   }
 
   // Upsert Product
-  const existing = await prisma.product.findFirst({
+  const existing = await db.product.findFirst({
     where: { name, origin, branchId: branchId ?? null },
   });
 
   let product;
   if (existing) {
-    product = await prisma.product.update({
+    product = await db.product.update({
       where: { id: existing.id },
       data: {
         currentStock: existing.currentStock + quantity,
@@ -156,7 +159,7 @@ export async function addProductStock(input: AddProductStockInput) {
       .toUpperCase()
       .slice(0, 20)}-${Date.now().toString().slice(-6)}`;
 
-    product = await prisma.product.create({
+    product = await db.product.create({
       data: {
         organizationId: user.organizationId,
         name,
@@ -173,7 +176,7 @@ export async function addProductStock(input: AddProductStockInput) {
   }
 
   // Audit receipt
-  await prisma.productReceipt.create({
+  await db.productReceipt.create({
     data: {
       organizationId: user.organizationId,
       productId: product.id,
@@ -194,9 +197,10 @@ export async function addProductStock(input: AddProductStockInput) {
 // ─── Getters for inventory page ─────────────────────────────────────────────
 
 export async function getProducts(origin?: "LOCAL_PURCHASE" | "IMPORTED" | "FACTORY_MADE") {
-  await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const products = await prisma.product.findMany({
+  const products = await db.product.findMany({
     where: origin ? { origin } : undefined,
     include: {
       Branch: { select: { name: true } },

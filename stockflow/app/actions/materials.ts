@@ -1,13 +1,14 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 
 export async function getRawMaterials() {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  // All authenticated users can view raw materials
-  return await prisma.rawMaterial.findMany({
+  // All authenticated users can view raw materials (tenant scoped)
+  return await db.rawMaterial.findMany({
     include: {
       Supplier: true,
       MaterialReceipt: {
@@ -20,9 +21,10 @@ export async function getRawMaterials() {
 }
 
 export async function getRawMaterial(id: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const material = await prisma.rawMaterial.findUnique({
+  const material = await db.rawMaterial.findUnique({
     where: { id },
     include: {
       Supplier: true,
@@ -49,7 +51,8 @@ export async function createRawMaterial(data: {
   diameter: string;
   supplierId?: string;
 }) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only admins and managers can create raw materials
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER' && user.role !== 'WAREHOUSE') {
@@ -59,7 +62,7 @@ export async function createRawMaterial(data: {
   // Generate SKU: MATERIAL-DIAMETER-TIMESTAMP
   const sku = `${data.materialName.replace(/\s+/g, '-').toUpperCase()}-${data.diameter.toUpperCase()}-${Date.now().toString().slice(-6)}`;
 
-  return await prisma.rawMaterial.create({
+  return await db.rawMaterial.create({
     data: {
       organizationId: user.organizationId,
       sku,
@@ -71,14 +74,15 @@ export async function createRawMaterial(data: {
 }
 
 export async function updateRawMaterialStock(id: string, kgReceived: number, reference?: string, supplierId?: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only warehouse staff, admins, and managers can update stock
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER' && user.role !== 'WAREHOUSE') {
     throw new Error('Unauthorized: Only warehouse staff can update material stock');
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     // Create receipt record
     await tx.materialReceipt.create({
       data: {

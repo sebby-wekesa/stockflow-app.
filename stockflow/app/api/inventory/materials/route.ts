@@ -1,11 +1,15 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const materials = await prisma.rawMaterial.findMany({
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const materials = await db.rawMaterial.findMany({
       where: {
         availableKg: {
           gt: 0, // Only show materials with available stock

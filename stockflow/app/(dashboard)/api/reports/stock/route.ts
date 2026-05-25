@@ -1,26 +1,21 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { getDateRange, toCSV, type DateRangeKey } from '@/lib/reports'
 
 export async function GET(request: Request) {
-  // Auth check
-  const supabase = await createServerSupabase()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  if (!authUser) {
-    return new NextResponse('Unauthorized', { status: 401 })
-  }
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user || !['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(user.role)) {
+  const user = await requireActiveAuth()
+  if (!['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(user.role)) {
     return new NextResponse('Forbidden', { status: 403 })
   }
+  const db = getTenantPrisma(user.organizationId)
 
   const { searchParams } = new URL(request.url)
   const range = (searchParams.get('range') as DateRangeKey) || '30d'
   const { start } = getDateRange(range)
 
-  // Get raw materials inventory
-  const rawMaterials = await prisma.rawMaterial.findMany({
+  // Get raw materials inventory (tenant scoped)
+  const rawMaterials = await db.rawMaterial.findMany({
     include: {
       InventoryRawMaterial: {
         include: {
@@ -31,7 +26,7 @@ export async function GET(request: Request) {
   })
 
    // Get finished goods inventory
-   const finishedGoods = await prisma.finishedGoods.findMany({
+   const finishedGoods = await db.finishedGoods.findMany({
      include: {
        InventoryFinishedGoods: {
          include: {

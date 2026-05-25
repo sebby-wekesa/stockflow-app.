@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
 
 export async function createSalesOrder(data: {
@@ -36,15 +36,16 @@ export async function createSalesOrder(data: {
     }
   }
 
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only sales staff, admins, and managers can create sales orders
   if (user.role !== 'SALES' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only sales staff can create orders');
   }
 
-  // Use transaction for atomic order creation
-  return await prisma.$transaction(async (tx) => {
+  // Use tenant-scoped transaction for atomic order creation
+  return await db.$transaction(async (tx) => {
     // Ensure placeholder design exists for non-manufactured product shadows
     let placeholderDesignId: string
     const existingDesign = await tx.design.findUnique({
@@ -175,7 +176,8 @@ export async function createSalesOrder(data: {
 }
 
 export async function getSalesOrders(role?: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
   const effectiveRole = role || user.role;
 
   // Sales staff see their own orders, admins/managers see all
@@ -183,7 +185,7 @@ export async function getSalesOrders(role?: string) {
     ? { /* Would need user relation - for now show all */ }
     : {};
 
-  const orders = await prisma.saleOrder.findMany({
+  const orders = await db.saleOrder.findMany({
     where: whereClause,
     include: {
       Customer: true,
@@ -221,14 +223,15 @@ export async function getSalesOrders(role?: string) {
 }
 
 export async function confirmSalesOrder(orderId: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only admins and managers can confirm orders
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only managers can confirm orders');
   }
 
-  const order = await prisma.saleOrder.findUnique({
+  const order = await db.saleOrder.findUnique({
     where: { id: orderId }
   });
 
@@ -236,7 +239,7 @@ export async function confirmSalesOrder(orderId: string) {
     throw new Error('Order not found or not in pending status');
   }
 
-  await prisma.saleOrder.update({
+  await db.saleOrder.update({
     where: { id: orderId },
     data: { status: 'CONFIRMED' }
   });
@@ -247,14 +250,15 @@ export async function confirmSalesOrder(orderId: string) {
 }
 
 export async function cancelSalesOrder(orderId: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only admins and managers can cancel orders
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only managers can cancel orders');
   }
 
-  const order = await prisma.saleOrder.findUnique({
+  const order = await db.saleOrder.findUnique({
     where: { id: orderId }
   });
 
@@ -262,7 +266,7 @@ export async function cancelSalesOrder(orderId: string) {
     throw new Error('Order not found or cannot be cancelled');
   }
 
-  await prisma.saleOrder.update({
+  await db.saleOrder.update({
     where: { id: orderId },
     data: { status: 'CANCELLED' }
   });

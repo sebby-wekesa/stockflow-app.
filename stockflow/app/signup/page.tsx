@@ -16,9 +16,9 @@ export default function SignupPage() {
     startTransition(async () => {
       const res = await signUpOrganization(fd)
       if ('error' in res) {
-        setError(res.error)
+        setError((res as any).error)
       } else {
-        setSubmittedEmail(res.email)
+        setSubmittedEmail((res as any).email ?? null)
       }
     })
   }

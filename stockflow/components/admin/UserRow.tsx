@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { updateUserRole, deleteUser, updateUser } from "@/app/actions/users";

@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 const LOW_STOCK_THRESHOLD = 50
 
 export async function GET() {
   try {
-    const lowStockAlerts = await prisma.rawMaterial.findMany({
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const lowStockAlerts = await db.rawMaterial.findMany({
       where: { availableKg: { lt: LOW_STOCK_THRESHOLD } },
       select: {
         id: true,

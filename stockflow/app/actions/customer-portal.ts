@@ -1,8 +1,10 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { hash, compare } from "bcryptjs";
 import { z } from "zod";
+import { prisma as basePrisma } from "@/lib/prisma"; // Only for initial customerPortalAccess lookups (bootstrap before org is known)
 
 const customerLoginSchema = z.object({
   accessCode: z.string().min(1),
@@ -12,9 +14,10 @@ const customerLoginSchema = z.object({
 export async function authenticateCustomer(accessCode: string, customerCode: string) {
   const validatedData = customerLoginSchema.parse({ accessCode, customerCode });
 
-  const portalAccess = await prisma.customerPortalAccess.findUnique({
+  // First find the portal access (this table may need org scoping in future)
+  const portalAccess = await basePrisma.customerPortalAccess.findUnique({
     where: {
-      customerId: accessCode // This should be a unique identifier
+      customerId: accessCode
     },
     include: {
       Customer: true
@@ -30,8 +33,11 @@ export async function authenticateCustomer(accessCode: string, customerCode: str
     throw new Error('Invalid access credentials');
   }
 
-  // Update last login
-  await prisma.customerPortalAccess.update({
+  // Use tenant-scoped client for the customer's organization
+  const db = getTenantPrisma(portalAccess.Customer.organizationId);
+
+  // Update last login (scoped)
+  await db.customerPortalAccess.update({
     where: { id: portalAccess.id },
     data: { lastLogin: new Date() }
   });
@@ -39,13 +45,14 @@ export async function authenticateCustomer(accessCode: string, customerCode: str
   return {
     customerId: portalAccess.Customer.id,
     customerName: portalAccess.Customer.name,
-    accessId: portalAccess.id
+    accessId: portalAccess.id,
+    organizationId: portalAccess.Customer.organizationId
   };
 }
 
 export async function getCustomerOrders(customerId: string, accessId: string) {
   // Verify access is still valid
-  const portalAccess = await prisma.customerPortalAccess.findUnique({
+  const portalAccess = await basePrisma.customerPortalAccess.findUnique({
     where: { id: accessId }
   });
 
@@ -53,7 +60,9 @@ export async function getCustomerOrders(customerId: string, accessId: string) {
     throw new Error('Access denied');
   }
 
-  const orders = await prisma.saleOrder.findMany({
+  const db = getTenantPrisma(portalAccess.organizationId || ''); // fallback safety
+
+  const orders = await db.saleOrder.findMany({
     where: { customerId },
     include: {
       SaleItem: {
@@ -90,7 +99,7 @@ export async function getCustomerOrders(customerId: string, accessId: string) {
 
 export async function getCustomerOrderTracking(customerId: string, accessId: string, orderId: string) {
   // Verify access
-  const portalAccess = await prisma.customerPortalAccess.findUnique({
+  const portalAccess = await basePrisma.customerPortalAccess.findUnique({
     where: { id: accessId }
   });
 
@@ -98,7 +107,9 @@ export async function getCustomerOrderTracking(customerId: string, accessId: str
     throw new Error('Access denied');
   }
 
-  const order = await prisma.saleOrder.findFirst({
+  const db = getTenantPrisma(portalAccess.organizationId || '');
+
+  const order = await db.saleOrder.findFirst({
     where: {
       id: orderId,
       customerId
@@ -161,9 +172,10 @@ export async function getCustomerOrderTracking(customerId: string, accessId: str
 
 export async function createCustomerPortalAccess(customerId: string) {
   // Only admins can create portal access
-  // This would be called from admin panel
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const customer = await prisma.customer.findUnique({
+  const customer = await db.customer.findUnique({
     where: { id: customerId }
   });
 
@@ -172,7 +184,7 @@ export async function createCustomerPortalAccess(customerId: string) {
   }
 
   // Check if access already exists
-  const existingAccess = await prisma.customerPortalAccess.findUnique({
+  const existingAccess = await db.customerPortalAccess.findUnique({
     where: { customerId }
   });
 
@@ -183,7 +195,7 @@ export async function createCustomerPortalAccess(customerId: string) {
   // Generate secure access code
   const accessCode = `CUST-${customer.code}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-  const portalAccess = await prisma.customerPortalAccess.create({
+  const portalAccess = await db.customerPortalAccess.create({
     data: {
       customerId,
       accessCode,

@@ -1,12 +1,16 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole('ADMIN', 'MANAGER', 'OPERATOR')
+    const user = await requireActiveAuth()
+    if (!['ADMIN', 'MANAGER', 'OPERATOR'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const db = getTenantPrisma(user.organizationId)
     const body = await request.json()
     const { materialName, diameter, kgReceived, supplierId } = body
 
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if material already exists
-    const existingMaterial = await prisma.rawMaterial.findFirst({
+    const existingMaterial = await db.rawMaterial.findFirst({
       where: {
         materialName,
         diameter,
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest) {
     let material
     if (existingMaterial) {
       // Update existing material
-      material = await prisma.rawMaterial.update({
+      material = await db.rawMaterial.update({
         where: { id: existingMaterial.id },
         data: {
           availableKg: existingMaterial.availableKg + kgReceived,
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Create new material
       const sku = `${materialName.replace(/\s+/g, '-').toUpperCase()}-${diameter.toUpperCase()}-${Date.now().toString().slice(-6)}`;
-      material = await prisma.rawMaterial.create({
+      material = await db.rawMaterial.create({
         data: {
           organizationId: user.organizationId,
           sku,

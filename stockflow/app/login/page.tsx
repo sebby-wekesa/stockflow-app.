@@ -20,12 +20,12 @@ export default function LoginPage() {
         setError(res.error);
         return;
       }
-      if (res && "message" in res && res.message) {
-        setMessage(res.message);
+      if (res && typeof res === 'object' && 'message' in res && res.message) {
+        setMessage(String((res as any).message));
         setIsLogin(true);
         return;
       }
-      if (res?.success) {
+      if (res && typeof res === 'object' && 'success' in res && (res as any).success) {
         // Success - wait a moment for session to be established, then redirect
         setTimeout(() => {
           router.push('/dashboard');

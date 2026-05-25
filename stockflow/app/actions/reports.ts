@@ -1,4 +1,5 @@
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { Prisma, type Design, type ProductionOrder, type StageLog } from '@prisma/client'
 
 export interface DepartmentBreakdown {
@@ -65,7 +66,10 @@ function summarizeByDept(logs: StageLog[]): DepartmentBreakdown[] {
 }
 
 export async function getMonthlyYieldReport(): Promise<MonthlyYieldReport> {
-  const logs = await prisma.stageLog.findMany({
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const logs = await db.stageLog.findMany({
     where: {
       completedAt: {
         gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) // Last 30 days
@@ -91,7 +95,10 @@ export async function getMonthlyYieldReport(): Promise<MonthlyYieldReport> {
 }
 
 export async function exportCompletedOrdersCSV(startDate: Date, endDate: Date): Promise<string> {
-  const orders = await prisma.productionOrder.findMany({
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const orders = await db.productionOrder.findMany({
     where: {
       status: 'COMPLETED',
       updatedAt: {

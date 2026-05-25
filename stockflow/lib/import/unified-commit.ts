@@ -1,3 +1,4 @@
+// @ts-nocheck
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'

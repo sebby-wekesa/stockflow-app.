@@ -47,7 +47,7 @@ const prismaClientSingleton = () => {
         return createProxy(); // Recursive proxy for nested properties
       }
     });
-    return createProxy() as PrismaClient;
+    return createProxy() as unknown as PrismaClient;
   }
 
   try {
@@ -60,7 +60,8 @@ const prismaClientSingleton = () => {
     console.error('Failed to create Prisma client:', error)
     // Return a mock client that throws on usage
     const throwFn = () => {
-      throw new Error(`Database connection failed: ${error.message}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      throw new Error(`Database connection failed: ${msg}`)
     };
     const createProxy = () => new Proxy(throwFn, {
       get: (target, prop) => {
@@ -68,7 +69,7 @@ const prismaClientSingleton = () => {
         return createProxy(); // Recursive proxy for nested properties
       }
     });
-    return createProxy() as PrismaClient;
+    return createProxy() as unknown as PrismaClient;
   }
 }
 

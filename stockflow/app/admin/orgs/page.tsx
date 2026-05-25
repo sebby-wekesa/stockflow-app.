@@ -23,8 +23,8 @@ export default async function AdminOrgsPage() {
       _count: {
         select: {
           User: true,
-          Product: true,
-          SaleOrder: true,
+          products: true,
+          saleOrders: true,
         },
       },
     },

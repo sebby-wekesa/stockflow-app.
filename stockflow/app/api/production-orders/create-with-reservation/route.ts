@@ -1,10 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
     const body = await request.json()
     const { designId, materialId, quantity } = body
 
@@ -23,9 +27,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use Prisma transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Check if design exists and get its stages
+    // Use tenant-scoped transaction
+    const result = await withTenantTransaction(user.organizationId, async (tx) => {
+      // Check if design exists and get its stages (automatically scoped)
       const design = await tx.design.findUnique({
         where: { id: designId },
         include: {
@@ -45,7 +49,7 @@ export async function POST(request: NextRequest) {
 
       const firstStage = design.stages[0]
 
-      // Check if material exists and has sufficient stock
+      // Check if material exists and has sufficient stock (scoped)
       const material = await tx.rawMaterial.findUnique({
         where: { id: materialId },
       })
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
       // Generate order number
       const orderNumber = `PO-${Date.now().toString().slice(-6)}`
 
-      // Create production order
+      // Create production order (organizationId injected by tenant client)
       const productionOrder = await tx.productionOrder.create({
         data: {
           orderNumber,
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Reserve material
+      // Reserve material (scoped)
       await tx.rawMaterial.update({
         where: { id: materialId },
         data: {

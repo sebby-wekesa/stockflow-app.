@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireActiveAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import type { UserRole } from "@/lib/types";
 import { UserRow } from "@/components/admin/UserRow";
 import InviteUserModal from "@/components/admin/InviteUserModal";
@@ -17,8 +17,11 @@ type AdminUserRow = {
 
 async function getUsers() {
   try {
-    // Get users from Prisma User table
-    const users = await prisma.user.findMany({
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
+    // Get users from Prisma User table (tenant scoped)
+    const users = await db.user.findMany({
       select: {
         id: true,
         email: true,
@@ -44,7 +47,7 @@ async function getUsers() {
 }
 
 export default async function AdminUsersPage() {
-  const user = await getUser();
+  const user = await requireActiveAuth();
 
   if (!user) {
     redirect("/login");

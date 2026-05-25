@@ -1,26 +1,21 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { createServerSupabase } from '@/lib/supabase/server'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { getDateRange, toCSV, type DateRangeKey } from '@/lib/reports'
 
 export async function GET(request: Request) {
-  // Auth check
-  const supabase = await createServerSupabase()
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  if (!authUser) {
-    return new NextResponse('Unauthorized', { status: 401 })
-  }
-  const user = await prisma.user.findUnique({ where: { id: authUser.id } })
-  if (!user || !['ADMIN', 'MANAGER', 'OPERATOR'].includes(user.role)) {
+  const user = await requireActiveAuth()
+  if (!['ADMIN', 'MANAGER', 'OPERATOR'].includes(user.role)) {
     return new NextResponse('Forbidden', { status: 403 })
   }
+  const db = getTenantPrisma(user.organizationId)
 
   const { searchParams } = new URL(request.url)
   const range = (searchParams.get('range') as DateRangeKey) || '30d'
   const { start, end } = getDateRange(range)
 
-  // Get completed production orders
-  const orders = await prisma.productionOrder.findMany({
+  // Get completed production orders (tenant scoped)
+  const orders = await db.productionOrder.findMany({
     where: {
       status: 'COMPLETED',
       completedAt: start ? { gte: start, lte: end } : undefined,

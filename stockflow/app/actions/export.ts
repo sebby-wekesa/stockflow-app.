@@ -1,9 +1,13 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 
 export async function exportYieldToCSV() {
-  const orders = await prisma.productionOrder.findMany({
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const orders = await db.productionOrder.findMany({
     include: {
       design: true,
       StageLog: true,

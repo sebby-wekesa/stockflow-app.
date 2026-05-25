@@ -1,23 +1,20 @@
-import { prisma } from "@/lib/prisma";
 import ApprovalTable from "./ApprovalTable";
-import { getUser } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Check } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
 export default async function OrderApprovalPage() {
-  const user = await getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requireActiveAuth();
 
   if (user.role !== "ADMIN" && user.role !== "MANAGER") {
     redirect("/unauthorized");
   }
 
-  const pendingOrders = await prisma.productionOrder.findMany({
+  const db = getTenantPrisma(user.organizationId);
+  const pendingOrders = await db.productionOrder.findMany({
     where: { status: "PENDING" },
     include: {
       design: true,

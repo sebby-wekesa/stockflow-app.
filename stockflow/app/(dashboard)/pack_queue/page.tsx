@@ -1,9 +1,13 @@
-import { prisma } from "@/lib/prisma"
+import { getTenantPrisma } from "@/lib/tenant-prisma"
+import { requireActiveAuth } from "@/lib/auth"
 
 export const dynamic = 'force-dynamic';
 
 export default async function PackQueuePage() {
-  const orders = await prisma.saleOrder.findMany({
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const orders = await db.saleOrder.findMany({
     where: { status: 'PENDING' },
     include: {
       SaleItem: {

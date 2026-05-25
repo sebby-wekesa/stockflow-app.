@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { designSchema } from "@/lib/schemas";
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
@@ -23,7 +23,8 @@ export async function createDesign(data: {
     unitOfMeasure: string;
   }[];
 }) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Validate user permissions
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
@@ -34,7 +35,7 @@ export async function createDesign(data: {
   const validatedData = designSchema.parse(data);
 
   // Check if design code already exists (tenant-scoped)
-  const existingDesign = await prisma.design.findUnique({
+  const existingDesign = await db.design.findUnique({
     where: {
       organizationId_code: {
         organizationId: user.organizationId,
@@ -48,7 +49,7 @@ export async function createDesign(data: {
   }
 
   // Use database transaction for atomicity
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     // Create the design
     const design = await tx.design.create({
       data: {
@@ -127,13 +128,14 @@ export async function updateDesign(id: string, data: {
     unitOfMeasure: string;
   }[];
 }) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only admins and managers can update design templates');
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     const design = await tx.design.update({
       where: { id },
       data: {
@@ -193,7 +195,8 @@ export async function updateDesign(id: string, data: {
 }
 
 export async function deleteDesign(id: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Validate user permissions
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
@@ -201,7 +204,7 @@ export async function deleteDesign(id: string) {
   }
 
   // Check if design is used in any production orders
-  const orderCount = await prisma.productionOrder.count({
+  const orderCount = await db.productionOrder.count({
     where: { designId: id }
   });
 
@@ -209,7 +212,7 @@ export async function deleteDesign(id: string) {
     throw new Error('Cannot delete design that is referenced by production orders');
   }
 
-  await prisma.design.delete({
+  await db.design.delete({
     where: { id }
   });
 

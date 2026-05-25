@@ -1,26 +1,28 @@
 export const dynamic = 'force-dynamic';
 
-import { prisma } from "@/lib/prisma";
 import { YieldDashboard } from "@/components/YieldDashboard";
 import { ExportButtons } from "@/components/admin/ExportButtons";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 
-async function getYieldData() {
+async function getYieldData(organizationId: string) {
+  const db = getTenantPrisma(organizationId);
   try {
-    // 1. Fetch Department Aggregates [cite: 98, 160]
-    const stats = await prisma.stageLog.groupBy({
+    // 1. Fetch Department Aggregates
+    const stats = await db.stageLog.groupBy({
       by: ['stageName'],
       _sum: { kgIn: true, kgOut: true, kgScrap: true }
     });
 
-    // 2. Fetch Scrap Distribution by Reason [cite: 33, 153]
-    const scrapLogs = await prisma.stageLog.groupBy({
+    // 2. Fetch Scrap Distribution by Reason
+    const scrapLogs = await db.stageLog.groupBy({
       by: ['scrapReason'],
       _sum: { kgScrap: true },
       where: { kgScrap: { gt: 0 } }
     });
 
-    // 3. Fetch WIP (Work in Progress) [cite: 27, 99]
-    const wipOrders = await prisma.productionOrder.findMany({
+    // 3. Fetch WIP (Work in Progress)
+    const wipOrders = await db.productionOrder.findMany({
       where: { status: 'IN_PRODUCTION' },
       select: {
         currentDept: true,
@@ -94,7 +96,8 @@ async function getYieldData() {
 
 
 export default async function YieldPage() {
-  const data = await getYieldData();
+  const user = await requireActiveAuth();
+  const data = await getYieldData(user.organizationId);
   return (
     <>
       <div className="section-header">

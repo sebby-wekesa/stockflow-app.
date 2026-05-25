@@ -1,9 +1,13 @@
-import { prisma } from "@/lib/prisma"
+import { getTenantPrisma } from "@/lib/tenant-prisma"
+import { requireActiveAuth } from "@/lib/auth"
 
 export const dynamic = 'force-dynamic';
 
 export default async function FinishedgoodsPage() {
-  const goods = await prisma.finishedGoods.findMany({
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const goods = await db.finishedGoods.findMany({
     include: {
       design: true,
     },

@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from 'next/cache';
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 
 export async function getOperatorQueue(role?: string, department?: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
   const effectiveRole = role || user.role;
   const effectiveDept = department || user.department;
 
@@ -13,11 +14,10 @@ export async function getOperatorQueue(role?: string, department?: string) {
   // If OPERATOR, they see their department's queue.
   let orders: any[] = []
   try {
-    orders = await prisma.productionOrder.findMany({
+    orders = await db.productionOrder.findMany({
       where: {
         status: "IN_PRODUCTION",
         ...(effectiveRole === "OPERATOR" && effectiveDept ? { currentDept: effectiveDept } : {}),
-        ...(effectiveRole !== "ADMIN" && user.branches?.[0] ? { branchId: user.branches[0].id } : {}),
       },
       include: {
         design: {
@@ -49,11 +49,12 @@ export async function getOperatorQueue(role?: string, department?: string) {
 }
 
 export async function getOperatorHistory() {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   let logs: any[] = []
   try {
-    logs = await prisma.stageLog.findMany({
+    logs = await db.stageLog.findMany({
       where: {
         operatorId: user.id,
       },
@@ -61,14 +62,14 @@ export async function getOperatorHistory() {
         ProductionOrder: {
           include: {
             design: true,
+          },
         },
       },
-    },
-    orderBy: {
-      completedAt: "desc",
-    },
-    take: 20, // Last 20 completed jobs
-  });
+      orderBy: {
+        completedAt: "desc",
+      },
+      take: 20, // Last 20 completed jobs
+    });
   } catch (error) {
     console.warn('Failed to fetch operator history:', error)
     logs = []
@@ -87,9 +88,12 @@ export async function getOperatorHistory() {
 }
 
 export async function getOrderForLogging(id: string) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
   let order
   try {
-    order = await prisma.productionOrder.findUnique({
+    order = await db.productionOrder.findUnique({
       where: { id },
       include: {
         design: {
@@ -126,7 +130,8 @@ export async function getOrderForLogging(id: string) {
 }
 
 export async function updateOrderPriority(orderId: string, priority: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Validate user permissions
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
@@ -139,7 +144,7 @@ export async function updateOrderPriority(orderId: string, priority: string) {
     throw new Error('Invalid priority level');
   }
 
-  await prisma.productionOrder.update({
+  await db.productionOrder.update({
     where: { id: orderId },
     data: { priority: priority as any }
   });
@@ -151,13 +156,13 @@ export async function updateOrderPriority(orderId: string, priority: string) {
 }
 
 export async function getActiveDepartments() {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   try {
-    const depts = await prisma.productionOrder.findMany({
+    const depts = await db.productionOrder.findMany({
       where: {
         status: { in: ["APPROVED", "IN_PRODUCTION"] },
-        ...(user.branches?.[0] ? { branchId: user.branches[0].id } : {}),
       },
       select: { currentDept: true },
       distinct: ["currentDept"],

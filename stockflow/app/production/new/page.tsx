@@ -1,13 +1,17 @@
 export const dynamic = 'force-dynamic';
 
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { CreateOrderForm } from '@/components/OrderForm'
 import { AlertCircle } from 'lucide-react'
 import { Design } from '@/types'
 
 async function getDesigns(): Promise<Design[]> {
   try {
-    const rawDesigns = await prisma.design.findMany({
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
+    const rawDesigns = await db.design.findMany({
       orderBy: {
         name: 'asc',
       },

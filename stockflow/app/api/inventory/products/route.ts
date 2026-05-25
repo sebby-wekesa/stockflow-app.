@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth';
+import { getTenantPrisma } from '@/lib/tenant-prisma';
+import { requireActiveAuth } from '@/lib/auth';
 
 // GET /api/inventory/products?origin=LOCAL_PURCHASE|IMPORTED|FACTORY_MADE
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
     const { searchParams } = new URL(request.url);
     const origin = searchParams.get('origin') as
       | 'LOCAL_PURCHASE'
@@ -14,7 +17,7 @@ export async function GET(request: NextRequest) {
       | 'FACTORY_MADE'
       | null;
 
-    const products = await prisma.product.findMany({
+    const products = await db.product.findMany({
       where: origin ? { origin } : undefined,
       include: {
         Branch: { select: { name: true } },
@@ -39,7 +42,11 @@ export async function GET(request: NextRequest) {
 // POST /api/inventory/products
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole('ADMIN', 'MANAGER', 'OPERATOR');
+    const user = await requireActiveAuth();
+    if (!['ADMIN', 'MANAGER', 'OPERATOR'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const db = getTenantPrisma(user.organizationId);
     const body = await request.json();
     const {
       name,
@@ -70,13 +77,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert the Product (match on name + origin + branchId)
-    const existing = await prisma.product.findFirst({
+    const existing = await db.product.findFirst({
       where: { name, origin, branchId: branchId ?? null },
     });
 
     let product;
     if (existing) {
-      product = await prisma.product.update({
+      product = await db.product.update({
         where: { id: existing.id },
         data: {
           currentStock: existing.currentStock + Number(quantity),
@@ -93,7 +100,7 @@ export async function POST(request: NextRequest) {
         .toUpperCase()
         .slice(0, 20)}-${Date.now().toString().slice(-6)}`;
 
-      product = await prisma.product.create({
+      product = await db.product.create({
         data: {
           organizationId: user.organizationId,
           name,
@@ -110,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Always write a receipt record for audit trail
-    const receipt = await prisma.productReceipt.create({
+    const receipt = await db.productReceipt.create({
       data: {
         organizationId: user.organizationId,
         productId: product.id,

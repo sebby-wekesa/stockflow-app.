@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { getUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { requireActiveAuth } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { ALL_BRANCHES, BRANCH_LABELS } from '@/lib/branches'
 import { TransferForm } from '@/components/stock/TransferForm'
 import type { BranchCode as Branch } from '@/lib/branches'
@@ -8,16 +8,16 @@ import type { BranchCode as Branch } from '@/lib/branches'
 export const dynamic = 'force-dynamic';
 
 export default async function TransferPage() {
-  const user = await getUser()
-  if (!user) throw new Error('Unauthorized')
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
 
   // Get user branches based on role or permissions
   const userBranches = ['ADMIN', 'MANAGER'].includes(user.role)
     ? ALL_BRANCHES
     : (['mombasa', 'nairobi', 'bonje'] as Branch[]) // For now, assume all branches for other roles
 
-  // Get products with stock in any branch
-  const productRecords = await prisma.product.findMany({
+  // Get products with stock in any branch (tenant scoped)
+  const productRecords = await db.product.findMany({
     where: {
       category: { not: 'service' }, // Exclude service products from transfers
       OR: [

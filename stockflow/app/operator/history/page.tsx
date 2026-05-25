@@ -1,19 +1,19 @@
 export const dynamic = 'force-dynamic';
 
-import { getUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireActiveAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { redirect } from "next/navigation";
 
 export default async function OperatorHistoryPage() {
-  const user = await getUser();
-  if (!user) redirect("/login");
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   if (user.role !== "OPERATOR" && user.role !== "ADMIN") {
     redirect("/unauthorized");
   }
 
-  // Get completed orders or logs for the user
-  const completedOrders = await prisma.productionOrder.findMany({
+  // Get completed orders or logs for the user (tenant scoped)
+  const completedOrders = await db.productionOrder.findMany({
     where: { status: "COMPLETED" },
     include: { design: true },
     orderBy: { updatedAt: "desc" },

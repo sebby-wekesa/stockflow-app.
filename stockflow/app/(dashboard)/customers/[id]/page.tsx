@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { formatKES } from '@/lib/branches'
 
 interface CustomerPageProps {
@@ -8,9 +9,12 @@ interface CustomerPageProps {
 }
 
 export default async function CustomerDetailPage({ params }: CustomerPageProps) {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   const { id } = await params
 
-  const customer = await prisma.customer.findUnique({
+  const customer = await db.customer.findUnique({
     where: { id },
     include: {
       SaleOrder: {

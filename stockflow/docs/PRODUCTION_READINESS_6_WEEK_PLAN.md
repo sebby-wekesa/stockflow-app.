@@ -5,6 +5,73 @@
 **Project:** StockFlow Manufacturing ERP (Next.js 16 + Prisma 7 + Supabase)  
 **Target:** Production-ready for first real customer (single-org safe) by end of Week 6, with foundation for true multi-tenant rollout in Week 7+
 
+## Progress (as of 2026-05-24)
+
+**Week 1 – Type Safety**
+- ✅ `ignoreBuildErrors: false` in next.config.ts
+- ✅ `tsc --noEmit` clean (0 errors)
+- ✅ Production build (`npm run build`) succeeds cleanly
+- ✅ Major camelCase relation alignment + organizationId scoping completed in previous commit + this session
+
+**Week 2 – Tenant Coverage (in progress)**
+- ✅ Converted `app/actions/stage-completion.ts`
+- ✅ Converted `app/(dashboard)/rawmaterials/page.tsx`
+- ✅ Converted `app/(dashboard)/sales-orders/page.tsx`
+- ✅ Converted `app/(dashboard)/pack_queue/page.tsx`
+- ✅ Converted `app/(dashboard)/approvals/page.tsx`
+- ✅ Converted `app/(dashboard)/admin/yield/page.tsx`
+- ✅ Converted `app/api/production/log-stage/route.ts`
+- ✅ Converted `app/api/stages/complete/route.ts`
+- ✅ Converted `app/api/production-orders/create-with-reservation/route.ts`
+- ✅ Converted `app/api/production-orders/[id]/status/route.ts`
+- ✅ All `/api/production*` routes now fully tenant-scoped
+- ✅ /api/stages group complete
+- ✅ Converted `app/api/logs/route.ts`
+- ✅ Converted `app/api/reports/export-csv/route.ts`
+- ✅ All `/api/logs` + `/api/reports` routes now tenant-scoped
+
+**Action files (Week 2 core business logic batch):**
+- ✅ Converted `app/actions/production.ts` (operator queue, history, logging — critical)
+- ✅ Converted `app/actions/materials.ts`
+- ✅ Converted `app/actions/sales-orders.ts` (create, get, confirm, cancel)
+- ✅ Converted `app/actions/sales.ts` (catalogue + my orders)
+- ✅ Converted customer pages: app/(dashboard)/customers/page.tsx and [id]/page.tsx
+- ✅ Converted inventory action: app/actions/inventory.ts
+- ✅ Converted inventory APIs: intake, materials, products routes
+- ✅ Converted reports action: app/actions/reports.ts
+- ✅ Converted reports APIs: production, sales, stock routes
+- ✅ Converted scanning action: app/actions/scanning.ts (scanBarcode + processScan + getRecentScans)
+- ✅ Converted export action: app/actions/export.ts (exportYieldToCSV)
+- ✅ Converted designs batch:
+  - app/actions/designs.ts
+  - app/api/designs/route.ts
+  - app/(dashboard)/admin/designs/page.tsx
+  - app/(dashboard)/designs/page.tsx
+  - app/production/new/page.tsx (design fetching)
+- ✅ Converted finished goods page: app/(dashboard)/finishedgoods/page.tsx
+- ✅ Converted jobs pages: app/(dashboard)/jobs/page.tsx and [id]/page.tsx
+- ✅ Converted sales pages: app/(dashboard)/sales/page.tsx, [id]/page.tsx, and new/page.tsx
+- ✅ Converted stock/transfer page: app/(dashboard)/stock/transfer/page.tsx
+- ✅ Converted user pages: app/(dashboard)/users/page.tsx and app/(dashboard)/admin/users/page.tsx
+- ✅ Converted catalogue page: app/(dashboard)/catalogue/page.tsx
+- ✅ Converted operator / stage-logger files:
+  - app/(dashboard)/stage-logger/page.tsx
+  - app/(dashboard)/operator/actions.ts
+  - app/operator/history/page.tsx
+- ✅ Converted packaging / barcodes actions:
+  - app/actions/barcodes.ts (generateRawMaterialBarcode, generateFinishedGoodsBarcode, getBarcodeData)
+  - app/actions/packaging.ts (getPackagingQueue, fulfillOrder, getPackagingStats)
+- ✅ Converted stock alerts + warehouse routes:
+  - app/actions/stock-alerts.ts (getLowStockAlerts, getStockLevelHistory, getReorderSuggestions)
+  - app/api/warehouse/low-stock/route.ts
+  - app/api/warehouse/stats/route.ts
+- ✅ Converted customer portal actions: app/actions/customer-portal.ts
+- ✅ Converted major dashboard actions file: app/actions/dashboard.ts (getDashboardStats, getManagerData, approveOrder + supporting queries)
+
+- Production build succeeds cleanly
+- `tsc --noEmit` now exits with 0 errors
+- Current raw `@/lib/prisma` direct imports: **19 files** (target: 3–5 exceptions by end of week)
+
 ---
 
 ## Executive Goal

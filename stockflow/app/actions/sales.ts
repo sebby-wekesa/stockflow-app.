@@ -1,16 +1,17 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import type { FinishedGoods, Design } from "@prisma/client";
 
 export async function getCatalogue() {
-  await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  // Get finished goods that are available for sale
+  // Get finished goods that are available for sale (tenant scoped)
   let finishedGoods: (FinishedGoods & { design: Design })[] = []
   try {
-    finishedGoods = await prisma.finishedGoods.findMany({
+    finishedGoods = await db.finishedGoods.findMany({
       where: {
         quantity: {
           gt: 0,
@@ -40,7 +41,7 @@ export async function getCatalogue() {
 }
 
 export async function getMyOrders() {
-  await requireAuth();
+  await requireActiveAuth();
 
   // This would need to be implemented based on your sales order schema
   // For now, return empty array since the schema shows SaleOrder but no user relation

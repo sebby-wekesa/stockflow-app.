@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { subDays, startOfDay, endOfDay } from "date-fns";
 
 export interface LowStockAlert {
@@ -17,13 +17,14 @@ export interface LowStockAlert {
 }
 
 export async function getLowStockAlerts(): Promise<LowStockAlert[]> {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const thirtyDaysAgo = subDays(new Date(), 30);
   const alerts: LowStockAlert[] = [];
 
   // Get all raw materials with BOM consumption data
-  const materials = await prisma.rawMaterial.findMany({
+  const materials = await db.rawMaterial.findMany({
     include: {
       MaterialConsumptionLog: {
         where: {
@@ -113,14 +114,15 @@ export async function getLowStockAlerts(): Promise<LowStockAlert[]> {
 }
 
 export async function getStockLevelHistory(materialId: string, days: number = 30) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const startDate = subDays(new Date(), days);
 
   // Get daily stock snapshots (this would need to be implemented with a stock history table in production)
   // For now, return a simple trend based on consumption
 
-  const material = await prisma.rawMaterial.findUnique({
+  const material = await db.rawMaterial.findUnique({
     where: { id: materialId },
     include: {
       MaterialReceipt: {
@@ -175,13 +177,14 @@ export interface ReorderSuggestion {
 }
 
 export async function getReorderSuggestions(): Promise<ReorderSuggestion[]> {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const thirtyDaysAgo = subDays(new Date(), 30);
   const suggestions: ReorderSuggestion[] = [];
 
   // Get all raw materials with consumption and sales data
-  const materials = await prisma.rawMaterial.findMany({
+  const materials = await db.rawMaterial.findMany({
     include: {
       Supplier: true,
       MaterialConsumptionLog: {

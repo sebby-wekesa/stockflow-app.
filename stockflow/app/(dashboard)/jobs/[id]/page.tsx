@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { requireActiveAuth } from "@/lib/auth";
 import { StageCompletionForm } from "@/components/StageCompletionForm";
 
 export const dynamic = 'force-dynamic';
@@ -8,10 +8,10 @@ export const dynamic = 'force-dynamic';
 export default async function JobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   
-  const user = await getUser();
-  if (!user) redirect("/login");
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const order = await prisma.productionOrder.findUnique({
+  const order = await db.productionOrder.findUnique({
     where: { id },
     include: {
       design: {

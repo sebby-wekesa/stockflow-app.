@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { getSecurityHeaders } from '@/lib/security'
@@ -32,6 +33,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
     const body = await request.json()
     const { orderNumber, designId, initialWeight, priority } = body
 
@@ -59,8 +63,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if design exists
-    const design = await prisma.design.findUnique({
+    // Check if design exists (tenant scoped)
+    const design = await db.design.findUnique({
       where: { id: designId },
     })
 
@@ -74,8 +78,8 @@ export async function POST(request: NextRequest) {
     // Generate a unique order number (e.g., PO-123456)
     const generatedOrderNumber = `PO-${Date.now().toString().slice(-6)}`;
 
-    // Create production order
-    const productionOrder = await prisma.productionOrder.create({
+    // Create production order (organizationId injected automatically by tenant client)
+    const productionOrder = await db.productionOrder.create({
       data: {
         orderNumber: generatedOrderNumber,
         designId,
@@ -83,9 +87,9 @@ export async function POST(request: NextRequest) {
         targetKg: initialWeight,
         priority: priority || 'MEDIUM',
         status: 'PENDING',
-        currentDept: "Cutting", // Default first department
-        currentStage: 1         // Default first stage
-      },
+        currentDept: "Cutting",
+        currentStage: 1
+      } as any,
       include: {
         design: true,
       },
@@ -113,10 +117,7 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     logger.error('Failed to create production order', error, {
-      orderNumber,
-      designId,
-      initialWeight,
-      priority
+      errorContext: 'production order creation'
     });
 
     // Provide more specific error messages
@@ -144,6 +145,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
     const dept = searchParams.get('dept')
@@ -151,7 +155,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const offset = parseInt(searchParams.get('offset') || '0', 10)
 
-    // Build query conditions
+    // Build query conditions (tenant scoping is automatic via db client)
     const where: any = {}
 
     // Map UI status to database status
@@ -178,9 +182,9 @@ export async function GET(request: NextRequest) {
       where.priority = priority
     }
 
-    // Fetch orders with design information
+    // Fetch orders with design information (automatically scoped to user's org)
     const [orders, total] = await Promise.all([
-      prisma.productionOrder.findMany({
+      db.productionOrder.findMany({
         where,
         select: {
           id: true,
@@ -197,24 +201,23 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: [
-          // Sort by creation date (newest first)
           { createdAt: 'desc' },
         ],
         take: limit,
         skip: offset,
       }),
-      prisma.productionOrder.count({ where }),
+      db.productionOrder.count({ where }),
     ])
 
     // Transform data for frontend
     const transformedOrders = orders.map((order) => ({
       id: order.id,
       orderNumber: order.orderNumber,
-      designName: order.Design?.name || 'Unknown Design',
+      designName: order.design?.name || 'Unknown Design',
       targetKg: order.targetKg,
       quantity: order.quantity,
       priority: order.priority,
-      specs: `${order.Design?.targetDimensions || ''}`,
+      specs: `${order.design?.targetDimensions || ''}`,
       status: order.status,
     }))
 

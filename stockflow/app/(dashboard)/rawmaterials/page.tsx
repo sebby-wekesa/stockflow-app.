@@ -1,12 +1,16 @@
-import { prisma } from "@/lib/prisma"
 import Link from 'next/link'
+import { getTenantPrisma } from "@/lib/tenant-prisma"
+import { requireActiveAuth } from "@/lib/auth"
 
 export const dynamic = 'force-dynamic';
 
 export default async function RawmaterialsPage() {
-  const materials = await prisma.rawMaterial.findMany();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const materials = await db.rawMaterial.findMany();
   
-  const receipts = await prisma.materialReceipt.findMany({
+  const receipts = await db.materialReceipt.findMany({
     include: { RawMaterial: true },
     orderBy: { createdAt: 'desc' },
     take: 20

@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 interface Design {
   id: string;
@@ -11,7 +12,10 @@ interface Design {
 
 export async function GET() {
   try {
-    const rawDesigns = await prisma.design.findMany({
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
+    const rawDesigns = await db.design.findMany({
       select: {
         id: true,
         name: true,

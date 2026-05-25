@@ -1,4 +1,4 @@
-import type { JobCardStatus, ProductCategory } from '@prisma/client'
+import type { ProductCategory } from '@prisma/client'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCTION STAGES
@@ -41,24 +41,6 @@ export function getStagesForCategory(category: ProductCategory): StageDefinition
   if (category === 'manufactured_spring') return SPRING_STAGES
   if (category === 'manufactured_ubolt') return UBOLT_STAGES
   return []
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STATUS LABELS
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const JOB_STATUS_LABELS: Record<JobCardStatus, string> = {
-  open: 'Open',
-  in_progress: 'In progress',
-  complete: 'Complete',
-  cancelled: 'Cancelled',
-}
-
-export const JOB_STATUS_BADGE_CLASS: Record<JobCardStatus, string> = {
-  open: 'bg-surface2 text-muted',
-  in_progress: 'bg-purple/15 text-purple',
-  complete: 'bg-teal/15 text-teal',
-  cancelled: 'bg-red/15 text-red',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

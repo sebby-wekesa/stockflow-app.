@@ -1,17 +1,17 @@
 import { redirect } from 'next/navigation'
-import { getUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { requireActiveAuth } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { SalesForm } from '@/components/sales/SalesForm'
 import type { BranchCode as Branch } from '@/lib/branches'
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewSalesPage() {
-  const user = await getUser()
-  if (!user) redirect('/login')
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
 
   // For now, assume user has branch
-  const userWithBranches = await prisma.user.findUnique({
+  const userWithBranches = await db.user.findUnique({
     where: { id: user.id },
     include: { Branch: true }
   })

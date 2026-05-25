@@ -1,10 +1,10 @@
 "use server";
 
 import { startOfDay, startOfWeek } from "date-fns";
-import { requireAuth } from "@/lib/auth";
+import { requireActiveAuth } from "@/lib/auth";
 import type { AuthUser, Role } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@/lib/prisma';
+import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { Prisma, type Design, type ProductionOrder, type RawMaterial, type StageLog } from '@prisma/client';
 
 interface Stat {
@@ -44,7 +44,8 @@ function toNumber(value: Prisma.Decimal | number | null | undefined) {
 }
 
 export async function getDashboardStats(user?: AuthUser, role?: Role) {
-  const authUser = user || await requireAuth();
+  const authUser = user || await requireActiveAuth();
+  const db = getTenantPrisma(authUser.organizationId);
   const effectiveRole = role || authUser.role;
   const now = new Date();
   const weekStart = startOfWeek(now);
@@ -60,7 +61,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   // 1. Raw Material Stock - Everyone can see, but Warehouse sees more detail
   let materials: RawMaterial[] = []
   try {
-    materials = await prisma.rawMaterial.findMany();
+    materials = await db.rawMaterial.findMany();
   } catch (error) {
     console.warn('Failed to fetch raw materials:', error)
     materials = []
@@ -108,7 +109,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
 
   let activeOrdersCount = 0
   try {
-    activeOrdersCount = await prisma.productionOrder.count({
+    activeOrdersCount = await db.productionOrder.count({
       where: activeOrdersWhere,
     });
   } catch (error) {
@@ -118,7 +119,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   let pendingApprovalsCount = isOperator || isWarehouse || isSales ? 0 : 0
   if (!isOperator && !isWarehouse && !isSales) {
     try {
-      pendingApprovalsCount = await prisma.productionOrder.count({
+      pendingApprovalsCount = await db.productionOrder.count({
         where: pendingApprovalsWhere,
       });
     } catch (error) {
@@ -130,7 +131,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   // 3. Finished Goods - Everyone can see basic counts
   let finishedGoods: { _sum: { kgProduced: number | null, quantity: number | null } } = { _sum: { kgProduced: null, quantity: null } }
   try {
-    const aggResult = await prisma.finishedGoods.aggregate({
+    const aggResult = await db.finishedGoods.aggregate({
       _sum: {
         kgProduced: true,
         quantity: true,
@@ -152,7 +153,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   if (isAdmin || isManager) {
     let weeklyLogs: StageLog[] = []
     try {
-      weeklyLogs = await prisma.stageLog.findMany({
+      weeklyLogs = await db.stageLog.findMany({
         where: {
           completedAt: {
             gte: weekStart,
@@ -180,7 +181,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   let recentOrders: (ProductionOrder & { design: Design })[] = []
   if (!(isWarehouse || isSales)) {
     try {
-      recentOrders = await prisma.productionOrder.findMany({
+      recentOrders = await db.productionOrder.findMany({
         take: 4,
         where: recentOrdersWhere,
         orderBy: {
@@ -203,7 +204,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   if (isAdmin || isManager) {
     let weeklyLogs: StageLog[] = []
     try {
-      weeklyLogs = await prisma.stageLog.findMany({
+      weeklyLogs = await db.stageLog.findMany({
         where: {
           completedAt: {
             gte: weekStart,
@@ -232,7 +233,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   if (isAdmin || isManager || isOperator) {
     let todayLogs: StageLog[] = []
     try {
-      todayLogs = await prisma.stageLog.findMany({
+      todayLogs = await db.stageLog.findMany({
         where: {
           completedAt: {
             gte: todayStart,
@@ -378,9 +379,12 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
 }
 
 export async function getManagerData() {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
   let pendingApprovals: any[] = []
   try {
-    pendingApprovals = await prisma.productionOrder.findMany({
+    pendingApprovals = await db.productionOrder.findMany({
       where: { status: 'PENDING' },
       include: { design: true },
     });
@@ -391,7 +395,7 @@ export async function getManagerData() {
 
   let activeProduction: any[] = []
   try {
-    const grouped = await prisma.productionOrder.groupBy({
+    const grouped = await db.productionOrder.groupBy({
       by: ['currentDept'],
       where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] } },
       _count: { _all: true },
@@ -411,7 +415,7 @@ export async function getManagerData() {
 
   let allLogs: StageLogWithOrder[] = []
   try {
-    allLogs = await prisma.stageLog.findMany({
+    allLogs = await db.stageLog.findMany({
       where: { kgScrap: { gt: 0 } },
       include: { ProductionOrder: true },
     });
@@ -423,7 +427,7 @@ export async function getManagerData() {
 
   let totalActiveOrders = 0
   try {
-    totalActiveOrders = await prisma.productionOrder.count({
+    totalActiveOrders = await db.productionOrder.count({
       where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] } },
     });
   } catch (error) {
@@ -433,7 +437,7 @@ export async function getManagerData() {
 
   let totalTonnageAgg: { _sum: { targetKg: number | null } } = { _sum: { targetKg: 0 } }
   try {
-    const aggResult = await prisma.productionOrder.aggregate({
+    const aggResult = await db.productionOrder.aggregate({
       where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] } },
       _sum: { targetKg: true },
     });
@@ -460,9 +464,12 @@ export async function getManagerData() {
 }
 
 export async function approveOrder(orderId: string) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
   let order
   try {
-    order = await prisma.productionOrder.findUnique({
+    order = await db.productionOrder.findUnique({
       where: { id: orderId },
       include: {
         design: {
@@ -505,7 +512,7 @@ export async function approveOrder(orderId: string) {
 
   let material
   try {
-    material = await prisma.rawMaterial.findUnique({
+    material = await db.rawMaterial.findUnique({
       where: { id: primaryBomItem.rawMaterialId },
     });
   } catch (error) {
@@ -517,7 +524,7 @@ export async function approveOrder(orderId: string) {
     throw new Error('Insufficient stock');
   }
 
-  await prisma.rawMaterial.update({
+  await db.rawMaterial.update({
     where: { id: material.id },
     data: {
       availableKg: material.availableKg.toNumber() - reserveQuantity,
@@ -525,7 +532,7 @@ export async function approveOrder(orderId: string) {
     },
   });
 
-  await prisma.productionOrder.update({
+  await db.productionOrder.update({
     where: { id: orderId },
     data: {
       status: 'APPROVED',

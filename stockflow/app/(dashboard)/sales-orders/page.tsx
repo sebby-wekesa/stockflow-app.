@@ -1,61 +1,53 @@
-import { prisma } from "@/lib/prisma";
 import { SalesOrderForm } from "@/components/SalesOrderForm";
 import { SalesOrderList } from "@/components/SalesOrderList";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 
-async function getSaleOrders() {
-  return await prisma.saleOrder.findMany({
-    include: {
-      SaleItem: {
-        include: {
-          FinishedGoods: {
-            include: {
-              design: true
+export default async function SalesOrdersPage() {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  const [rawSaleOrders, stock, products] = await Promise.all([
+    db.saleOrder.findMany({
+      include: {
+        SaleItem: {
+          include: {
+            FinishedGoods: {
+              include: {
+                design: true
+              }
             }
           }
         }
-      }
-    },
-    orderBy: { createdAt: 'desc' }
-  });
-}
-
-async function getAvailableStock() {
-  return await prisma.finishedGoods.findMany({
-    where: { quantity: { gt: 0 } },
-    include: {
-      design: {
-        select: {
-          name: true,
-          code: true,
-          targetWeight: true
+      },
+      orderBy: { createdAt: 'desc' }
+    }),
+    db.finishedGoods.findMany({
+      where: { quantity: { gt: 0 } },
+      include: {
+        design: {
+          select: {
+            name: true,
+            code: true,
+            targetWeight: true
+          }
         }
       }
-    }
-  });
-}
-
-async function getAvailableProducts() {
-  return await prisma.product.findMany({
-    where: { currentStock: { gt: 0 } },
-    select: {
-      id: true,
-      name: true,
-      sku: true,
-      currentStock: true,
-      uom: true,
-      origin: true,
-      unitCost: true,
-      createdAt: true,
-    },
-    orderBy: { name: 'asc' },
-  });
-}
-
-export default async function SalesOrdersPage() {
-  const [rawSaleOrders, stock, products] = await Promise.all([
-    getSaleOrders(),
-    getAvailableStock(),
-    getAvailableProducts()
+    }),
+    db.product.findMany({
+      where: { currentStock: { gt: 0 } },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        currentStock: true,
+        uom: true,
+        origin: true,
+        unitCost: true,
+        createdAt: true,
+      },
+      orderBy: { name: 'asc' },
+    })
   ]);
 
   // Transform saleOrders to match component expectations

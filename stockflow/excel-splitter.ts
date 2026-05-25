@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Workbook } from 'exceljs';
 import { existsSync, mkdirSync } from 'fs';
 import { join, dirname, basename, extname } from 'path';

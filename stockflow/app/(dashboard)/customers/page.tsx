@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { formatKES } from '@/lib/branches'
 
 const PAGE_SIZE = 50
@@ -9,6 +10,9 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<Record<string, string>>
 }) {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   const params = await searchParams
   const q = params.q?.trim() ?? ''
   const page = Math.max(1, Number(params.page ?? 1))
@@ -22,7 +26,7 @@ export default async function CustomersPage({
   }
 
   const [customers, total] = await Promise.all([
-    prisma.customer.findMany({
+    db.customer.findMany({
       where,
       orderBy: { name: 'asc' },
       take: PAGE_SIZE,
@@ -36,7 +40,7 @@ export default async function CustomersPage({
         }
       }
     }),
-    prisma.customer.count({ where }),
+    db.customer.count({ where }),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)

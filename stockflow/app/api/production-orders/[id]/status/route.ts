@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export async function PATCH(
   request: NextRequest,
@@ -10,8 +10,13 @@ export async function PATCH(
 ) {
   const params = await props.params;
   try {
-    // Verify user has manager or admin role
-    const user = await requireRole('ADMIN', 'MANAGER')
+    // Verify user has manager or admin role (tenant aware)
+    const user = await requireActiveAuth()
+    if (!['ADMIN', 'MANAGER'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const db = getTenantPrisma(user.organizationId)
 
     const body = await request.json()
     const { status, rejectionReason } = body
@@ -32,8 +37,8 @@ export async function PATCH(
       )
     }
 
-    // Get the current order
-    const order = await prisma.productionOrder.findUnique({
+    // Get the current order (tenant scoped)
+    const order = await db.productionOrder.findUnique({
       where: { id: params.id },
     })
 
@@ -52,10 +57,10 @@ export async function PATCH(
 
     const newStatus = statusMap[status]
 
-    // If approving, perform inventory deduction
+    // If approving, perform inventory deduction (tenant scoped)
     let updatedOrder;
     if (status === 'RELEASED') {
-      updatedOrder = await prisma.$transaction(async (tx) => {
+      updatedOrder = await withTenantTransaction(user.organizationId, async (tx) => {
         // 1. Get the Design to see which raw materials are needed
         const design = await tx.design.findUnique({
           where: { id: order.designId },
@@ -92,7 +97,7 @@ export async function PATCH(
             : order.quantity;
         const requiredQuantity = plannedUnits * primaryBomItem.quantity.toNumber();
 
-        if (primaryBomItem.rawMaterial.availableKg.toNumber() < requiredQuantity) {
+        if (primaryBomItem.RawMaterial?.availableKg.toNumber() < requiredQuantity) {
           throw new Error('Insufficient stock to release this order');
         }
 
@@ -123,7 +128,7 @@ export async function PATCH(
         });
       });
     } else {
-      updatedOrder = await prisma.productionOrder.update({
+      updatedOrder = await db.productionOrder.update({
         where: { id: params.id },
         data: {
           status: newStatus,
@@ -143,9 +148,9 @@ export async function PATCH(
       });
     }
 
-    // Create an audit log entry
+    // Create an audit log entry (using scoped client)
     try {
-      await prisma.$executeRaw`
+      await db.$executeRaw`
         INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, created_at)
         VALUES (${user.id}, ${status === 'RELEASED' ? 'APPROVED_ORDER' : 'REJECTED_ORDER'}, 'ProductionOrder', ${params.id}, ${JSON.stringify({
           previousStatus: order.status,
@@ -197,7 +202,10 @@ export async function GET(
 ) {
   const params = await props.params;
   try {
-    const order = await prisma.productionOrder.findUnique({
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const order = await db.productionOrder.findUnique({
       where: { id: params.id },
       include: {
         design: true,

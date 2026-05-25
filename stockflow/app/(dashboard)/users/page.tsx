@@ -1,11 +1,15 @@
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { InviteButton } from './_components/InviteButton'
 import { UserTable } from './_components/ClientComponents'
 
 export const dynamic = 'force-dynamic'
 
 export default async function UsersPage() {
-   const users = await prisma.user.findMany({
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
+   const users = await db.user.findMany({
      orderBy: { createdAt: 'asc' },
      include: {
        Branch: {

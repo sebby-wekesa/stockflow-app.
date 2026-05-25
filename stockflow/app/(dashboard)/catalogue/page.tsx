@@ -1,16 +1,20 @@
-import { prisma } from "@/lib/prisma"
+import { getTenantPrisma } from "@/lib/tenant-prisma"
+import { requireActiveAuth } from "@/lib/auth"
 import CatalogueClient from "./CatalogueClient";
 
 export const dynamic = 'force-dynamic';
 
 export default async function CataloguePage() {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
   const [finishedGoods, generalProducts] = await Promise.all([
-    prisma.finishedGoods.findMany({
+    db.finishedGoods.findMany({
       where: { quantity: { gt: 0 } },
       include: { design: true },
       orderBy: { createdAt: 'desc' }
     }),
-    prisma.product.findMany({
+    db.product.findMany({
       where: { currentStock: { gt: 0 } },
       select: { id: true, name: true, sku: true, currentStock: true, uom: true, origin: true, unitCost: true, createdAt: true },
     })

@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 import { BRANCH_LABELS } from '@/lib/branches'
 import { STATUS_BADGE_CLASS, STATUS_LABELS, formatKES } from '@/lib/sales-utils'
 import type { BranchCode as Branch } from '@/lib/branches'
@@ -14,6 +15,9 @@ export default async function SalesPage({
 }: {
   searchParams: Promise<Record<string, string>>
 }) {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
   const params = await searchParams
   const branch = params.branch as Branch | undefined
   const status = params.status as SalesOrderStatus | undefined
@@ -30,7 +34,7 @@ export default async function SalesPage({
   }
 
    const [orders, total] = await Promise.all([
-     prisma.saleOrder.findMany({
+     db.saleOrder.findMany({
        where,
        orderBy: { createdAt: 'desc' },
        take: PAGE_SIZE,
@@ -40,7 +44,7 @@ export default async function SalesPage({
          createdByUser: { select: { name: true, branchId: true } },
        },
      }),
-     prisma.saleOrder.count({ where }),
+     db.saleOrder.count({ where }),
    ])
    
     // Calculate summary by branch

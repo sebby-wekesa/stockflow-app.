@@ -354,7 +354,8 @@ export function DepartmentQueue({ userDept }: DepartmentQueueProps) {
               order={activeJob}
               onComplete={() => {
                 setActiveJob(null);
-                fetchJobs();
+                // TODO: refresh jobs list
+                window.location.reload();
               }}
             />
           </div>

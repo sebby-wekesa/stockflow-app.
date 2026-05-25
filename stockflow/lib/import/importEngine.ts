@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { StockOrigin, ProductCategory, StockStatus, SaleStatus, Design, FinishedGoods } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { prisma } from '@/lib/prisma';

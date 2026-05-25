@@ -1,11 +1,12 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
 
 export async function getPackagingQueue() {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only packaging staff, admins, and managers can access packaging queue
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
@@ -13,7 +14,7 @@ export async function getPackagingQueue() {
   }
 
   // Get confirmed sales orders that have items ready for packaging
-  const salesOrders = await prisma.saleOrder.findMany({
+  const salesOrders = await db.saleOrder.findMany({
     where: {
       status: 'CONFIRMED'
     },
@@ -63,7 +64,8 @@ export async function getPackagingQueue() {
 }
 
 export async function fulfillOrder(orderId: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Only packaging staff, admins, and managers can fulfill orders
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
@@ -71,7 +73,7 @@ export async function fulfillOrder(orderId: string) {
   }
 
   // Use transaction for atomic fulfillment
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     const order = await tx.saleOrder.findUnique({
       where: { id: orderId },
       include: {
@@ -135,7 +137,8 @@ export async function fulfillOrder(orderId: string) {
 }
 
 export async function getPackagingStats() {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   const [
     pendingOrders,
@@ -143,12 +146,12 @@ export async function getPackagingStats() {
     totalPackagedThisWeek
   ] = await Promise.all([
     // Pending orders count
-    prisma.saleOrder.count({
+    db.saleOrder.count({
       where: { status: 'CONFIRMED' }
     }),
 
     // Orders shipped today
-    prisma.saleOrder.count({
+    db.saleOrder.count({
       where: {
         status: 'SHIPPED',
         updatedAt: {
@@ -158,7 +161,7 @@ export async function getPackagingStats() {
     }),
 
     // Total items packaged this week
-    prisma.saleOrder.aggregate({
+    db.saleOrder.aggregate({
       where: {
         status: 'SHIPPED',
         updatedAt: {

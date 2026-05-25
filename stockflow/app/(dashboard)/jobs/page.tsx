@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
-import { getUser } from '@/lib/auth'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +21,8 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<Record<string, string>>
 }) {
-  const user = await getUser()
-  if (!user) return null
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
 
   const params = await searchParams
   const status = params.status as 'PENDING' | 'APPROVED' | 'IN_PRODUCTION' | 'COMPLETED' | 'REJECTED' | 'CANCELLED' | undefined
@@ -32,7 +32,7 @@ export default async function JobsPage({
   if (status) where.status = status
 
   const [jobs, total] = await Promise.all([
-    prisma.productionOrder.findMany({
+    db.productionOrder.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: PAGE_SIZE,
@@ -44,7 +44,7 @@ export default async function JobsPage({
         }
       }
     }),
-    prisma.productionOrder.count({ where }),
+    db.productionOrder.count({ where }),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)

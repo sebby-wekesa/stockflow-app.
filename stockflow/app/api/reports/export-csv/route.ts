@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth';
+import { getTenantPrisma } from '@/lib/tenant-prisma';
+import { requireActiveAuth } from '@/lib/auth';
 
 export interface MonthlyYieldReport {
   departments: DepartmentBreakdown[];
@@ -28,7 +28,12 @@ export interface GlobalMetrics {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole('ADMIN');
+    const user = await requireActiveAuth();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const db = getTenantPrisma(user.organizationId);
 
     const { searchParams } = new URL(request.url);
     const startDateParam = searchParams.get('startDate');
@@ -42,8 +47,8 @@ export async function GET(request: NextRequest) {
 
     const endDate = endDateParam ? new Date(endDateParam) : new Date();
 
-    // Fetch completed orders within the date range
-    const completedOrders = await prisma.productionOrder.findMany({
+    // Fetch completed orders within the date range (tenant scoped)
+    const completedOrders = await db.productionOrder.findMany({
       where: {
         status: 'COMPLETED',
         completedAt: {
@@ -52,7 +57,7 @@ export async function GET(request: NextRequest) {
         },
       },
       include: {
-        Design: true,
+        design: true,
       },
       orderBy: { completedAt: 'desc' },
     });
@@ -73,7 +78,7 @@ export async function GET(request: NextRequest) {
     const csvRows = completedOrders.map(order =>
       [
         order.id,
-        `"${order.Design.name}"`,
+        `"${order.design.name}"`,
         order.targetKg,
         order.completedAt?.toISOString().split('T')[0] || '',
         order.currentDept || ''

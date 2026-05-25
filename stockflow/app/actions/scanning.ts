@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { getBarcodeData } from "@/app/actions/barcodes";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ const scanResultSchema = z.object({
 });
 
 export async function scanBarcode(barcode: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
 
   if (!['OPERATOR', 'WAREHOUSE', 'PACKAGING', 'ADMIN'].includes(user.role)) {
     throw new Error('Unauthorized: Insufficient permissions for scanning');
@@ -37,7 +37,8 @@ export async function processScan(data: {
   scrapReason?: string;
   notes?: string;
 }) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   if (!['OPERATOR', 'WAREHOUSE', 'PACKAGING', 'ADMIN'].includes(user.role)) {
     throw new Error('Unauthorized: Insufficient permissions for processing scans');
@@ -49,7 +50,7 @@ export async function processScan(data: {
   // Calculate scrap (kg_in - kg_out)
   const kgScrap = Math.max(0, validatedData.kgIn - validatedData.kgOut);
 
-  return await prisma.$transaction(async (tx) => {
+  return await db.$transaction(async (tx) => {
     if (validatedData.type === 'raw_material') {
       // Handle raw material receipt/processing
       const material = await tx.rawMaterial.findUnique({
@@ -142,9 +143,10 @@ export async function processScan(data: {
 
 // Get recent scans for the current user
 export async function getRecentScans(limit: number = 10) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const recentLogs = await prisma.auditLog.findMany({
+  const recentLogs = await db.auditLog.findMany({
     where: {
       userId: user.id,
       action: 'BARCODE_SCAN_PROCESSED'

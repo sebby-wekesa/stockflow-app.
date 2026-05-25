@@ -1,10 +1,9 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { stageLogSchema } from "@/lib/schemas";
 import { revalidatePath } from 'next/cache';
-import { Prisma } from '@prisma/client';
 
 export async function completeStage(data: {
   orderId: string;
@@ -18,7 +17,8 @@ export async function completeStage(data: {
   department?: string;
   notes?: string;
 }) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
   // Validate user permissions
   if (user.role !== 'OPERATOR' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
@@ -28,8 +28,8 @@ export async function completeStage(data: {
   // Validate input data
   const validatedData = stageLogSchema.parse(data);
 
-  // Use database transaction for atomicity
-  return await prisma.$transaction(async (tx) => {
+  // Use database transaction for atomicity (tenant-scoped)
+  return await withTenantTransaction(user.organizationId, async (tx) => {
     // Get the production order
     const order = await tx.productionOrder.findUnique({
       where: { id: validatedData.orderId },
@@ -87,7 +87,7 @@ export async function completeStage(data: {
 
     // Determine next stage and update order
     const nextStageSequence = validatedData.sequence + 1;
-    const nextStage = order.design?.stages?.find(s => s.sequence === nextStageSequence);
+    const nextStage = order.design?.stages?.find((s: any) => s.sequence === nextStageSequence);
 
     if (nextStage) {
       // Move to next stage
@@ -142,9 +142,10 @@ export async function completeStage(data: {
 }
 
 export async function getOrderForCompletion(orderId: string) {
-  const user = await requireAuth();
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
 
-  const order = await prisma.productionOrder.findUnique({
+  const order = await db.productionOrder.findUnique({
     where: { id: orderId },
     include: {
       design: {

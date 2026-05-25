@@ -1,16 +1,20 @@
 import { Metadata } from 'next'
 import { StageLoggingForm } from '@/components/StageLoggingForm'
-import { prisma } from '@/lib/prisma'
+import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { requireActiveAuth } from '@/lib/auth'
 
 export const metadata: Metadata = {
   title: 'Stage Logger | StockFlow',
   description: 'Log material weights and track production stages',
 }
 
-// Mock active orders - in production, fetch from database
+// Fetch active orders for the current tenant
 async function getActiveOrders() {
   try {
-    const orders = await prisma.productionOrder.findMany({
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const orders = await db.productionOrder.findMany({
       where: {
         status: {
           in: ['IN_PRODUCTION', 'APPROVED'],

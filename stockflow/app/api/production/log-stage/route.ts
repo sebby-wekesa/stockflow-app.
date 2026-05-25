@@ -1,30 +1,30 @@
 export const dynamic = 'force-dynamic';
 
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { getUser, requireRole } from "@/lib/auth";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { stageCompletionSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
   try {
-    // 1. Verify Authentication & Role [cite: 55, 137]
-    const user = await getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1. Verify Authentication & Role
+    const user = await requireActiveAuth();
     
     // Check if user has OPERATOR or ADMIN role
     if (user.role !== 'OPERATOR' && user.role !== 'ADMIN') {
       return NextResponse.json({ error: "Forbidden: Only operators can log production" }, { status: 403 });
     }
 
+    const db = getTenantPrisma(user.organizationId);
     const body = await req.json();
 
     // 2. Get the current order with full stage sequence to identify the stage details
-    const order = await prisma.productionOrder.findUnique({
+    const order = await db.productionOrder.findUnique({
       where: { id: body.orderId },
       include: {
         design: {
           include: {
-            Stage: {
+            stages: {
               orderBy: { sequence: "asc" }
             }
           }
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
     const { kgIn, kgOut, kgScrap, scrapReason } = validation.data;
     const nextStage = stages[currentStageIndex + 1];
 
-    // 5. Create the stage log [cite: 147, 153]
-    const log = await prisma.stageLog.create({
+    // 5. Create the stage log
+    const log = await db.stageLog.create({
       data: {
         orderId: body.orderId,
         kgIn,
@@ -77,13 +77,14 @@ export async function POST(req: Request) {
         sequence: currentStage.sequence,
         operatorId: user.id,
         department: currentStage.department,
+        organizationId: user.organizationId,
       }
     });
 
-    // 5. Update the Production Order (The Handoff) [cite: 99, 103]
+    // 5. Update the Production Order (The Handoff)
     const isLastStage = !nextStage;
 
-    await prisma.productionOrder.update({
+    await db.productionOrder.update({
       where: { id: body.orderId },
       data: {
         targetKg: kgOut,
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
     if (isLastStage) {
       // Generate SKU (FG-YYYY-NNNN)
       const currentYear = new Date().getFullYear();
-      const lastFinishedGoods = await prisma.finishedGoods.findFirst({
+      const lastFinishedGoods = await db.finishedGoods.findFirst({
         orderBy: { createdAt: 'desc' },
         select: { sku: true },
       });
@@ -113,12 +114,13 @@ export async function POST(req: Request) {
 
       const sku = `FG-${currentYear}-${nextNumber.toString().padStart(4, '0')}`;
 
-      await prisma.finishedGoods.create({
+      await db.finishedGoods.create({
         data: {
           sku,
           designId: order.designId,
           quantity: order.quantity,
-          kgProduced: kgOut, // kgOut is the total batch weight produced
+          kgProduced: kgOut,
+          organizationId: user.organizationId,
         }
       });
     }

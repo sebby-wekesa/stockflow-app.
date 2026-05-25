@@ -1,10 +1,14 @@
 export const dynamic = 'force-dynamic';
 
-import { prisma } from "@/lib/prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { requireActiveAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
+    const user = await requireActiveAuth();
+    const db = getTenantPrisma(user.organizationId);
+
     const body = await req.json();
     const { 
       orderId, 
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
     // 2. Determine operatorId if not provided (fallback to first operator for demo purposes)
     let effectiveOperatorId = operatorId;
     if (!effectiveOperatorId) {
-      const firstOperator = await prisma.user.findFirst({ where: { role: "OPERATOR" } });
+      const firstOperator = await db.user.findFirst({ where: { role: "OPERATOR" } });
       effectiveOperatorId = firstOperator?.id;
     }
 
@@ -35,7 +39,7 @@ export async function POST(req: Request) {
     }
 
     // 3. Create the Stage Log record for history
-    const log = await prisma.stageLog.create({
+    const log = await db.stageLog.create({
       data: {
         orderId,
         kgIn,
@@ -46,17 +50,18 @@ export async function POST(req: Request) {
         stageName,
         sequence: currentSequence,
         operatorId: effectiveOperatorId,
+        organizationId: user.organizationId,
       }
     });
 
     // 4. Dynamic Logic to find the next stage/department
     // We fetch the current order to get its designId
-    const order = await prisma.productionOrder.findUnique({
+    const order = await db.productionOrder.findUnique({
       where: { id: orderId },
       include: {
-        Design: {
+        design: {
           include: {
-            Stage: {
+            stages: {
               orderBy: { sequence: "asc" }
             }
           }
@@ -69,8 +74,8 @@ export async function POST(req: Request) {
     }
 
     // Find the current stage index and next stage
-    const currentStageIndex = order.Design.Stage.findIndex(s => s.sequence === currentSequence);
-    const nextStage = order.Design.Stage[currentStageIndex + 1];
+    const currentStageIndex = order.design?.stages?.findIndex((s: any) => s.sequence === currentSequence) ?? -1;
+    const nextStage = order.design?.stages?.[currentStageIndex + 1];
 
     let nextDept = "Completed";
     let finalStatus: "COMPLETED" | "IN_PRODUCTION" = "COMPLETED";
@@ -83,7 +88,7 @@ export async function POST(req: Request) {
     }
 
     // 5. Update the Production Order to move it to the next queue
-    const updatedOrder = await prisma.productionOrder.update({
+    const updatedOrder = await db.productionOrder.update({
       where: { id: orderId },
       data: {
         currentStage: nextSeq,
