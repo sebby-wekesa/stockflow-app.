@@ -16,7 +16,6 @@ stockflow-app./
 │   ├── prisma/                 # Schema + seed (30+ models)
 │   ├── docs/                   # Full project documentation
 │   └── README.md               # Detailed developer guide
-├── .kilo/                      # Kilo AI agent configuration & worktrees
 └── README.md                   # You are here
 ```
 
