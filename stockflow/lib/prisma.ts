@@ -87,6 +87,56 @@ export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
 /**
+ * Lightweight Prisma client for authentication lookups only.
+ * Uses DIRECT_URL (bypasses Supabase pooler) for much higher reliability
+ * on the hot path that runs on every page load.
+ */
+const directUrl = process.env.DIRECT_URL
+
+function getDirectConnectionString(url: string) {
+  if (!url) return url;
+
+  const parsed = new URL(url);
+
+  // Inject uselibpqcompat for sslmode=require to keep current behavior
+  // (suppresses the deprecation warning from pg/pg-connection-string)
+  if (parsed.searchParams.get('sslmode') === 'require' && !parsed.searchParams.has('uselibpqcompat')) {
+    parsed.searchParams.set('uselibpqcompat', 'true');
+  }
+
+  return parsed.toString();
+}
+
+const authClientSingleton = () => {
+  if (!directUrl) {
+    console.warn('DIRECT_URL not set — falling back to main prisma for auth')
+    return prisma
+  }
+
+  try {
+    const processedUrl = getDirectConnectionString(directUrl);
+    const adapter = new PrismaPg({ connectionString: processedUrl });
+    const client = new PrismaClient({ adapter });
+    return client;
+  } catch (error) {
+    console.error('Failed to create auth Prisma client with DIRECT_URL, falling back')
+    return prisma
+  }
+}
+
+type AuthClient = ReturnType<typeof authClientSingleton>
+
+const globalForAuthPrisma = globalThis as unknown as {
+  authPrisma: AuthClient | undefined
+}
+
+export const authPrisma = globalForAuthPrisma.authPrisma ?? authClientSingleton()
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForAuthPrisma.authPrisma = authPrisma
+}
+
+/**
  * Helper function to retry database operations on transient connection/pool errors.
  * Implements exponential backoff with jitter.
  */

@@ -1,7 +1,7 @@
 import { getManagerData, approveOrder } from '@/app/actions/dashboard'
 import Link from 'next/link'
 
-export default async function ManagerContent() {
+export default async function ManagerDashboard() {
   const { pendingApprovals, activeProduction, scrapAlerts, totalActiveOrders, totalTonnage, pendingCount } = await getManagerData()
 
   return (

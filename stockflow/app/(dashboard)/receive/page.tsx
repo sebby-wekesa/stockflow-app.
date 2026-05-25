@@ -57,8 +57,10 @@ export default function ReceivePage() {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Material type</label>
-              <select
+              <input
+                type="text"
                 className="form-input"
+                list="material-types"
                 value={materialName}
                 onChange={(e) => {
                   setMaterialName(e.target.value);
@@ -67,11 +69,13 @@ export default function ReceivePage() {
                   else if (e.target.value.includes("20mm")) setDiameter("20mm");
                   else if (e.target.value.includes("25mm")) setDiameter("25mm");
                 }}
-              >
-                <option>Steel rod 16mm</option>
-                <option>Steel rod 20mm</option>
-                <option>Steel rod 25mm</option>
-              </select>
+                placeholder="e.g. Steel rod 16mm or custom type"
+              />
+              <datalist id="material-types">
+                <option value="Steel rod 16mm" />
+                <option value="Steel rod 20mm" />
+                <option value="Steel rod 25mm" />
+              </datalist>
             </div>
             <div className="form-group">
               <label className="form-label">Quantity (kg)</label>
@@ -100,14 +104,18 @@ export default function ReceivePage() {
             </div>
             <div className="form-group">
               <label className="form-label">Supplier</label>
-              <select
+              <input
+                type="text"
                 className="form-input"
+                list="suppliers"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
-              >
-                <option>Steel Masters Ltd</option>
-                <option>KenSteel Supply</option>
-              </select>
+                placeholder="e.g. Steel Masters Ltd or type new supplier"
+              />
+              <datalist id="suppliers">
+                <option value="Steel Masters Ltd" />
+                <option value="KenSteel Supply" />
+              </datalist>
             </div>
           </div>
           <div className="form-group mb-16">

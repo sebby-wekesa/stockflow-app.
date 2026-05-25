@@ -28,11 +28,26 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
-import { prisma } from '@/lib/prisma'
+import { authPrisma } from '@/lib/prisma'
+
+// Use direct (non-pooled) client for user lookups to avoid pooler timeouts
+const prisma = authPrisma
 import type { User, Organization } from '@prisma/client'
 
+/**
+ * The shape of user data we actually fetch for tenant context.
+ * We deliberately use a limited select for performance + resilience
+ * against schema drift / pooler issues.
+ */
+export type TenantUser = Pick<
+  User,
+  'id' | 'email' | 'name' | 'role' | 'department' | 'organizationId'
+> & {
+  Organization: Pick<Organization, 'id' | 'name' | 'slug' | 'status'> | null
+}
+
 export type TenantContext = {
-  user: User
+  user: TenantUser
   organization: Pick<Organization, 'id' | 'name' | 'slug' | 'status'>
   organizationId: string
   role: User['role']
@@ -67,7 +82,13 @@ export async function getTenantContext(): Promise<TenantContext> {
 
   const user = await prisma.user.findUnique({
     where: { id: authUser.id },
-    include: {
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      department: true,
+      organizationId: true,
       Organization: {
         select: { id: true, name: true, slug: true, status: true },
       },
@@ -95,9 +116,9 @@ export async function getTenantContext(): Promise<TenantContext> {
   }
 
   return {
-    user,
-    organization: user.Organization,
-    organizationId: user.Organization.id,
+    user: user as TenantUser,
+    organization: user.Organization!,
+    organizationId: user.Organization!.id,
     role: user.role,
   }
 }
@@ -170,7 +191,13 @@ export async function getTenantContextOrNull(): Promise<TenantContext | null> {
 
     const user = await prisma.user.findUnique({
       where: { id: authUser.id },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        department: true,
+        organizationId: true,
         Organization: {
           select: { id: true, name: true, slug: true, status: true },
         },
@@ -181,9 +208,9 @@ export async function getTenantContextOrNull(): Promise<TenantContext | null> {
     if (user.Organization.status !== 'ACTIVE') return null
 
     return {
-      user,
-      organization: user.Organization,
-      organizationId: user.Organization.id,
+      user: user as TenantUser,
+      organization: user.Organization!,
+      organizationId: user.Organization!.id,
       role: user.role,
     }
   } catch {

@@ -1,10 +1,10 @@
 import { RoleGuard } from "@/components/RoleGuard";
-import ManagerContent from "./ManagerContent";
+import ManagerDashboard from "@/components/ManagerDashboard";
 
 export default function ManagerDashboardPage() {
   return (
     <RoleGuard allowedRoles={['MANAGER', 'ADMIN']}>
-      <ManagerContent />
+      <ManagerDashboard />
     </RoleGuard>
   );
 }
