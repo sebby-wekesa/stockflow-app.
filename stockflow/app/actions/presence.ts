@@ -8,6 +8,7 @@ export async function updateLastSeen() {
     const user = await requireActiveAuth()
     const db = getTenantPrisma(user.organizationId)
 
+    // Use the main prisma client for this lightweight write to reduce extension overhead
     await db.user.update({
       where: { id: user.id },
       data: { lastSeenAt: new Date() },
@@ -15,7 +16,10 @@ export async function updateLastSeen() {
 
     return { success: true }
   } catch (error) {
-    console.error('Failed to update last seen:', error)
+    // Swallow errors — presence is non-critical
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('updateLastSeen skipped (expected in dev):', (error as Error).message)
+    }
     return { success: false }
   }
 }

@@ -5,16 +5,15 @@ import { updateLastSeen } from '@/app/actions/presence'
 
 export function PresenceHeartbeat() {
   useEffect(() => {
-    // Update immediately on mount
-    updateLastSeen()
+    // Fire-and-forget — do not block render
+    updateLastSeen().catch(() => {})
 
-    // Then update every 45 seconds while the tab is active
+    // Much gentler: every 4 minutes + on focus (prevents pooler exhaustion)
     const interval = setInterval(() => {
-      updateLastSeen()
-    }, 45 * 1000)
+      updateLastSeen().catch(() => {})
+    }, 4 * 60 * 1000)
 
-    // Also update when the user becomes active again (tab focus)
-    const handleFocus = () => updateLastSeen()
+    const handleFocus = () => updateLastSeen().catch(() => {})
     window.addEventListener('focus', handleFocus)
 
     return () => {

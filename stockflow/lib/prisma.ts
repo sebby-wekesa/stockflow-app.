@@ -17,17 +17,17 @@ function getConnectionString(url: string) {
     parsed.searchParams.set('pgbouncer', 'true')
   }
 
-  // Very conservative limit for Supabase session pooler
+  // Supabase transaction pooler (pgbouncer) tuning — keep very low to avoid exhausting the pooler
   if (!parsed.searchParams.has('connection_limit')) {
-    parsed.searchParams.set('connection_limit', '5')
+    parsed.searchParams.set('connection_limit', '1')   // 1 is often safest with Next.js + pooler
   }
 
   if (!parsed.searchParams.has('pool_timeout')) {
-    parsed.searchParams.set('pool_timeout', '15')
+    parsed.searchParams.set('pool_timeout', '10')
   }
 
   if (!parsed.searchParams.has('statement_timeout')) {
-    parsed.searchParams.set('statement_timeout', '10000')
+    parsed.searchParams.set('statement_timeout', '8000')
   }
 
   return parsed.toString()
@@ -92,8 +92,8 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  maxAttempts: number = 4,
-  baseDelayMs: number = 150
+  maxAttempts: number = 6,   // increased for Supabase pooler flakiness in dev
+  baseDelayMs: number = 200
 ): Promise<T> {
   let lastError: any
 
