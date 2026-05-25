@@ -26,9 +26,10 @@ interface SellableItem {
 interface SalesOrderFormProps {
   products: SellableItem[]
   onOrderPlaced?: () => void
+  preselectedItems?: any[]   // items chosen directly from catalogue
 }
 
-export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps) {
+export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: SalesOrderFormProps) {
   // Normalize whatever shape we receive (old catalogue shape with .design or new flat shape)
   const allItems: SellableItem[] = products.map((p: Record<string, unknown>) => ({
     id: p.id,
@@ -43,6 +44,28 @@ export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps)
     uom: p.uom,
   }));
 
+  // Initialize with preselected items if provided (from catalogue "choose" flow)
+  const getInitialLines = (): OrderLine[] => {
+    if (!preselectedItems || preselectedItems.length === 0) return [];
+    
+    return preselectedItems.map((item: any) => {
+      const normalized = allItems.find(i => i.id === item.id) || item;
+      const unitPrice = normalized.price ?? 0;
+      const maxQty = normalized.availableQty || 1;
+      
+      return {
+        itemId: normalized.id,
+        name: normalized.name || normalized.design?.name || 'Item',
+        code: normalized.code || normalized.design?.code || '',
+        source: normalized.source,
+        origin: normalized.origin,
+        maxQty,
+        quantity: 1,
+        unitPrice,
+      };
+    });
+  };
+
   // New line-item based selection for sales team (supports mixing Products + Designs easily)
   type OrderLine = {
     itemId: string
@@ -56,7 +79,7 @@ export function SalesOrderForm({ products, onOrderPlaced }: SalesOrderFormProps)
   }
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [orderLines, setOrderLines] = useState<OrderLine[]>([])
+  const [orderLines, setOrderLines] = useState<OrderLine[]>(getInitialLines)
   const [customerName, setCustomerName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)

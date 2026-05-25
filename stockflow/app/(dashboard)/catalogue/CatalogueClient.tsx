@@ -35,6 +35,32 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showOnlyInStock, setShowOnlyInStock] = useState(false);
 
+  // Selection for sales team to choose multiple items directly from catalogue
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const selectAllVisible = () => {
+    const visibleIds = filteredAndSortedProducts.map(p => p.id);
+    const newSelected = new Set(selectedIds);
+    visibleIds.forEach(id => newSelected.add(id));
+    setSelectedIds(newSelected);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const selectedProducts = formattedProducts.filter(p => selectedIds.has(p.id));
+
   const formattedProducts = products.map(p => ({
     id: p.id,
     name: p.design.name,
@@ -100,15 +126,27 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
   }, [formattedProducts, searchTerm, sortBy, sortOrder, showOnlyInStock]);
 
   if (showOrderForm) {
+    const preselected = selectedIds.size > 0 
+      ? formattedProducts.filter(p => selectedIds.has(p.id))
+      : undefined;
+
     return (
       <div className="dashboard-content">
         <div className="section-header">
           <div>
             <h1>Place Sales Order</h1>
-            <div className="section-sub">Create a new sales order from available products</div>
+            <div className="section-sub">
+              {preselected 
+                ? `Ordering ${preselected.length} selected item${preselected.length !== 1 ? 's' : ''}`
+                : 'Create a new sales order from available products'
+              }
+            </div>
           </div>
           <button
-            onClick={() => setShowOrderForm(false)}
+            onClick={() => {
+              setShowOrderForm(false);
+              // keep selection so user can adjust if needed
+            }}
             className="btn btn-secondary"
           >
             ← Back to Catalogue
@@ -117,7 +155,11 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
         <div className="card">
           <SalesOrderForm
             products={formattedProducts}
-            onOrderPlaced={() => setShowOrderForm(false)}
+            preselectedItems={preselected}
+            onOrderPlaced={() => {
+              setShowOrderForm(false);
+              clearSelection();
+            }}
           />
         </div>
       </div>
@@ -128,98 +170,63 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
     <div className="dashboard-content">
       <div className="section-header">
         <div>
-          <h1>Product Catalogue</h1>
+          <div className="section-title">Product Catalogue</div>
           <div className="section-sub">Browse and order finished goods from available stock</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowOrderForm(true)}>
+        <button 
+          className="btn btn-primary" 
+          onClick={() => setShowOrderForm(true)}
+        >
           Place Sales Order
         </button>
       </div>
 
       {/* Search and Filter Controls */}
       <div className="card">
-        <div style={{
-          display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: 1, minWidth: '250px' }}>
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Search */}
+          <div className="flex-1 min-w-[240px]">
             <input
               type="text"
               placeholder="Search by name or code..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--surface2)',
-                border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '8px 12px',
-                color: 'var(--text)',
-                fontSize: '14px',
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
-              onBlur={(e) => e.target.style.borderColor = 'var(--border2)'}
+              className="form-input w-full"
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              fontSize: '13px'
-            }}>
+
+          {/* Filters */}
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={showOnlyInStock}
                 onChange={(e) => setShowOnlyInStock(e.target.checked)}
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  accentColor: 'var(--accent)'
-                }}
+                className="accent-accent"
               />
-              <span style={{ color: 'var(--text)' }}>In stock only</span>
+              <span>In stock only</span>
             </label>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{
-              fontSize: '13px',
-              fontWeight: 500,
-              color: 'var(--text)'
-            }}>
-              Sort by:
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              style={{
-                background: 'var(--surface2)',
-                border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '6px 10px',
-                color: 'var(--text)',
-                fontSize: '13px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="name">Name</option>
-              <option value="code">Code</option>
-              <option value="price">Price</option>
-              <option value="quantity">Quantity</option>
-              <option value="date">Date Added</option>
-            </select>
-            <button
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="btn btn-secondary"
-              style={{ padding: '6px 10px', fontSize: '12px' }}
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="form-input text-sm py-1"
+              >
+                <option value="name">Name</option>
+                <option value="code">Code</option>
+                <option value="price">Price</option>
+                <option value="quantity">Quantity</option>
+                <option value="date">Date Added</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="btn btn-ghost btn-sm px-2"
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -233,39 +240,38 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
               {filteredAndSortedProducts.length} product{filteredAndSortedProducts.length !== 1 ? 's' : ''} available
             </div>
           </div>
+
+          {/* Selection controls for sales team */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted">
+                {selectedIds.size} selected
+              </span>
+              <button onClick={clearSelection} className="btn btn-ghost btn-sm">
+                Clear
+              </button>
+              <button 
+                onClick={() => setShowOrderForm(true)} 
+                className="btn btn-primary btn-sm"
+              >
+                Create Order from Selection
+              </button>
+            </div>
+          )}
+          {selectedIds.size === 0 && (
+            <button onClick={selectAllVisible} className="btn btn-ghost btn-sm">
+              Select all visible
+            </button>
+          )}
         </div>
 
         {filteredAndSortedProducts.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px 20px',
-            color: 'var(--muted)'
-          }}>
-            <div style={{
-              display: 'inline-block',
-              marginBottom: '12px'
-            }}>
-              <div style={{
-                padding: '16px',
-                background: 'var(--surface2)',
-                border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius)',
-                display: 'inline-block'
-              }}>
-                📦
-              </div>
+          <div className="text-center py-12 text-muted">
+            <div className="inline-block mb-3 p-4 bg-surface2 border border-border2 rounded-lg text-2xl">
+              📦
             </div>
-            <p style={{
-              fontSize: '14px',
-              color: 'var(--muted)',
-              marginBottom: '4px'
-            }}>
-              No products found
-            </p>
-            <p style={{
-              fontSize: '12px',
-              color: 'var(--muted)'
-            }}>
+            <p className="text-sm mb-1">No products found</p>
+            <p className="text-xs">
               {products.length === 0
                 ? "No finished goods available in catalogue."
                 : "Try adjusting your search or filter criteria."}
@@ -276,17 +282,42 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: '40px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={filteredAndSortedProducts.length > 0 && filteredAndSortedProducts.every(p => selectedIds.has(p.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          selectAllVisible();
+                        } else {
+                          clearSelection();
+                        }
+                      }}
+                    />
+                  </th>
                   <th>Product</th>
                   <th>Code</th>
                   <th>Description</th>
                   <th>Weight</th>
                   <th>Stock</th>
                   <th>Price</th>
+                  <th style={{ width: '100px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAndSortedProducts.map(p => (
-                  <tr key={p.id}>
+                  <tr 
+                    key={p.id} 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => toggleSelect(p.id)}
+                  >
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                      />
+                    </td>
                     <td style={{ fontWeight: 500, color: 'var(--text)' }}>
                       {p.name}
                     </td>
@@ -327,6 +358,19 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
                       color: 'var(--accent)'
                     }}>
                       ${p.price?.toFixed(2) || 'TBD'}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => {
+                          const newSelected = new Set(selectedIds);
+                          newSelected.add(p.id);
+                          setSelectedIds(newSelected);
+                          setShowOrderForm(true);
+                        }}
+                        className="btn btn-primary btn-sm text-xs px-3 py-1"
+                      >
+                        Choose
+                      </button>
                     </td>
                   </tr>
                 ))}
