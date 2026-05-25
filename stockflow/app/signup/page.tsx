@@ -18,30 +18,65 @@ export default function SignupPage() {
       if ('error' in res) {
         setError((res as any).error)
       } else {
-        setSubmittedEmail((res as any).email ?? null)
+        // Try to get email from form since action doesn't return it
+        const email = fd.get('email') as string
+        setSubmittedEmail(email)
       }
     })
   }
 
   if (submittedEmail) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-bg px-4">
-        <div className="card p-8 max-w-md w-full">
-          <div className="text-4xl mb-4 text-center">📧</div>
-          <h1 className="font-head text-2xl font-bold mb-3 text-center">
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--bg)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          padding: '40px',
+          width: '100%',
+          maxWidth: '420px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '20px' }}>📧</div>
+          <h1 style={{
+            fontFamily: 'var(--font-head)',
+            fontSize: '24px',
+            fontWeight: 800,
+            marginBottom: '12px',
+            color: 'var(--text)'
+          }}>
             Check your inbox
           </h1>
-          <p className="text-muted text-sm mb-6 text-center leading-relaxed">
+          <p style={{ color: 'var(--muted)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
             We sent a confirmation link to{' '}
-            <span className="font-mono text-text">{submittedEmail}</span>.
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{submittedEmail}</span>.
             Click the link to verify your email.
           </p>
-          <p className="text-xs text-muted text-center mb-6">
-            After verification, your organization will be reviewed by an
-            administrator. You&apos;ll get a second email once you&apos;re approved
-            — usually within one business day.
+          <p style={{ color: 'var(--muted)', fontSize: '12px', marginBottom: '32px' }}>
+            After verification, your organization will be reviewed by an administrator. 
+            You&apos;ll get a second email once you&apos;re approved — usually within one business day.
           </p>
-          <Link href="/login" className="btn btn-ghost w-full text-center">
+          <Link 
+            href="/login" 
+            style={{
+              display: 'inline-block',
+              padding: '10px 24px',
+              background: 'transparent',
+              border: '1px solid var(--border2)',
+              color: 'var(--muted)',
+              borderRadius: 'var(--radius-sm)',
+              textDecoration: 'none',
+              fontSize: '13px',
+              fontWeight: 600
+            }}
+          >
             Back to login
           </Link>
         </div>
@@ -50,132 +85,153 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg px-4 py-12">
-      <div className="card p-8 max-w-md w-full">
-        <h1 className="font-head text-2xl font-bold mb-2">Create your organization</h1>
-        <p className="text-muted text-sm mb-6">
-          Sign your company up for StockFlow. We&apos;ll review your account
-          and approve it within one business day.
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--bg)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '40px',
+        width: '100%',
+        maxWidth: '420px'
+      }}>
+        {/* Branded Header - matching login page style */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            fontFamily: 'var(--font-head)',
+            fontSize: '24px',
+            fontWeight: 800,
+            color: 'var(--accent)',
+            letterSpacing: '-0.5px',
+            marginBottom: '4px'
+          }}>
+            StockFlow
+          </div>
+          <div style={{
+            fontSize: '11px',
+            color: 'var(--muted)',
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase'
+          }}>
+            Manufacturing Platform
+          </div>
+        </div>
+
+        <h1 style={{
+          fontFamily: 'var(--font-head)',
+          fontSize: '20px',
+          fontWeight: 700,
+          marginBottom: '8px',
+          color: 'var(--text)'
+        }}>
+          Create your organization
+        </h1>
+        <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '24px', lineHeight: 1.4 }}>
+          Sign your company up for StockFlow. We&apos;ll review your account and approve it within one business day.
         </p>
 
         {error && (
-          <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          <div style={{
+            background: 'rgba(224, 85, 85, 0.12)',
+            color: 'var(--red)',
+            padding: '12px 14px',
+            borderRadius: 'var(--radius-sm)',
+            marginBottom: '20px',
+            fontSize: '13px',
+            border: '1px solid rgba(224, 85, 85, 0.3)'
+          }}>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">
-              Company name
-            </label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div className="form-group">
+            <label className="form-label">Company name</label>
             <input
               type="text"
-              name="organizationName"
+              name="companyName"
               required
               minLength={2}
               maxLength={120}
-              className="input w-full"
+              className="form-input"
               placeholder="Acme Springs Ltd"
               disabled={isPending}
             />
           </div>
 
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">
-              Your full name
-            </label>
+          <div className="form-group">
+            <label className="form-label">Your full name</label>
             <input
               type="text"
               name="fullName"
               required
               minLength={2}
               maxLength={120}
-              className="input w-full"
+              className="form-input"
               placeholder="Jane Doe"
               disabled={isPending}
             />
           </div>
 
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">
-              Work email
-            </label>
+          <div className="form-group">
+            <label className="form-label">Work email</label>
             <input
               type="email"
               name="email"
               required
-              className="input w-full"
+              className="form-input"
               placeholder="jane@acmesprings.co.ke"
               disabled={isPending}
             />
           </div>
 
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">
-              Phone (optional)
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              maxLength={40}
-              className="input w-full"
-              placeholder="+254 ..."
-              disabled={isPending}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">
-              Password
-            </label>
+          <div className="form-group">
+            <label className="form-label">Password</label>
             <input
               type="password"
               name="password"
               required
               minLength={8}
               maxLength={128}
-              className="input w-full"
+              className="form-input"
               placeholder="At least 8 characters"
               disabled={isPending}
             />
-            <p className="text-xs text-muted mt-1">
-              Use at least 8 characters. You&apos;ll need to verify your email
-              before signing in.
+            <p style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '4px' }}>
+              You&apos;ll need to verify your email before signing in.
             </p>
           </div>
 
-          {/* Honeypot — hidden from real users, visible to bots */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              left: '-10000px',
-              top: 'auto',
-              width: '1px',
-              height: '1px',
-              overflow: 'hidden',
-            }}
-          >
-            <label>
-              Website (leave blank)
-              <input type="text" name="website" tabIndex={-1} autoComplete="off" />
-            </label>
+          {/* Honeypot — hidden from real users */}
+          <div style={{ position: 'absolute', left: '-9999px', opacity: 0 }}>
+            <input type="text" name="website" tabIndex={-1} autoComplete="off" />
           </div>
 
           <button
             type="submit"
             disabled={isPending}
-            className="btn btn-primary w-full"
+            className="btn btn-primary"
+            style={{ width: '100%', marginTop: '8px', padding: '11px 16px', fontSize: '14px' }}
           >
             {isPending ? 'Creating account...' : 'Create organization'}
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-border text-center">
-          <p className="text-sm text-muted">
+        <div style={{ 
+          marginTop: '28px', 
+          paddingTop: '20px', 
+          borderTop: '1px solid var(--border)',
+          textAlign: 'center' 
+        }}>
+          <p style={{ fontSize: '13px', color: 'var(--muted)' }}>
             Already have an account?{' '}
-            <Link href="/login" className="text-accent hover:underline">
+            <Link href="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
               Sign in
             </Link>
           </p>
