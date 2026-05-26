@@ -9,22 +9,14 @@ export async function GET() {
     const user = await requireActiveAuth()
     const db = getTenantPrisma(user.organizationId)
 
-    const totalRawMaterials = await db.rawMaterial.count()
-    const lowStockItems = await db.rawMaterial.count({
-      where: { availableKg: { lt: LOW_STOCK_THRESHOLD } }
-    })
-
-    const recentDeliveries = await db.materialReceipt.count({
-      where: {
-        createdAt: {
-          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
-        }
-      }
-    })
-
-    const pendingOrders = await db.productionOrder.count({
-      where: { status: 'PENDING' }
-    })
+    // Parallel — these four counts have no dependencies on each other
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const [totalRawMaterials, lowStockItems, recentDeliveries, pendingOrders] = await Promise.all([
+      db.rawMaterial.count(),
+      db.rawMaterial.count({ where: { availableKg: { lt: LOW_STOCK_THRESHOLD } } }),
+      db.materialReceipt.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      db.productionOrder.count({ where: { status: 'PENDING' } }),
+    ])
 
     return NextResponse.json({
       totalRawMaterials,

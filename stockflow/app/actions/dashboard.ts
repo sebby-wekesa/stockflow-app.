@@ -58,165 +58,114 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   const isWarehouse = effectiveRole === "WAREHOUSE";
   const isSales = effectiveRole === "SALES";
 
-  // 1. Raw Material Stock - Everyone can see, but Warehouse sees more detail
-  let materials: RawMaterial[] = []
-  try {
-    materials = await db.rawMaterial.findMany();
-  } catch (error) {
-    console.warn('Failed to fetch raw materials:', error)
-    materials = []
-  }
-  const rawMaterialStock = materials.reduce(
-    (sum, m) => sum + toNumber(m.availableKg) + toNumber(m.reservedKg),
-    0
-  );
-  const totalFree = materials.reduce(
-    (sum, m) => sum + toNumber(m.availableKg),
-    0
-  );
-
-  // 2. Active Orders - Filter based on role
+  // 2. Active Orders - Filter based on role (compute the where clauses up front
+  //    so we can use them in the parallel fetch below)
   let activeOrdersWhere: any = {};
   let pendingApprovalsWhere: any = {};
 
   if (isOperator) {
-    // Operators only see orders in their department
     activeOrdersWhere = {
       status: { in: ["APPROVED", "IN_PRODUCTION"] },
       currentDept: authUser.department,
     };
-    pendingApprovalsWhere = {
-      status: "PENDING",
-      // Operators don't see pending approvals
-    };
+    pendingApprovalsWhere = { status: "PENDING" };
   } else if (isWarehouse) {
-    // Warehouse staff only see basic counts, no order details
     activeOrdersWhere = {};
     pendingApprovalsWhere = {};
   } else if (isSales) {
-    // Sales see minimal production info
     activeOrdersWhere = {};
     pendingApprovalsWhere = {};
   } else {
-    // Admin/Manager see all
-    activeOrdersWhere = {
-      status: { in: ["APPROVED", "IN_PRODUCTION"] },
-    };
-    pendingApprovalsWhere = {
-      status: "PENDING",
-    };
-  }
-
-  let activeOrdersCount = 0
-  try {
-    activeOrdersCount = await db.productionOrder.count({
-      where: activeOrdersWhere,
-    });
-  } catch (error) {
-    console.warn('Failed to count active orders:', error)
-    activeOrdersCount = 0
-  }
-  let pendingApprovalsCount = isOperator || isWarehouse || isSales ? 0 : 0
-  if (!isOperator && !isWarehouse && !isSales) {
-    try {
-      pendingApprovalsCount = await db.productionOrder.count({
-        where: pendingApprovalsWhere,
-      });
-    } catch (error) {
-      console.warn('Failed to count pending approvals:', error)
-      pendingApprovalsCount = 0
-    }
-  }
-
-  // 3. Finished Goods - Everyone can see basic counts
-  let finishedGoods: { _sum: { kgProduced: number | null, quantity: number | null } } = { _sum: { kgProduced: null, quantity: null } }
-  try {
-    const aggResult = await db.finishedGoods.aggregate({
-      _sum: {
-        kgProduced: true,
-        quantity: true,
-      },
-    });
-    finishedGoods = {
-      _sum: {
-        kgProduced: aggResult._sum.kgProduced?.toNumber() ?? null,
-        quantity: aggResult._sum.quantity ?? null,
-      }
-    };
-  } catch (error) {
-    console.warn('Failed to aggregate finished goods:', error)
-    finishedGoods = { _sum: { kgProduced: 0, quantity: 0 } }
-  }
-
-  // 4. Scrap This Week - Only Admin/Manager see scrap data
-  let scrapThisWeek = 0;
-  if (isAdmin || isManager) {
-    let weeklyLogs: StageLog[] = []
-    try {
-      weeklyLogs = await db.stageLog.findMany({
-        where: {
-          completedAt: {
-            gte: weekStart,
-          },
-        },
-      });
-    } catch (error) {
-      console.warn('Failed to fetch weekly logs for scrap:', error)
-      weeklyLogs = []
-    }
-    scrapThisWeek = weeklyLogs.reduce((sum, log) => sum + log.kgScrap.toNumber(), 0);
+    activeOrdersWhere = { status: { in: ["APPROVED", "IN_PRODUCTION"] } };
+    pendingApprovalsWhere = { status: "PENDING" };
   }
 
   // 5. Recent Orders - Filter based on role
   let recentOrdersWhere: any = {};
   if (isOperator) {
-    recentOrdersWhere = {
-      currentDept: authUser.department,
-    };
+    recentOrdersWhere = { currentDept: authUser.department };
   } else if (isWarehouse || isSales) {
-    // Warehouse and Sales see limited or no order details
-    recentOrdersWhere = {}; // Will return empty array below
+    recentOrdersWhere = {};
   }
 
-  let recentOrders: (ProductionOrder & { design: Design })[] = []
-  if (!(isWarehouse || isSales)) {
-    try {
-      recentOrders = await db.productionOrder.findMany({
-        take: 4,
-        where: recentOrdersWhere,
-        orderBy: {
-          updatedAt: "desc",
-        },
-        include: {
-          design: true,
-        },
-      });
-    } catch (error) {
-      console.warn('Failed to fetch recent orders:', error)
-      recentOrders = []
+  const fetchPendingApprovals = !isOperator && !isWarehouse && !isSales;
+  const fetchScrapAndDeptMetrics = isAdmin || isManager;
+  const fetchTodayThroughput = isAdmin || isManager || isOperator;
+  const fetchRecentOrders = !(isWarehouse || isSales);
+
+  // ─── PARALLEL FETCH ─────────────────────────────────────────────────────────
+  const [
+    materials,
+    activeOrdersCountRaw,
+    pendingApprovalsCountRaw,
+    finishedGoodsAggRaw,
+    weeklyLogsRaw,
+    recentOrdersRaw,
+    todayLogsRaw,
+  ] = await Promise.all([
+    db.rawMaterial.findMany().catch((e) => { console.warn('Failed to fetch raw materials:', e); return [] as RawMaterial[]; }),
+    db.productionOrder.count({ where: activeOrdersWhere }).catch((e) => { console.warn('Failed to count active orders:', e); return 0; }),
+    fetchPendingApprovals
+      ? db.productionOrder.count({ where: pendingApprovalsWhere }).catch((e) => { console.warn('Failed to count pending approvals:', e); return 0; })
+      : Promise.resolve(0),
+    db.finishedGoods.aggregate({ _sum: { kgProduced: true, quantity: true } }).catch((e) => { console.warn('Failed to aggregate finished goods:', e); return { _sum: { kgProduced: null, quantity: null } }; }),
+    fetchScrapAndDeptMetrics
+      ? db.stageLog.findMany({ where: { completedAt: { gte: weekStart } } }).catch((e) => { console.warn('Failed to fetch weekly logs:', e); return [] as StageLog[]; })
+      : Promise.resolve([] as StageLog[]),
+    fetchRecentOrders
+      ? db.productionOrder.findMany({
+          take: 4,
+          where: recentOrdersWhere,
+          orderBy: { updatedAt: "desc" },
+          include: { design: true },
+        }).catch((e) => { console.warn('Failed to fetch recent orders:', e); return [] as (ProductionOrder & { design: Design })[]; })
+      : Promise.resolve([] as (ProductionOrder & { design: Design })[]),
+    fetchTodayThroughput
+      ? db.stageLog.findMany({
+          where: {
+            completedAt: { gte: todayStart },
+            ...(isOperator && authUser.department ? { department: authUser.department } : {}),
+          },
+        }).catch((e) => { console.warn('Failed to fetch today logs:', e); return [] as StageLog[]; })
+      : Promise.resolve([] as StageLog[]),
+  ]);
+
+  const materialsTyped = materials as RawMaterial[];
+  const activeOrdersCount = activeOrdersCountRaw;
+  const pendingApprovalsCount = pendingApprovalsCountRaw;
+  const weeklyLogs = weeklyLogsRaw as StageLog[];
+  const recentOrders = recentOrdersRaw as (ProductionOrder & { design: Design })[];
+  const todayLogs = todayLogsRaw as StageLog[];
+
+  // 1. Raw Material totals (in-memory, no DB)
+  const rawMaterialStock = materialsTyped.reduce(
+    (sum, m) => sum + toNumber(m.availableKg) + toNumber(m.reservedKg),
+    0
+  );
+  const totalFree = materialsTyped.reduce(
+    (sum, m) => sum + toNumber(m.availableKg),
+    0
+  );
+
+  // 3. Finished Goods totals (already aggregated above)
+  const finishedGoods = {
+    _sum: {
+      kgProduced: finishedGoodsAggRaw._sum.kgProduced?.toNumber() ?? null,
+      quantity: finishedGoodsAggRaw._sum.quantity ?? null,
     }
+  };
+
+  // 4. Scrap This Week (reuses weeklyLogs)
+  let scrapThisWeek = 0;
+  if (fetchScrapAndDeptMetrics) {
+    scrapThisWeek = weeklyLogs.reduce((sum, log) => sum + log.kgScrap.toNumber(), 0);
   }
 
-  // 6. Department Metrics (Scrap & Throughput) - Only Admin/Manager see detailed metrics
+  // 6. Department Metrics — Scrap (reuses weeklyLogs again, no extra query)
   let departmentScrap: DepartmentScrap[] = [];
   let throughput: Throughput[] = [];
 
-  if (isAdmin || isManager) {
-    let weeklyLogs: StageLog[] = []
-    try {
-      weeklyLogs = await db.stageLog.findMany({
-        where: {
-          completedAt: {
-            gte: weekStart,
-          },
-        },
-      });
-    } catch (error) {
-      console.warn('Failed to fetch weekly logs for department scrap:', error)
-      weeklyLogs = []
-    }
-
-    // Group weekly logs by dept for scrap chart
+  if (fetchScrapAndDeptMetrics) {
     const deptScrapMap: Record<string, number> = {};
     weeklyLogs.forEach(log => {
       const dept = log.department || "Unknown";
@@ -230,23 +179,8 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
     });
   }
 
-  if (isAdmin || isManager || isOperator) {
-    let todayLogs: StageLog[] = []
-    try {
-      todayLogs = await db.stageLog.findMany({
-        where: {
-          completedAt: {
-            gte: todayStart,
-          },
-          ...(isOperator && authUser.department ? { department: authUser.department } : {}),
-        },
-      });
-    } catch (error) {
-      console.warn('Failed to fetch today logs for throughput:', error)
-      todayLogs = []
-    }
-
-    // Group today's logs for throughput
+  // 7. Today's Throughput (uses todayLogs from the parallel fetch)
+  if (fetchTodayThroughput) {
     const throughputMap: Record<string, { dept: string; jobs: Set<string>; kg: number; scrap: number; ops: Set<string> }> = {};
     todayLogs.forEach(log => {
       const dept = log.department || "Unknown";
@@ -283,7 +217,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
         label: 'Raw material stock',
         value: rawMaterialStock,
         suffix: 'kg',
-        sub: `${materials.length} materials · ${totalFree} kg free`,
+        sub: `${materialsTyped.length} materials · ${totalFree} kg free`,
         color: 'amber'
       },
       {
@@ -334,7 +268,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
         label: 'Raw material stock',
         value: rawMaterialStock,
         suffix: 'kg',
-        sub: `${materials.length} materials · ${totalFree} kg free`,
+        sub: `${materialsTyped.length} materials · ${totalFree} kg free`,
         color: 'amber'
       },
       {
@@ -461,86 +395,4 @@ export async function getManagerData() {
     totalTonnage: totalTonnageAgg._sum.targetKg || 0,
     pendingCount,
   };
-}
-
-export async function approveOrder(orderId: string) {
-  const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
-
-  let order
-  try {
-    order = await db.productionOrder.findUnique({
-      where: { id: orderId },
-      include: {
-        design: {
-          include: {
-            stages: {
-              orderBy: { sequence: 'asc' }
-            },
-            billOfMaterials: {
-              include: { RawMaterial: true }
-            }
-          }
-        }
-      },
-    });
-  } catch (error) {
-    console.warn('Failed to find order:', error)
-    throw new Error('Database error: Could not find order')
-  }
-
-  if (!order || order.status !== 'PENDING') {
-    throw new Error('Invalid order');
-  }
-
-  if (!order.design.billOfMaterials || order.design.billOfMaterials.length === 0) {
-    throw new Error('No raw materials assigned to design');
-  }
-
-  const firstStage = order.design.stages[0];
-  if (!firstStage) {
-    throw new Error('Design has no production stages configured');
-  }
-
-  // For now, assume single raw material per design (take first BOM item)
-  const primaryBomItem = order.design.billOfMaterials[0];
-  const plannedUnits =
-    order.design.targetWeight && order.design.targetWeight.gt(0)
-      ? order.targetKg.toNumber() / order.design.targetWeight.toNumber()
-      : order.quantity;
-  const reserveQuantity = plannedUnits * primaryBomItem.quantity.toNumber();
-
-  let material
-  try {
-    material = await db.rawMaterial.findUnique({
-      where: { id: primaryBomItem.rawMaterialId },
-    });
-  } catch (error) {
-    console.warn('Failed to find raw material:', error)
-    throw new Error('Database error: Could not find raw material')
-  }
-
-  if (!material || material.availableKg.toNumber() < reserveQuantity) {
-    throw new Error('Insufficient stock');
-  }
-
-  await db.rawMaterial.update({
-    where: { id: material.id },
-    data: {
-      availableKg: material.availableKg.toNumber() - reserveQuantity,
-      reservedKg: material.reservedKg.toNumber() + reserveQuantity,
-    },
-  });
-
-  await db.productionOrder.update({
-    where: { id: orderId },
-    data: {
-      status: 'APPROVED',
-      approvedAt: new Date(),
-      currentStage: firstStage.sequence,
-      currentDept: firstStage.department,
-    },
-  });
-
-  revalidatePath('/manager');
 }

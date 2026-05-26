@@ -1,10 +1,20 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma';
+import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { requireActiveAuth } from '@/lib/auth';
 
 // GET /api/inventory/products?origin=LOCAL_PURCHASE|IMPORTED|FACTORY_MADE
+//                              &page=1&limit=200
+//                              &include_receipts=1
+//
+// Pagination defaults to page=1, limit=200. Existing callers without these
+// params keep working — they just get the first 200 products (down from
+// "everything"). For very large catalogues callers should paginate.
+//
+// `include_receipts` is opt-in: when present, each product carries its 10
+// most recent ProductReceipt rows (down from 50). Pages that don't need
+// receipt history should omit the flag to skip the join entirely.
 export async function GET(request: NextRequest) {
   try {
     const user = await requireActiveAuth();
@@ -17,19 +27,55 @@ export async function GET(request: NextRequest) {
       | 'FACTORY_MADE'
       | null;
 
-    const products = await db.product.findMany({
-      where: origin ? { origin } : undefined,
-      include: {
-        Branch: { select: { name: true } },
-        ProductReceipt: {
-          orderBy: { createdAt: 'desc' },
-          take: 50,
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Defensive parsing of pagination params
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
+    const limit = Math.min(
+      500, // hard cap
+      Math.max(1, parseInt(searchParams.get('limit') ?? '200', 10) || 200)
+    );
+    const includeReceipts = searchParams.get('include_receipts') !== null;
 
-    return NextResponse.json({ products });
+    const where = origin ? { origin } : undefined;
+
+    // Run count + products in parallel
+    const [total, raw] = await Promise.all([
+      db.product.count({ where }),
+      db.product.findMany({
+        where,
+        include: {
+          Branch: { select: { name: true } },
+          ...(includeReceipts
+            ? {
+                ProductReceipt: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 10,
+                },
+              }
+            : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    // Reshape: Prisma relations are PascalCase but the inventory UI expects
+    // `branch` and `receipts`. Map them so existing consumers keep working.
+    const products = (raw as any[]).map((p) => ({
+      ...p,
+      branch: p.Branch ?? null,
+      receipts: p.ProductReceipt ?? [],
+      Branch: undefined,
+      ProductReceipt: undefined,
+    }));
+
+    return NextResponse.json({
+      products,
+      page,
+      limit,
+      total,
+      hasMore: page * limit < total,
+    });
   } catch (error) {
     console.error('[GET /api/inventory/products]', error);
     return NextResponse.json(
@@ -75,72 +121,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transactional product upsert + receipt write (prevents partial writes and reduces
-    // window for duplicate-product creation under concurrent receipts for same name+origin+branch)
-    const { product, receipt, wasExisting } = await withTenantTransaction(user.organizationId, async (tx) => {
-      // Re-lookup inside tx for consistency
-      const existing = await tx.product.findFirst({
-        where: { name, origin, branchId: branchId ?? null },
-      });
+    const { withTenantTransaction } = await import('@/lib/tenant-prisma');
 
-      let product;
-      let wasExisting = !!existing;
-
-      if (existing) {
-        product = await tx.product.update({
-          where: { id: existing.id },
-          data: {
-            currentStock: existing.currentStock + Number(quantity),
-            unitCost: unitCost ? Number(unitCost) : existing.unitCost,
-            landingCost: landingCost ? Number(landingCost) : existing.landingCost,
-            vendor: vendor || existing.vendor,
-            updatedAt: new Date(),
-          },
+    // Wrap the find-or-create + receipt write in one transaction so the
+    // product upsert AND the receipt either both land or neither does.
+    // Use atomic `increment` for the stock so concurrent POSTs to the same
+    // name+origin+branch don't lose each other's deltas.
+    const { product, receipt, wasUpdate } = await withTenantTransaction(
+      user.organizationId,
+      async (tx) => {
+        const existing = await tx.product.findFirst({
+          where: { name, origin, branchId: branchId ?? null },
         });
-      } else {
-        // Generate a simple SKU
-        const sku = `${origin.slice(0, 3)}-${name
-          .replace(/\s+/g, '-')
-          .toUpperCase()
-          .slice(0, 20)}-${Date.now().toString().slice(-6)}`;
 
-        product = await tx.product.create({
+        let product: { id: string };
+        let wasUpdate: boolean;
+
+        if (existing) {
+          product = await tx.product.update({
+            where: { id: existing.id },
+            data: {
+              currentStock: { increment: Number(quantity) },
+              ...(unitCost !== undefined && unitCost !== null
+                ? { unitCost: Number(unitCost) }
+                : {}),
+              ...(landingCost !== undefined && landingCost !== null
+                ? { landingCost: Number(landingCost) }
+                : {}),
+              ...(vendor ? { vendor } : {}),
+            },
+          });
+          wasUpdate = true;
+        } else {
+          // Generate a simple SKU. Concurrent creates with the same name are
+          // disambiguated by the unique (organizationId, sku) constraint —
+          // if a collision happens, the transaction aborts and the caller
+          // can retry.
+          const sku = `${origin.slice(0, 3)}-${name
+            .replace(/\s+/g, '-')
+            .toUpperCase()
+            .slice(0, 20)}-${Date.now().toString().slice(-6)}`;
+
+          product = await tx.product.create({
+            data: {
+              name,
+              sku,
+              origin,
+              uom,
+              currentStock: Number(quantity),
+              unitCost: unitCost ? Number(unitCost) : null,
+              landingCost: landingCost ? Number(landingCost) : null,
+              vendor: vendor || null,
+              branchId: branchId || null,
+            },
+          });
+          wasUpdate = false;
+        }
+
+        // Receipt write is now part of the same transaction
+        const receipt = await tx.productReceipt.create({
           data: {
-            organizationId: user.organizationId,
-            name,
-            sku,
-            origin,
-            uom,
-            currentStock: Number(quantity),
+            productId: product.id,
+            qtyReceived: Number(quantity),
             unitCost: unitCost ? Number(unitCost) : null,
             landingCost: landingCost ? Number(landingCost) : null,
+            reference: reference || null,
             vendor: vendor || null,
+            loggedBy: loggedBy || null,
             branchId: branchId || null,
           },
         });
-      }
 
-      // Receipt inside same tx
-      const receipt = await tx.productReceipt.create({
-        data: {
-          organizationId: user.organizationId,
-          productId: product.id,
-          qtyReceived: Number(quantity),
-          unitCost: unitCost ? Number(unitCost) : null,
-          landingCost: landingCost ? Number(landingCost) : null,
-          reference: reference || null,
-          vendor: vendor || null,
-          loggedBy: loggedBy || null,
-          branchId: branchId || null,
-        },
-      });
-
-      return { product, receipt, wasExisting };
-    }, { maxWait: 10000, timeout: 30000 });
+        return { product, receipt, wasUpdate };
+      },
+      { maxWait: 10000, timeout: 30000 }
+    );
 
     return NextResponse.json(
       {
-        message: wasExisting ? 'Stock updated successfully' : 'Product added successfully',
+        message: wasUpdate ? 'Stock updated successfully' : 'Product added successfully',
         product,
         receipt,
       },
