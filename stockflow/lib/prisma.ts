@@ -23,17 +23,20 @@ function getConnectionString(url: string) {
       parsed.searchParams.set('pgbouncer', 'true')
     }
 
-    // Supabase transaction pooler (pgbouncer) tuning — keep conservative defaults
+    // Production defaults for pooler tuning. Allow overriding via env var
+    const defaultConnLimit = process.env.DB_CONNECTION_LIMIT || (process.env.NODE_ENV === 'production' ? '10' : '1')
     if (!parsed.searchParams.has('connection_limit')) {
-      parsed.searchParams.set('connection_limit', '1')   // 1 is often safest with serverless poolers
+      parsed.searchParams.set('connection_limit', defaultConnLimit)
     }
 
+    const defaultPoolTimeout = process.env.DB_POOL_TIMEOUT || (process.env.NODE_ENV === 'production' ? '30' : '10')
     if (!parsed.searchParams.has('pool_timeout')) {
-      parsed.searchParams.set('pool_timeout', '10')
+      parsed.searchParams.set('pool_timeout', defaultPoolTimeout)
     }
 
+    const defaultStatementTimeout = process.env.DB_STATEMENT_TIMEOUT || '8000'
     if (!parsed.searchParams.has('statement_timeout')) {
-      parsed.searchParams.set('statement_timeout', '8000')
+      parsed.searchParams.set('statement_timeout', defaultStatementTimeout)
     }
   }
 
@@ -197,18 +200,24 @@ export async function withRetry<T>(
     } catch (error: any) {
       lastError = error
 
-      if (!isRetryableError(error) || attempt === maxAttempts) {
-        // Log full details on final failure (or non-retryable error)
-        console.error('withRetry: giving up', {
-          attempt,
-          maxAttempts,
-          name: error?.name,
-          code: error?.code,
-          prismaCode: (error as any)?.code,
-          message: error?.message?.slice(0, 300),
-        })
-        throw error
-      }
+    if (!isRetryableError(error) || attempt === maxAttempts) {
+         // Log full details on final failure (or non-retryable error)
+         try {
+           const { logDbError } = await import('./prisma-metrics')
+           logDbError(error)
+         } catch {
+           console.error('withRetry: giving up', {
+             attempt,
+             maxAttempts,
+             name: error?.name,
+             code: error?.code,
+             prismaCode: (error as any)?.code,
+             message: error?.message?.slice(0, 300),
+           })
+         }
+         throw error
+       }
+
 
       // Exponential backoff with jitter
       const exponentialDelay = baseDelayMs * Math.pow(2, attempt - 1)
