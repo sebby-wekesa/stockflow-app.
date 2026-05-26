@@ -100,8 +100,19 @@ export async function signIn(formData: FormData) {
     password: validation.data.password,
   });
 
+  // Diagnostic logging (no token values): record whether user/session were returned and error codes
+  try {
+    console.info('supabase.signInWithPassword result:', {
+      userId: data?.user?.id ?? null,
+      hasSession: !!data?.session,
+      errorCode: (error as any)?.status ?? (error as any)?.message ?? null,
+    });
+  } catch (logErr) {
+    console.error('Failed to log signIn diagnostic:', String(logErr));
+  }
+
   if (error) {
-    console.error("Supabase auth error:", error);
+    console.error("Supabase auth error:", String(error));
     return { error: getAuthErrorMessage(error) };
   }
 
@@ -110,6 +121,14 @@ export async function signIn(formData: FormData) {
   }
 
   if (!data.session) {
+    // Log cookie snapshot when session is missing to help diagnose refresh token issues
+    try {
+      const cookieStoreDiag = (await cookies()).getAll().map(c => ({ name: c.name, len: c.value?.length ?? 0 }));
+      console.warn('Sign-in succeeded but no session returned. Cookie snapshot (names+lengths):', cookieStoreDiag);
+    } catch (cErr) {
+      console.error('Failed to read cookies during missing-session diagnostic:', String(cErr));
+    }
+
     return { error: "Authentication failed. Please try again." };
   }
 
