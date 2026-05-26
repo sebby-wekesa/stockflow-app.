@@ -94,6 +94,45 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   const fetchRecentOrders = !(isWarehouse || isSales);
 
   // ─── PARALLEL FETCH ─────────────────────────────────────────────────────────
+  // Run independent queries in small batches to avoid bursting DB pooler
+  async function runBatches<T>(tasks: Array<() => Promise<T>>, batchSize = 3): Promise<T[]> {
+    const results: T[] = []
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const batch = tasks.slice(i, i + batchSize).map((fn) => fn())
+      const res = await Promise.all(batch)
+      results.push(...res)
+    }
+    return results
+  }
+
+  const queryTasks: Array<() => Promise<any>> = [
+    () => db.rawMaterial.findMany().catch((e) => { console.warn('Failed to fetch raw materials:', e); return [] as RawMaterial[]; }),
+    () => db.productionOrder.count({ where: activeOrdersWhere }).catch((e) => { console.warn('Failed to count active orders:', e); return 0; }),
+    () => (fetchPendingApprovals
+      ? db.productionOrder.count({ where: pendingApprovalsWhere }).catch((e) => { console.warn('Failed to count pending approvals:', e); return 0; })
+      : Promise.resolve(0)),
+    () => db.finishedGoods.aggregate({ _sum: { kgProduced: true, quantity: true } }).catch((e) => { console.warn('Failed to aggregate finished goods:', e); return { _sum: { kgProduced: null, quantity: null } }; }),
+    () => (fetchScrapAndDeptMetrics
+      ? db.stageLog.findMany({ where: { completedAt: { gte: weekStart } } }).catch((e) => { console.warn('Failed to fetch weekly logs:', e); return [] as StageLog[]; })
+      : Promise.resolve([] as StageLog[])),
+    () => (fetchRecentOrders
+      ? db.productionOrder.findMany({
+          take: 4,
+          where: recentOrdersWhere,
+          orderBy: { updatedAt: "desc" },
+          include: { design: true },
+        }).catch((e) => { console.warn('Failed to fetch recent orders:', e); return [] as (ProductionOrder & { design: Design })[]; })
+      : Promise.resolve([] as (ProductionOrder & { design: Design })[])),
+    () => (fetchTodayThroughput
+      ? db.stageLog.findMany({
+          where: {
+            completedAt: { gte: todayStart },
+            ...(isOperator && authUser.department ? { department: authUser.department } : {}),
+          },
+        }).catch((e) => { console.warn('Failed to fetch today logs:', e); return [] as StageLog[]; })
+      : Promise.resolve([] as StageLog[])),
+  ]
+
   const [
     materials,
     activeOrdersCountRaw,
@@ -102,33 +141,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
     weeklyLogsRaw,
     recentOrdersRaw,
     todayLogsRaw,
-  ] = await Promise.all([
-    db.rawMaterial.findMany().catch((e) => { console.warn('Failed to fetch raw materials:', e); return [] as RawMaterial[]; }),
-    db.productionOrder.count({ where: activeOrdersWhere }).catch((e) => { console.warn('Failed to count active orders:', e); return 0; }),
-    fetchPendingApprovals
-      ? db.productionOrder.count({ where: pendingApprovalsWhere }).catch((e) => { console.warn('Failed to count pending approvals:', e); return 0; })
-      : Promise.resolve(0),
-    db.finishedGoods.aggregate({ _sum: { kgProduced: true, quantity: true } }).catch((e) => { console.warn('Failed to aggregate finished goods:', e); return { _sum: { kgProduced: null, quantity: null } }; }),
-    fetchScrapAndDeptMetrics
-      ? db.stageLog.findMany({ where: { completedAt: { gte: weekStart } } }).catch((e) => { console.warn('Failed to fetch weekly logs:', e); return [] as StageLog[]; })
-      : Promise.resolve([] as StageLog[]),
-    fetchRecentOrders
-      ? db.productionOrder.findMany({
-          take: 4,
-          where: recentOrdersWhere,
-          orderBy: { updatedAt: "desc" },
-          include: { design: true },
-        }).catch((e) => { console.warn('Failed to fetch recent orders:', e); return [] as (ProductionOrder & { design: Design })[]; })
-      : Promise.resolve([] as (ProductionOrder & { design: Design })[]),
-    fetchTodayThroughput
-      ? db.stageLog.findMany({
-          where: {
-            completedAt: { gte: todayStart },
-            ...(isOperator && authUser.department ? { department: authUser.department } : {}),
-          },
-        }).catch((e) => { console.warn('Failed to fetch today logs:', e); return [] as StageLog[]; })
-      : Promise.resolve([] as StageLog[]),
-  ]);
+  ] = await runBatches(queryTasks, Number(process.env.DB_QUERY_BATCH_SIZE || 3));
 
   const materialsTyped = materials as RawMaterial[];
   const activeOrdersCount = activeOrdersCountRaw;
