@@ -1,10 +1,16 @@
 import { notFound, redirect } from 'next/navigation'
+import type { ImportBatch, ImportRow } from '@prisma/client'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { ImportWorkflow } from './_components/ImportWorkflow'
 
 interface PageProps {
   params: Promise<{ id: string }>
+}
+
+type BatchWithIncludes = ImportBatch & {
+  User: { name: string | null } | null
+  ImportRow: ImportRow[]
 }
 
 export default async function ImportDetailPage({ params }: PageProps) {
@@ -24,7 +30,7 @@ export default async function ImportDetailPage({ params }: PageProps) {
         take: 10, // For preview
       },
     },
-  })
+  }) as BatchWithIncludes | null
 
   if (!batch) {
     notFound()

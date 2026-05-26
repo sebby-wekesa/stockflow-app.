@@ -12,22 +12,29 @@ function getConnectionString(url: string) {
     parsed.searchParams.set('uselibpqcompat', 'true')
   }
 
-  // Enable connection pooling for Supabase (transaction mode recommended)
-  if (!parsed.searchParams.has('pgbouncer')) {
-    parsed.searchParams.set('pgbouncer', 'true')
-  }
+  // Only inject Supabase / pgbouncer tuning in production by default.
+  // In local development multiple hot-reloaded Prisma instances can cause
+  // transient ETIMEDOUT errors when forced through a pooler. If you need
+  // to test pooler behavior locally, set ENABLE_PG_BOUNCER=true.
+  const enablePgbouncer = process.env.ENABLE_PG_BOUNCER === 'true' || process.env.NODE_ENV === 'production'
 
-  // Supabase transaction pooler (pgbouncer) tuning — keep very low to avoid exhausting the pooler
-  if (!parsed.searchParams.has('connection_limit')) {
-    parsed.searchParams.set('connection_limit', '1')   // 1 is often safest with Next.js + pooler
-  }
+  if (enablePgbouncer) {
+    if (!parsed.searchParams.has('pgbouncer')) {
+      parsed.searchParams.set('pgbouncer', 'true')
+    }
 
-  if (!parsed.searchParams.has('pool_timeout')) {
-    parsed.searchParams.set('pool_timeout', '10')
-  }
+    // Supabase transaction pooler (pgbouncer) tuning — keep conservative defaults
+    if (!parsed.searchParams.has('connection_limit')) {
+      parsed.searchParams.set('connection_limit', '1')   // 1 is often safest with serverless poolers
+    }
 
-  if (!parsed.searchParams.has('statement_timeout')) {
-    parsed.searchParams.set('statement_timeout', '8000')
+    if (!parsed.searchParams.has('pool_timeout')) {
+      parsed.searchParams.set('pool_timeout', '10')
+    }
+
+    if (!parsed.searchParams.has('statement_timeout')) {
+      parsed.searchParams.set('statement_timeout', '8000')
+    }
   }
 
   return parsed.toString()
@@ -80,11 +87,18 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClientSingleton | undefined
 }
 
-// 3. Export the instance
-export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
+  // 3. Export the instance
+  export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
-// 4. Prevent multiple instances in development
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+  // 4. Prevent multiple instances in development
+  if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+  // If running under Turbopack/Next dev with many hot-reloads, increase
+  // the retry window slightly to tolerate transient pooler flakiness.
+  // Allow opt-in override via DEV_DB_RETRY_ATTEMPTS.
+  export const DEFAULT_DB_MAX_RETRY = Number(process.env.DEV_DB_RETRY_ATTEMPTS || 6)
+
+  // 5. Export authPrisma and helpers unchanged
 
 /**
  * Lightweight Prisma client for authentication lookups only.
@@ -142,7 +156,7 @@ if (process.env.NODE_ENV !== 'production') {
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  maxAttempts: number = 6,   // increased for Supabase pooler flakiness in dev
+  maxAttempts: number = Number(process.env.DB_MAX_RETRY_ATTEMPTS || process.env.DEV_DB_RETRY_ATTEMPTS || 6),
   baseDelayMs: number = 200
 ): Promise<T> {
   let lastError: any

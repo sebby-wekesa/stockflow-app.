@@ -42,6 +42,20 @@ export async function signUpOrganization(formData: FormData) {
     return { success: true }
   }
 
+  // Generate slug/code with short random suffix to eliminate collision races
+  // (two signups for "Acme Springs" at the same time). Keeps names human-friendly.
+  const baseSlug = data.companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'neworg'
+  const short = Math.random().toString(36).slice(2, 6)
+  const slug = `${baseSlug}-${short}`
+  const baseCode = data.companyName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 6) || 'NEWORG'
+  const code = `${baseCode}${short.toUpperCase()}`
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -64,8 +78,8 @@ export async function signUpOrganization(formData: FormData) {
       const org = await tx.organization.create({
         data: {
           name: data.companyName,
-          code: data.companyName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'NEWORG',
-          slug: data.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          code,
+          slug,
           status: 'PENDING_APPROVAL',
           ownerUserId: authUser.user.id,
         },

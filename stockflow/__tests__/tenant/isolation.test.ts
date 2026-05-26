@@ -200,6 +200,7 @@ describe('Tenant Isolation', () => {
           kgIn: 100,
           kgOut: 90,
           kgScrap: 10,
+          operatorId: 'user-a',
         })
       } catch (e: any) {
         // Expected if stage sequence or order state doesn't perfectly match seed
@@ -232,6 +233,7 @@ describe('Tenant Isolation', () => {
         kgIn: 95,
         kgOut: 90,
         kgScrap: 5,
+        operatorId: 'user-a',
       })
 
       const logsAfter = await dbA.stageLog.findMany({ where: { orderId: 'po-test-a' } })

@@ -4,8 +4,9 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireActiveAuth, type AuthUser } from '@/lib/auth'
-import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import type { ProductCategory } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 /** Returns the auth user if role is ADMIN or MANAGER, else throws. */
 async function requireProductManager(): Promise<AuthUser> {
@@ -70,7 +71,6 @@ function extractForm(formData: FormData) {
 
 export async function createProduct(formData: FormData) {
   const user = await requireProductManager()
-  const db = getTenantPrisma(user.organizationId)
 
   const parsed = createSchema.safeParse(extractForm(formData))
   if (!parsed.success) {
@@ -78,44 +78,48 @@ export async function createProduct(formData: FormData) {
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
   }
 
-  // Uniqueness is now per-org (sku), so we look up scoped to our org
-  const existing = await db.product.findFirst({
-    where: { sku: parsed.data.product_code },
-  })
-  if (existing) {
-    throw new Error(`Product code "${parsed.data.product_code}" already exists`)
+  // Transactional create + alias (sku unique constraint in DB prevents real dups even on race)
+  let product: any
+  try {
+    product = await withTenantTransaction(user.organizationId, async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          sku: parsed.data.product_code,
+          name: parsed.data.canonical_name,
+          category: parsed.data.category as ProductCategory,
+          uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
+          unitCost: parsed.data.cost_price ?? null,
+          vendor: parsed.data.vendor ?? null,
+          reorderLevel: parsed.data.reorder_point ?? null,
+          currentStock: 0,
+          organizationId: user.organizationId,
+        },
+      })
+
+      // The canonical name itself is automatically a self-alias
+      await tx.productAlias.upsert({
+        where: {
+          product_id_alias: {
+            product_id: created.id,
+            alias: parsed.data.canonical_name,
+          },
+        },
+        update: {},
+        create: {
+          product_id: created.id,
+          alias: parsed.data.canonical_name,
+          organizationId: user.organizationId,
+        },
+      })
+
+      return created
+    }, { maxWait: 10000, timeout: 30000 })
+  } catch (err: any) {
+    if (err?.code === 'P2002' || /unique constraint.*sku/i.test(String(err?.message))) {
+      throw new Error(`Product code "${parsed.data.product_code}" already exists`)
+    }
+    throw err
   }
-
-  // organizationId auto-injected by db extension
-  const product = await db.product.create({
-    data: {
-      sku: parsed.data.product_code,
-      name: parsed.data.canonical_name,
-      category: parsed.data.category as ProductCategory,
-      uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
-      unitCost: parsed.data.cost_price ?? null,
-      vendor: parsed.data.vendor ?? null,
-      reorderLevel: parsed.data.reorder_point ?? null,
-      currentStock: 0,
-      organizationId: user.organizationId,
-    },
-  })
-
-  // The canonical name itself is automatically a self-alias
-  await db.productAlias.upsert({
-    where: {
-      product_id_alias: {
-        product_id: product.id,
-        alias: parsed.data.canonical_name,
-      },
-    },
-    update: {},
-    create: {
-      product_id: product.id,
-      alias: parsed.data.canonical_name,
-      organizationId: user.organizationId,
-    },
-  })
 
   revalidatePath('/products')
   redirect(`/products/${product.id}`)

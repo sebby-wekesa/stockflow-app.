@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import Link from "next/link";
+import { withRetry } from '@/lib/prisma'
 
 interface ScrapByDept {
   dept: string;
@@ -45,38 +46,39 @@ interface AdminStats {
 }
 
 async function getAdminStats(db: any): Promise<AdminStats> {
-  const totalOrders = await db.productionOrder.count();
-  const pendingOrders = await db.productionOrder.count({ where: { status: "PENDING" } });
-  const inProduction = await db.productionOrder.count({ where: { status: "IN_PRODUCTION" } });
-  const completed = await db.productionOrder.count({ where: { status: "COMPLETED" } });
-  const designs = await db.design.count();
+  const totalOrders = await withRetry(() => db.productionOrder.count(), undefined);
+  const pendingOrders = await withRetry(() => db.productionOrder.count({ where: { status: "PENDING" } }), undefined);
+  const inProduction = await withRetry(() => db.productionOrder.count({ where: { status: "IN_PRODUCTION" } }), undefined);
+  const completed = await withRetry(() => db.productionOrder.count({ where: { status: "COMPLETED" } }), undefined);
+  const designs = await withRetry(() => db.design.count(), undefined);
 
   // Count users from Prisma User table
-  const users = await db.user.count();
+  const users = await withRetry(() => db.user.count(), undefined);
 
-  const inventory = await db.rawMaterial.findMany();
+
+  const inventory = await withRetry<any[]>(() => db.rawMaterial.findMany(), undefined);
 
   // Calculate dashboard stats
-  const rawMaterialStock = inventory.reduce(
+  const rawMaterialStock = (inventory as any[]).reduce(
     (sum: number, m: any) => sum + (m.availableKg?.toNumber() ?? 0) + (m.reservedKg?.toNumber() ?? 0),
     0
   );
-  const totalFree = inventory.reduce(
+  const totalFree = (inventory as any[]).reduce(
     (sum: number, m: any) => sum + (m.availableKg?.toNumber() ?? 0),
     0
   );
 
-  const activeOrdersCount = await db.productionOrder.count({
+  const activeOrdersCount = await withRetry<number>(() => db.productionOrder.count({
     where: { status: { in: ["APPROVED", "IN_PRODUCTION"] } },
-  });
+  }), undefined);
   const pendingApprovalsCount = pendingOrders;
 
-  const finishedGoodsAgg = await db.finishedGoods.aggregate({
+  const finishedGoodsAgg = await withRetry<any>(() => db.finishedGoods.aggregate({
     _sum: {
       kgProduced: true,
       quantity: true,
     },
-  });
+  }), undefined);
   const finishedGoods = {
     _sum: {
       kgProduced: finishedGoodsAgg._sum.kgProduced?.toNumber() ?? 0,
@@ -92,14 +94,14 @@ async function getAdminStats(db: any): Promise<AdminStats> {
   todayStart.setHours(0, 0, 0, 0);
 
   // Scrap this week (from StageLog)
-  const scrapWeekAgg = await db.stageLog.aggregate({
+  const scrapWeekAgg = await withRetry<any>(() => db.stageLog.aggregate({
     _sum: { kgScrap: true },
     where: { completedAt: { gte: oneWeekAgo } },
-  });
+  }), undefined);
   const scrapThisWeek = scrapWeekAgg._sum.kgScrap?.toNumber() ?? 0;
 
   // Scrap by department this week
-  const scrapDeptRaw = await db.stageLog.groupBy({
+  const scrapDeptRaw = await withRetry<any[]>(() => db.stageLog.groupBy({
     by: ['department'],
     _sum: { kgScrap: true },
     where: {
@@ -107,9 +109,9 @@ async function getAdminStats(db: any): Promise<AdminStats> {
       department: { not: null },
     },
     orderBy: { _sum: { kgScrap: 'desc' } },
-  });
-  const totalScrapForPct = scrapDeptRaw.reduce((s: number, r: any) => s + (r._sum.kgScrap?.toNumber() ?? 0), 0) || 1;
-  const scrapByDept = scrapDeptRaw.map((r: any) => {
+  }), undefined);
+  const totalScrapForPct = (scrapDeptRaw as any[]).reduce((s: number, r: any) => s + (r._sum.kgScrap?.toNumber() ?? 0), 0) || 1;
+  const scrapByDept = (scrapDeptRaw as any[]).map((r: any) => {
     const kg = r._sum.kgScrap?.toNumber() ?? 0;
     const pct = Math.round((kg / totalScrapForPct) * 100);
     return { dept: r.department!, kg, pct };
@@ -118,18 +120,18 @@ async function getAdminStats(db: any): Promise<AdminStats> {
   // Department throughput for today (from StageLog + active ProductionOrders)
   const knownDepts = ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding'];
 
-  const activeByDeptRaw = await db.productionOrder.groupBy({
+  const activeByDeptRaw = await withRetry<any[]>(() => db.productionOrder.groupBy({
     by: ['currentDept'],
     _count: { _all: true },
     where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] }, currentDept: { not: null } },
-  });
-  const activeMap = new Map(activeByDeptRaw.map((a: any) => [ (a.currentDept || '').toLowerCase(), a._count._all ]));
+  }), undefined);
+  const activeMap = new Map((activeByDeptRaw as any[]).map((a: any) => [ (a.currentDept || '').toLowerCase(), a._count._all ]));
 
   // Fetch today's logs to compute distinct operators + aggregates per dept
-  const todayLogs = await db.stageLog.findMany({
+  const todayLogs = await withRetry<any[]>(() => db.stageLog.findMany({
     where: { completedAt: { gte: todayStart }, department: { not: null } },
     select: { department: true, operatorId: true, kgIn: true, kgOut: true, kgScrap: true },
-  });
+  }), undefined);
 
     const deptToday = new Map<string, { kgIn: number; kgOut: number; kgScrap: number; ops: Set<string> }>();
    for (const log of todayLogs) {
@@ -177,22 +179,22 @@ async function getAdminStats(db: any): Promise<AdminStats> {
   });
 
   return {
-    totalOrders,
-    pendingOrders,
-    inProduction,
-    completed,
-    designs,
-    users,
-    inventory,
-    rawMaterialStock,
-    totalFree,
-    activeOrdersCount,
-    pendingApprovalsCount,
-    finishedGoods,
-    scrapThisWeek,
-    scrapByDept,
-    departmentThroughput,
-    recentOrders: recentOrders.map((o: any) => ({
+    totalOrders: Number(totalOrders ?? 0),
+    pendingOrders: Number(pendingOrders ?? 0),
+    inProduction: Number(inProduction ?? 0),
+    completed: Number(completed ?? 0),
+    designs: Number(designs ?? 0),
+    users: Number(users ?? 0),
+    inventory: (inventory as any[]) ?? [],
+    rawMaterialStock: Number(rawMaterialStock ?? 0),
+    totalFree: Number(totalFree ?? 0),
+    activeOrdersCount: Number(activeOrdersCount ?? 0),
+    pendingApprovalsCount: Number(pendingApprovalsCount ?? 0),
+    finishedGoods: finishedGoods as any,
+    scrapThisWeek: Number(scrapThisWeek ?? 0),
+    scrapByDept: scrapByDept as any[],
+    departmentThroughput: departmentThroughput as DeptThroughput[],
+    recentOrders: (recentOrders as any[]).map((o: any) => ({
       id: o.orderNumber,
       design: o.design?.name ?? '—',
       kg: o.targetKg?.toNumber?.() ?? Number(o.targetKg) ?? 0,

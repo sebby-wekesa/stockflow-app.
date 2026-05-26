@@ -1,4 +1,5 @@
 import { getTenantPrisma } from '@/lib/tenant-prisma'
+import type { Prisma } from '@prisma/client'
 export { STATUS_LABELS, STATUS_BADGE_CLASS, formatKES } from './sales-utils'
 
 // Springtech's invoice prefix convention. Other orgs will get the default
@@ -24,9 +25,10 @@ const SPRINGTECH_INVOICE_PREFIX: Record<string, string> = {
  */
 export async function nextInvoiceNumber(
   organizationId: string,
-  branch: string
+  branch: string,
+  txClient?: Prisma.TransactionClient
 ): Promise<string> {
-  const db = getTenantPrisma(organizationId)
+  const db = (txClient as any) || getTenantPrisma(organizationId)
   const prefix = SPRINGTECH_INVOICE_PREFIX[branch.toLowerCase()] ?? ''
 
   const existing = await db.saleOrder.findMany({

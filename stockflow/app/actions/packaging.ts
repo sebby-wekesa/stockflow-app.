@@ -131,7 +131,7 @@ export async function fulfillOrder(orderId: string) {
       success: true,
       orderId,
       fulfilledAt: new Date(),
-      totalItems: order.SaleItem.reduce((sum, item) => sum + item.quantity, 0)
+      totalItems: order.SaleItem.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0)
     };
   });
 }

@@ -2,7 +2,7 @@
 
 import { requireAuth } from "@/lib/auth";
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
-import { SaleStatus } from "@prisma/client";
+import type { SaleStatus } from "@prisma/client";
 
 interface ParsedSaleRow {
   date: Date;
@@ -95,7 +95,7 @@ export async function importSalesData(rawText: string, branchName: string = "Nai
         data: {
           customerName: sale.customerName,
           totalAmount: sale.totalAmount,
-          status: SaleStatus.CONFIRMED,
+          status: 'CONFIRMED' satisfies SaleStatus,
           createdAt: sale.date,
           SaleItem: {
             create: {

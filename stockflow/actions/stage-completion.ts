@@ -30,7 +30,7 @@ export async function completeStage(input: StageCompletionInput) {
     }
 
     const currentStageIndex = order.design.stages.findIndex(
-      (s) => s.sequence === validated.sequence
+      (s: { sequence: number }) => s.sequence === validated.sequence
     );
 
     if (currentStageIndex === -1) {

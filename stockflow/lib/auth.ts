@@ -22,10 +22,7 @@
  */
 
 import { supabaseServerComponent } from "./supabase-admin";
-import { authPrisma, withRetry } from "./prisma";
-
-// Use the direct (non-pooled) client for auth lookups — much more reliable
-const prisma = authPrisma;
+import { prisma, authPrisma, withRetry } from "./prisma";
 import { type UserRole } from "./types";
 import type { OrgStatus } from "@prisma/client";
 
@@ -55,90 +52,78 @@ export async function getUser(): Promise<AuthUser | null> {
   if (!authUser) return null;
 
   try {
-    if (!prisma.user) {
-      console.error("User model not available in Prisma client");
+    // Use the authPrisma client for auth lookups to improve reliability
+    // (authPrisma uses DIRECT_URL or falls back to main prisma). Wrap calls
+    // with withRetry to tolerate transient pooler errors in dev.
+    if (!authPrisma || !authPrisma.user) {
+      console.error("Auth Prisma client or User model not available");
       return null;
     }
 
-    // Use raw query for the User row to avoid any ORM relation or field validation issues
-    // caused by schema drift between the generated client and the actual DB.
-    const [rawUser] = await withRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT 
-           id, 
-           email, 
-           name, 
-           role, 
-           department, 
-           "organizationId", 
-           "branchId" 
-         FROM "User" 
-         WHERE id = $1 
-         LIMIT 1`,
-        authUser.id
-      )
-    ) as any[];
+    let user: any = null
+    try {
+      user = await withRetry(() => authPrisma.user.findUnique({
+        where: { id: authUser.id },
+        include: {
+          Branch: true,
+          Organization: {
+            select: { id: true, name: true, slug: true, status: true },
+          },
+        },
+      }), undefined)
+    } catch (e: any) {
+      console.warn('authPrisma lookup failed, falling back to main prisma:', e?.message || e)
+      try {
+        user = await withRetry(() => prisma.user.findUnique({
+          where: { id: authUser.id },
+          include: {
+            Branch: true,
+            Organization: {
+              select: { id: true, name: true, slug: true, status: true },
+            },
+          },
+        }), undefined)
+      } catch (e2: any) {
+        console.error('Fallback prisma lookup also failed:', e2?.message || e2)
+        return null
+      }
+    }
 
-    if (!rawUser) {
+
+    if (!user) {
       console.log("User not found in database for ID:", authUser.id);
       return null;
     }
 
-    // Fetch Organization separately (minimal, no relations)
-    const organization = await withRetry(() =>
-      prisma.organization.findUnique({
-        where: { id: rawUser.organizationid || rawUser.organizationId },
-        select: { id: true, name: true, slug: true, status: true },
-      })
-    );
-
-    if (!organization) {
-      console.warn("User has no organization linked:", rawUser.id);
+    if (!user.Organization) {
+      console.warn("User has no organization linked:", user.id);
       return null;
     }
 
-    // Lightweight Branch fetch (optional)
-    let branch = null;
-    const branchId = rawUser.branchid || rawUser.branchId;
-    if (branchId) {
-      branch = await withRetry(() =>
-        prisma.branch.findUnique({
-          where: { id: branchId },
-          select: { id: true, name: true },
-        })
-      );
-    }
-
     // Hard gate: SUSPENDED and CLOSED orgs cannot access the app at all
-    if (organization.status === 'SUSPENDED' || organization.status === 'CLOSED') {
+    if (user.Organization.status === 'SUSPENDED' || user.Organization.status === 'CLOSED') {
       return null;
     }
     // PENDING_APPROVAL users CAN be returned (so pages can show the
     // waiting screen), but most actions will check status === 'ACTIVE'
 
     return {
-      id: rawUser.id,
-      email: rawUser.email,
-      name: rawUser.name ?? "",
-      role: rawUser.role,
-      department: rawUser.department,
-      branches: branch ? [{ id: branch.id, name: branch.name }] : [],
-      organizationId: organization.id,
+      id: user.id,
+      email: user.email,
+      name: user.name ?? "",
+      role: user.role,
+      department: user.department ?? null,
+      branches: user.Branch ? [{ id: user.Branch.id, name: user.Branch.name }] : [],
+      organizationId: user.Organization.id,
       organization: {
-        id: organization.id,
-        name: organization.name,
-        slug: organization.slug,
-        status: organization.status,
+        id: user.Organization.id,
+        name: user.Organization.name,
+        slug: user.Organization.slug,
+        status: user.Organization.status,
       },
     };
-  } catch (error: any) {
-    console.error("Prisma lookup failed in getUser:", {
-      name: error?.name,
-      code: error?.code,
-      message: error?.message,
-      meta: error?.meta,
-      stack: error?.stack?.slice(0, 500),
-    });
+  } catch (error) {
+    console.error("Prisma lookup failed:", error);
     return null;
   }
 }

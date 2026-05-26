@@ -30,7 +30,7 @@ export default async function CataloguePage() {
      },
      quantity: p.quantity,
      kgProduced: Number(p.kgProduced),
-     price: p.unitCost,
+     price: p.unitCost ?? null,
      createdAt: p.createdAt.toISOString(),
      source: 'manufactured' as const,
    }));
@@ -45,7 +45,7 @@ export default async function CataloguePage() {
      },
      quantity: Math.floor(p.currentStock),
      kgProduced: 0,
-     price: p.unitCost,
+     price: p.unitCost ?? null,
      createdAt: p.createdAt.toISOString(),
      source: 'product' as const,
    }));

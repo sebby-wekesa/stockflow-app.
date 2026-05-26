@@ -6,6 +6,11 @@ import { z } from 'zod'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { nextInvoiceNumber } from '@/lib/sales'
+import { Prisma } from '@prisma/client'
+
+function isUniqueConstraintError(err: any): boolean {
+  return err?.code === 'P2002' || /unique constraint|duplicate key/i.test(String(err?.message || err))
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SALES SCHEMA NOTES
@@ -101,24 +106,12 @@ export async function createSalesOrder(formData: FormData) {
 
   const productMap = new Map(products.map((p) => [p.id, p]))
 
-  // Pre-flight: check stock for invoiced orders
-  if (action === 'invoice') {
-    for (const line of data.lines) {
-      const product = productMap.get(line.product_id)!
-      if (product.currentStock < Number(line.qty)) {
-        throw new Error(
-          `Insufficient stock for ${product.sku ?? product.name}: have ${product.currentStock}, need ${line.qty}`
-        )
-      }
-    }
-  }
+  const totalAmount = data.lines.reduce(
+    (sum, l) => sum + Number(l.unit_price) * Number(l.qty),
+    0
+  )
 
-  const orderNumber =
-    action === 'invoice'
-      ? await nextInvoiceNumber(user.organizationId, branchRow.code as any)
-      : `DRAFT-${Date.now().toString(36).toUpperCase()}`
-
-  // Ensure the "IMPORTED" placeholder Design exists for FG shadow records
+  // Ensure the "IMPORTED" placeholder Design exists (outside tx for simplicity; low contention)
   let placeholderDesignId: string
   const existingDesign = await db.design.findFirst({
     where: { code: 'IMPORTED' },
@@ -137,75 +130,100 @@ export async function createSalesOrder(formData: FormData) {
     placeholderDesignId = d.id
   }
 
-  const totalAmount = data.lines.reduce(
-    (sum, l) => sum + Number(l.unit_price) * Number(l.qty),
-    0
-  )
+  // Atomic write with retry for invoice# uniqueness under concurrency.
+  // Stock checks+updates are atomic via updateMany (prevents negative stock on race).
+  let result: any
+  let attempts = 0
+  const maxAttempts = 3
+  while (attempts < maxAttempts) {
+    attempts++
+    try {
+      result = await withTenantTransaction(user.organizationId, async (tx) => {
+        const orderNumber =
+          action === 'invoice'
+            ? await nextInvoiceNumber(user.organizationId, branchRow.code as any, tx as any)
+            : `DRAFT-${Date.now().toString(36).toUpperCase()}`
 
-  // Atomic write: order + items + movements + stock decrement
-  const result = await withTenantTransaction(user.organizationId, async (tx) => {
-    const order = await tx.saleOrder.create({
-      data: {
-        id: orderNumber,
-        customerId: data.customer_id || null,
-        customerName: data.customer_name,
-        totalAmount,
-        status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
-        createdBy: user.id,
-      },
-    })
-
-    for (const line of data.lines) {
-      const product = productMap.get(line.product_id)!
-      const qty = Number(line.qty)
-      const unitPrice = Number(line.unit_price)
-
-      // Ensure FinishedGoods shadow exists for this org
-      const fgSku = product.sku || product.id
-      let fg = await tx.finishedGoods.findFirst({ where: { sku: fgSku } })
-      if (!fg) {
-        fg = await tx.finishedGoods.create({
+        const order = await tx.saleOrder.create({
           data: {
-            sku: fgSku,
-            designId: placeholderDesignId,
-            quantity: 0,
-            kgProduced: 0,
-            unitCost: unitPrice,
-          },
-        })
-      }
-
-      await tx.saleItem.create({
-        data: {
-          saleOrderId: order.id,
-          finishedGoodsId: fg.id,
-          quantity: qty,
-          unitPrice,
-          totalPrice: qty * unitPrice,
-        },
-      })
-
-      if (action === 'invoice') {
-        await tx.stockMovement.create({
-          data: {
-            productId: line.product_id,
-            branchId: branchRow.id,
-            movementType: 'sale',
-            quantity: -qty,
-            reference: orderNumber,
-            notes: line.notes ?? `Sale to ${data.customer_name}`,
+            id: orderNumber,
+            customerId: data.customer_id || null,
+            customerName: data.customer_name,
+            totalAmount,
+            status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
+            createdBy: user.id,
           },
         })
 
-        await tx.product.update({
-          where: { id: line.product_id },
-          data: { currentStock: { decrement: qty } },
-        })
+        for (const line of data.lines) {
+          const product = productMap.get(line.product_id)!
+          const qty = Number(line.qty)
+          const unitPrice = Number(line.unit_price)
+
+          // Ensure FinishedGoods shadow exists for this org
+          const fgSku = product.sku || product.id
+          let fg = await tx.finishedGoods.findFirst({ where: { sku: fgSku } })
+          if (!fg) {
+            fg = await tx.finishedGoods.create({
+              data: {
+                sku: fgSku,
+                designId: placeholderDesignId,
+                quantity: 0,
+                kgProduced: 0,
+                unitCost: unitPrice,
+              },
+            })
+          }
+
+          await tx.saleItem.create({
+            data: {
+              saleOrderId: order.id,
+              finishedGoodsId: fg.id,
+              quantity: qty,
+              unitPrice,
+              totalPrice: qty * unitPrice,
+            },
+          })
+
+          if (action === 'invoice') {
+            // Atomic check + decrement: only updates if currentStock >= qty.
+            // Prevents negative stock even under concurrent sales.
+            const stockUpdate = await tx.product.updateMany({
+              where: {
+                id: line.product_id,
+                currentStock: { gte: qty },
+              },
+              data: { currentStock: { decrement: qty } },
+            })
+            if (stockUpdate.count === 0) {
+              throw new Error(
+                `Insufficient stock for ${product.sku ?? product.name}: have less than ${qty} (concurrent sale)`
+              )
+            }
+
+            await tx.stockMovement.create({
+              data: {
+                productId: line.product_id,
+                branchId: branchRow.id,
+                movementType: 'sale',
+                quantity: -qty,
+                reference: orderNumber,
+                notes: line.notes ?? `Sale to ${data.customer_name}`,
+              },
+            })
+          }
+        }
+
+        return order
+      }, { maxWait: 10000, timeout: 30000 })
+      break
+    } catch (err: any) {
+      if (attempts >= maxAttempts || !isUniqueConstraintError(err)) {
+        throw err
       }
+      // Rare race on invoice number: retry will compute next higher number
     }
-
-    return order
-  }, { maxWait: 10000, timeout: 30000 })
+  }
 
   revalidatePath('/sales')
   revalidatePath('/stock')
@@ -229,18 +247,6 @@ export async function confirmDraft(orderId: string) {
     throw new Error('Only pending orders can be confirmed')
   }
 
-  // Verify stock by looking up Product by FG sku
-  for (const line of order.SaleItem) {
-    const product = await db.product.findFirst({
-      where: { sku: line.FinishedGoods.sku },
-    })
-    if (!product || product.currentStock < line.quantity) {
-      throw new Error(
-        `Insufficient stock for ${line.FinishedGoods.sku}: have ${product?.currentStock ?? 0}, need ${line.quantity}`
-      )
-    }
-  }
-
   await withTenantTransaction(user.organizationId, async (tx) => {
     await tx.saleOrder.update({
       where: { id: orderId },
@@ -253,19 +259,30 @@ export async function confirmDraft(orderId: string) {
       })
       if (!product) continue
 
+      const qty = line.quantity
+
+      // Atomic guard + decrement (same pattern as createSalesOrder)
+      const stockUpdate = await tx.product.updateMany({
+        where: {
+          id: product.id,
+          currentStock: { gte: qty },
+        },
+        data: { currentStock: { decrement: qty } },
+      })
+      if (stockUpdate.count === 0) {
+        throw new Error(
+          `Insufficient stock for ${line.FinishedGoods.sku}: have less than ${qty} (concurrent sale)`
+        )
+      }
+
       await tx.stockMovement.create({
         data: {
           productId: product.id,
           movementType: 'sale',
-          quantity: -line.quantity,
+          quantity: -qty,
           reference: order.id,
           notes: `Sale confirmed for ${order.customerName}`,
         },
-      })
-
-      await tx.product.update({
-        where: { id: product.id },
-        data: { currentStock: { decrement: line.quantity } },
       })
     }
   }, { maxWait: 10000, timeout: 30000 })

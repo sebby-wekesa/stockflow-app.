@@ -57,22 +57,22 @@ export function getTenantPrisma(organizationId: string): TenantPrismaClient {
     query: {
       $allModels: {
         // READ operations: inject organizationId into where
-        async findFirst({ args, query, model }) {
+        async findFirst({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async findMany({ args, query, model }) {
+        async findMany({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async findFirstOrThrow({ args, query, model }) {
+        async findFirstOrThrow({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async findUnique({ args, query, model }) {
+        async findUnique({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           // findUnique can only use unique keys, so we can't add org to where directly.
           // Instead, run the query then double-check the result belongs to this tenant.
@@ -83,7 +83,7 @@ export function getTenantPrisma(organizationId: string): TenantPrismaClient {
           }
           return result
         },
-        async findUniqueOrThrow({ args, query, model }) {
+        async findUniqueOrThrow({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           const result = await query(args)
           if (result && (result as any).organizationId &&
@@ -94,29 +94,29 @@ export function getTenantPrisma(organizationId: string): TenantPrismaClient {
           }
           return result
         },
-        async count({ args, query, model }) {
+        async count({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async aggregate({ args, query, model }) {
+        async aggregate({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async groupBy({ args, query, model }) {
+        async groupBy({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
 
         // WRITE operations: inject organizationId into data
-        async create({ args, query, model }) {
+        async create({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.data = { ...(args.data ?? {}), organizationId } as any
           return query(args)
         },
-        async createMany({ args, query, model }) {
+        async createMany({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           if (Array.isArray(args.data)) {
             args.data = args.data.map((row: any) => ({ ...row, organizationId })) as any
@@ -125,7 +125,7 @@ export function getTenantPrisma(organizationId: string): TenantPrismaClient {
           }
           return query(args)
         },
-        async update({ args, query, model }) {
+        async update({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           // Cannot add to where (unique filter only). Verify after.
           // We use updateMany internally pattern: pre-check the record belongs to us.
@@ -134,24 +134,24 @@ export function getTenantPrisma(organizationId: string): TenantPrismaClient {
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async updateMany({ args, query, model }) {
+        async updateMany({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async upsert({ args, query, model }) {
+        async upsert({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           args.create = { ...(args.create ?? {}), organizationId } as any
           // update doesn't need organizationId injected since it can't change
           return query(args)
         },
-        async delete({ args, query, model }) {
+        async delete({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)
         },
-        async deleteMany({ args, query, model }) {
+        async deleteMany({ args, query, model }: { args: any; query: (a: any) => Promise<any>; model: string }) {
           if (UNSCOPED_MODELS.has(model)) return query(args)
           args.where = { ...(args.where ?? {}), organizationId }
           return query(args)

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
+import { withRetry } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export default async function JobsPage({
   if (status) where.status = status
 
   const [jobs, total] = await Promise.all([
-    db.productionOrder.findMany({
+    withRetry(() => db.productionOrder.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: PAGE_SIZE,
@@ -43,8 +44,8 @@ export default async function JobsPage({
           select: { completedAt: true, kgIn: true, kgOut: true, sequence: true }
         }
       }
-    }),
-    db.productionOrder.count({ where }),
+    }), undefined),
+    withRetry(() => db.productionOrder.count({ where }), undefined),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)

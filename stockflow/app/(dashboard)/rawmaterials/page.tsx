@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getTenantPrisma } from "@/lib/tenant-prisma"
 import { requireActiveAuth } from "@/lib/auth"
+import { withRetry } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic';
 
@@ -8,13 +9,13 @@ export default async function RawmaterialsPage() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
-  const materials = await db.rawMaterial.findMany();
+  const materials = await withRetry(() => db.rawMaterial.findMany(), undefined);
   
-  const receipts = await db.materialReceipt.findMany({
+  const receipts = await withRetry(() => db.materialReceipt.findMany({
     include: { RawMaterial: true },
     orderBy: { createdAt: 'desc' },
     take: 20
-  }).catch(() => []); // Temporary fallback if schema is out of sync
+  }), undefined).catch(() => []); // Temporary fallback if schema is out of sync
 
   return (
     <div>

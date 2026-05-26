@@ -50,10 +50,17 @@ export async function matchProductName(
       select: { product_id: true, alias: true },
     })
 
-    const productMap = new Map(products.map((p) => [p.id, p]))
+    // Project to the narrow MatchResult.product shape (sku can be null in
+    // some product origins, so the type widens here intentionally).
+    const slimProducts = products.map((p) => ({
+      id: p.id,
+      sku: (p.sku ?? null) as string | null,
+      name: p.name,
+    }))
+    const productMap = new Map(slimProducts.map((p) => [p.id, p]))
 
     // Index canonical names
-    for (const product of products) {
+    for (const product of slimProducts) {
       const canonicalKey = normaliseForMatching(product.name)
       orgCache.set(canonicalKey, { product, confidence: 1.0 })
     }
