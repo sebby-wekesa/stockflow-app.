@@ -35,12 +35,50 @@ type StageLogWithOrder = StageLog & {
   ProductionOrder: ProductionOrder;
 }
 
+type FinishedGoodsAggregate = {
+  _sum: {
+    kgProduced: Prisma.Decimal | null;
+    quantity: number | null;
+  };
+};
+
+type PendingApproval = ProductionOrder & {
+  design: Design;
+};
+
+type ActiveProductionSummary = {
+  currentDept: string | null;
+  _count: {
+    _all: number;
+  };
+  _sum: {
+    targetKg: number | null;
+  };
+};
+
 function toNumber(value: Prisma.Decimal | number | null | undefined) {
   if (typeof value === "number") {
     return value;
   }
 
   return value?.toNumber() ?? 0;
+}
+
+const DEFAULT_DASHBOARD_QUERY_BATCH_SIZE = 3;
+const MAX_DASHBOARD_QUERY_BATCH_SIZE = 10;
+
+function getDashboardQueryBatchSize(value: string | undefined) {
+  if (!value) return DEFAULT_DASHBOARD_QUERY_BATCH_SIZE;
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    console.warn(
+      `Invalid DB_QUERY_BATCH_SIZE="${value}". Falling back to ${DEFAULT_DASHBOARD_QUERY_BATCH_SIZE}.`
+    );
+    return DEFAULT_DASHBOARD_QUERY_BATCH_SIZE;
+  }
+
+  return Math.min(Math.floor(parsed), MAX_DASHBOARD_QUERY_BATCH_SIZE);
 }
 
 export async function getDashboardStats(user?: AuthUser, role?: Role) {
@@ -60,8 +98,8 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
 
   // 2. Active Orders - Filter based on role (compute the where clauses up front
   //    so we can use them in the parallel fetch below)
-  let activeOrdersWhere: any = {};
-  let pendingApprovalsWhere: any = {};
+  let activeOrdersWhere: Prisma.ProductionOrderWhereInput = {};
+  let pendingApprovalsWhere: Prisma.ProductionOrderWhereInput = {};
 
   if (isOperator) {
     activeOrdersWhere = {
@@ -81,7 +119,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   }
 
   // 5. Recent Orders - Filter based on role
-  let recentOrdersWhere: any = {};
+  let recentOrdersWhere: Prisma.ProductionOrderWhereInput = {};
   if (isOperator) {
     recentOrdersWhere = { currentDept: authUser.department };
   } else if (isWarehouse || isSales) {
@@ -105,7 +143,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
     return results
   }
 
-  const queryTasks: Array<() => Promise<any>> = [
+  const queryTasks: Array<() => Promise<unknown>> = [
     () => db.rawMaterial.findMany().catch((e) => { console.warn('Failed to fetch raw materials:', e); return [] as RawMaterial[]; }),
     () => db.productionOrder.count({ where: activeOrdersWhere }).catch((e) => { console.warn('Failed to count active orders:', e); return 0; }),
     () => (fetchPendingApprovals
@@ -141,11 +179,12 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
     weeklyLogsRaw,
     recentOrdersRaw,
     todayLogsRaw,
-  ] = await runBatches(queryTasks, Number(process.env.DB_QUERY_BATCH_SIZE || 3));
+  ] = await runBatches(queryTasks, getDashboardQueryBatchSize(process.env.DB_QUERY_BATCH_SIZE));
 
   const materialsTyped = materials as RawMaterial[];
-  const activeOrdersCount = activeOrdersCountRaw;
-  const pendingApprovalsCount = pendingApprovalsCountRaw;
+  const activeOrdersCount = activeOrdersCountRaw as number;
+  const pendingApprovalsCount = pendingApprovalsCountRaw as number;
+  const finishedGoodsAgg = finishedGoodsAggRaw as FinishedGoodsAggregate;
   const weeklyLogs = weeklyLogsRaw as StageLog[];
   const recentOrders = recentOrdersRaw as (ProductionOrder & { design: Design })[];
   const todayLogs = todayLogsRaw as StageLog[];
@@ -163,8 +202,8 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   // 3. Finished Goods totals (already aggregated above)
   const finishedGoods = {
     _sum: {
-      kgProduced: finishedGoodsAggRaw._sum.kgProduced?.toNumber() ?? null,
-      quantity: finishedGoodsAggRaw._sum.quantity ?? null,
+      kgProduced: finishedGoodsAgg._sum.kgProduced?.toNumber() ?? null,
+      quantity: finishedGoodsAgg._sum.quantity ?? null,
     }
   };
 
@@ -360,7 +399,7 @@ export async function getManagerData() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
-  let pendingApprovals: any[] = []
+  let pendingApprovals: PendingApproval[] = []
   try {
     pendingApprovals = await db.productionOrder.findMany({
       where: { status: 'PENDING' },
@@ -371,7 +410,7 @@ export async function getManagerData() {
     pendingApprovals = []
   }
 
-  let activeProduction: any[] = []
+  let activeProduction: ActiveProductionSummary[] = []
   try {
     const grouped = await db.productionOrder.groupBy({
       by: ['currentDept'],

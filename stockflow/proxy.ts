@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeUserRole } from '@/lib/types'
 import { getRoleHomePage } from '@/lib/auth-session'
@@ -29,6 +29,15 @@ const STATUS_ROUTES = [
   '/signup',
 ]
 
+type OrganizationStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
+
+type UserContextRow = {
+  role?: string | null
+  Organization?: {
+    status?: OrganizationStatus | null
+  } | null
+}
+
 async function resolveUserContext(userId: string, fallbackRole?: string) {
   const supabaseAdmin = getSupabaseAdmin()
   if (!supabaseAdmin) {
@@ -49,10 +58,11 @@ async function resolveUserContext(userId: string, fallbackRole?: string) {
       return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
     }
 
-    const orgStatus = (data as any)?.Organization?.status ?? 'ACTIVE'
+    const userContext = data as UserContextRow | null
+    const orgStatus = userContext?.Organization?.status ?? 'ACTIVE'
     return {
-      role: normalizeUserRole((data as any)?.role ?? fallbackRole),
-      orgStatus: orgStatus as 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED',
+      role: normalizeUserRole(userContext?.role ?? fallbackRole),
+      orgStatus,
     }
   } catch (error) {
     console.error('User context lookup error:', error)
@@ -60,10 +70,10 @@ async function resolveUserContext(userId: string, fallbackRole?: string) {
   }
 }
 
-export default async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Skip middleware for API routes, static assets, and Next.js internals
+  // Skip proxy for API routes, static assets, and Next.js internals
   if (
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
@@ -85,10 +95,10 @@ export default async function middleware(request: NextRequest) {
         get(name: string) {
           return request.cookies.get(name)?.value
         },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options: CookieOptions) {
           response.cookies.set({ name, value, ...options })
         },
-        remove(name: string, options: any) {
+        remove(name: string, options: CookieOptions) {
           response.cookies.set({ name, value: '', ...options })
         },
       },
@@ -108,7 +118,7 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Has a valid user — look up role and org status
+  // Has a valid user - look up role and org status
   const ctx = await resolveUserContext(
     user.id,
     user.user_metadata?.role
@@ -139,7 +149,7 @@ export default async function middleware(request: NextRequest) {
 
   // ACTIVE org from here on
 
-  // On /login while logged in → bounce to their home page
+  // On /login while logged in -> bounce to their home page
   if (pathname === '/login') {
     const homePage = getRoleHomePage(ctx.role)
     if (homePage !== pathname) {
@@ -147,7 +157,7 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
-  // On status routes while ACTIVE → no need, send to dashboard
+  // On status routes while ACTIVE -> no need, send to dashboard
   if (isStatusRoute && pathname !== '/signup') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
