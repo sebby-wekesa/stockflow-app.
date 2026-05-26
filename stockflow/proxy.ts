@@ -41,6 +41,32 @@ type UserContextRow = {
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development'
 
+  // Allow a more compatible policy by default in production to avoid
+  // breaking third-party resources while we iterate. Set CSP_STRICT=1 to
+  // enforce the strict per-request nonce+strict-dynamic policy.
+  const strict = process.env.CSP_STRICT === '1'
+
+  if (!strict) {
+    return [
+      "default-src 'self'",
+      // Include https: so external scripts (CDNs) load. Include 'unsafe-inline' as
+      // a temporary compatibility measure. Use CSP_STRICT=1 to re-enable strict mode.
+      `script-src 'self' 'nonce-${nonce}' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https:`,
+      // Allow Google Fonts stylesheet
+      `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com 'unsafe-inline'`,
+      // Prefer style-src-elem to control stylesheet loading
+      `style-src-elem 'self' https://fonts.googleapis.com`,
+      `img-src 'self' blob: data: https:`,
+      `font-src 'self' https://fonts.gstatic.com data:`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https:`,
+      `object-src 'none'`,
+      `base-uri 'self'`,
+      `form-action 'self'`,
+      `frame-ancestors 'none'`,
+      `upgrade-insecure-requests`,
+    ].join('; ')
+  }
+
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
