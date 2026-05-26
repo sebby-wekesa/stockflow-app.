@@ -312,6 +312,30 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
   };
 }
 
+export async function approveOrder(orderId: string) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  // Only managers and admins can approve
+  if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
+    throw new Error('Forbidden: insufficient permissions')
+  }
+
+  // Ensure order exists and is pending
+  const order = await db.productionOrder.findUnique({ where: { id: orderId } });
+  if (!order) throw new Error('Order not found');
+  if (order.status !== 'PENDING') throw new Error('Only pending orders can be approved');
+
+  await db.productionOrder.update({
+    where: { id: orderId },
+    data: { status: 'APPROVED', approvedBy: user.id, approvedAt: new Date() },
+  });
+
+  revalidatePath('/manager');
+  revalidatePath('/admin/approvals');
+  return { success: true };
+}
+
 export async function getManagerData() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
