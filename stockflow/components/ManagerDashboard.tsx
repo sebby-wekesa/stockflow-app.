@@ -1,4 +1,4 @@
-import { getManagerData, approveOrder } from '@/app/actions/dashboard'
+import { getManagerData, approveOrderAction } from '@/app/actions/dashboard'
 import Link from 'next/link'
 
 export default async function ManagerDashboard() {
