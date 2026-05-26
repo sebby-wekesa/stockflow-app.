@@ -50,7 +50,8 @@ export default async function ManagerDashboard() {
                 <div className="card-sm"><div style={{fontSize:'10px',color:'var(--muted)'}}>SPECIFICATIONS</div><div style={{fontSize:'12px',marginTop:'3px'}}>{order.design?.code} · {order.targetDims ?? order.design?.targetDimensions ?? '—'}</div></div>
               </div>
               <div className="approval-actions">
-                <form action={approveOrder.bind(null, order.id)}>
+                <form action={approveOrderAction} method="post">
+                  <input type="hidden" name="orderId" value={order.id} />
                   <button className="btn btn-teal">Approve & release</button>
                 </form>
                 <Link href={`/production-orders/${order.id}/edit`} className="btn btn-ghost">Edit specs</Link>

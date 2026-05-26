@@ -336,6 +336,13 @@ export async function approveOrder(orderId: string) {
   return { success: true };
 }
 
+// Server Action wrapper for <form action=> usage
+export async function approveOrderAction(formData: FormData) {
+  const orderId = String(formData.get('orderId') ?? '')
+  if (!orderId) throw new Error('Invalid order id')
+  await approveOrder(orderId)
+}
+
 export async function getManagerData() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
