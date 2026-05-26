@@ -11,10 +11,8 @@ import { clearAuthCookies } from "@/lib/auth-session";
 // use the base prisma client because no organizationId exists yet.
 // This is documented as an approved Week 2 exception.
 import { prisma, withRetry } from "@/lib/prisma";
-import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { loginSchema } from "@/lib/validations";
-import { ALL_BRANCHES } from "@/lib/branches";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { checkRateLimitAsync, getClientIp } from "@/lib/rate-limit";
 
 const ROLE_PATHS = {
   ADMIN: "/admin/dashboard",
@@ -80,7 +78,7 @@ export async function signIn(formData: FormData) {
   // Check happens BEFORE input validation so even malformed requests count.
   const ip = await getClientIp();
   const rlKey = `signin:${ip}:${(email ?? '').toLowerCase().trim()}`;
-  const rl = checkRateLimit(rlKey, { windowMs: 60_000, maxRequests: 5 });
+  const rl = await checkRateLimitAsync(rlKey, { windowMs: 60_000, maxRequests: 5 });
   if (!rl.success) {
     return { error: rl.error };
   }
@@ -122,70 +120,50 @@ export async function signIn(formData: FormData) {
     return { error: "Authentication failed. Please try again." };
   }
 
-  // Fire the DB sync work in the background — do NOT block the login response
-  // This prevents slow logins when the DB is under load or timing out.
-  void (async () => {
-    try {
-      const existingUser = await withRetry(() =>
-        prisma.user.findUnique({ where: { id: data.user.id } })
-      );
-
-      if (!existingUser) {
-        await withRetry(() =>
-          prisma.user.create({
-            data: {
-              id: data.user.id,
-              email: data.user.email!,
-              name: data.user.user_metadata?.name || '',
-              role: (data.user.user_metadata?.role as any) || 'PENDING',
-              password: 'SUPABASE_AUTH',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          })
-        );
-        console.log("Created new user record in database");
-      } else {
-        if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
-          await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
-            user_metadata: { 
-              name: existingUser.name,
-              role: existingUser.role
-            }
-          });
-          console.log("Updated user metadata with current role from database");
-        }
-        console.log("User record already exists in database");
-      }
-
-      // Ensure user has an organization (create default if missing)
-      const userWithOrg = await prisma.user.findUnique({
+  // Verify the user has a fully-set-up account in our Prisma database.
+  // In multitenant mode, never auto-create a User row or attach a user to
+  // the first available organization. Users must arrive via signup or invite.
+  try {
+    const existingUser = await withRetry(() =>
+      prisma.user.findUnique({
         where: { id: data.user.id },
-        include: { Organization: true }
-      });
-      if (!userWithOrg?.Organization) {
-        let org = await prisma.organization.findFirst();
-        if (!org) {
-          org = await prisma.organization.create({
-            data: { 
-              name: "Default Org", 
-              code: "DEFAULT",
-              slug: "default-org"
-            }
-          });
-        }
-        await prisma.user.update({
-          where: { id: data.user.id },
-          data: { organizationId: org.id }
-        });
-        console.log("Linked user to organization:", org.id);
-      }
-    } catch (dbError) {
-      console.error("Background DB sync after login failed:", dbError);
-    }
-  })();
+        select: { id: true, role: true, name: true, organizationId: true },
+      })
+    );
 
-  console.log("Login successful, session and database records established");
+    if (!existingUser) {
+      await supabase.auth.signOut();
+      return {
+        error:
+          "Your account isn't fully set up. Please complete signup or ask your administrator to invite you.",
+      };
+    }
+
+    if (!existingUser.organizationId) {
+      await supabase.auth.signOut();
+      return {
+        error:
+          "Your account isn't linked to an organization. Please contact support.",
+      };
+    }
+
+    if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
+      await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+        user_metadata: {
+          name: existingUser.name,
+          role: existingUser.role,
+        },
+      });
+    }
+  } catch (dbError) {
+    console.error("Sign-in verification failed:", dbError);
+    await supabase.auth.signOut();
+    return {
+      error: "Unable to verify your account. Please try again or contact support.",
+    };
+  }
+
+  console.log("Login successful, session and database records verified");
   return { success: true };
 }
 

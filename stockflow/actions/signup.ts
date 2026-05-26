@@ -18,7 +18,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import { checkRateLimitAsync, getClientIp } from '@/lib/rate-limit'
 import { validatePassword } from '@/lib/security'
 
 const signUpSchema = z.object({
@@ -87,7 +87,7 @@ async function generateUniqueOrgIdentifiers(name: string): Promise<{ slug: strin
 export async function signUpOrganization(formData: FormData) {
   // Rate-limit: 3 signups per hour per IP.
   const ip = await getClientIp()
-  const rl = checkRateLimit(`signup:${ip}`, {
+  const rl = await checkRateLimitAsync(`signup:${ip}`, {
     windowMs: 60 * 60_000,
     maxRequests: 3,
   })

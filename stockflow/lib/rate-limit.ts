@@ -1,12 +1,8 @@
 // lib/rate-limit.ts
 //
-// In-memory rate limiter.
-//
-// LIMITATION: in serverless deployments (Vercel, Lambda) each instance has
-// its own Map, so an attacker hitting parallel cold instances bypasses the
-// limit. This is acceptable as a first line of defence but you should swap
-// to a Redis-backed limiter (Upstash, Redis Cloud) before going public with
-// signup. See Phase 5 in the audit plan.
+// Rate limiter with two backends:
+//   1. Upstash Redis, selected when UPSTASH_REDIS_REST_URL and token are set
+//   2. In-memory Map for local development and fallback
 
 interface RateLimitEntry {
   count: number;
@@ -21,15 +17,15 @@ export interface RateLimitOptions {
   keyGenerator?: (request: Request) => string;
 }
 
-/**
- * Lower-level check used by both the request-based middleware and the
- * Server-Action friendly checkRateLimit() below.
- */
-function checkAndIncrement(
+type RateLimitResult =
+  | { success: true }
+  | { success: false; error: string; resetIn: number };
+
+function checkAndIncrementInMemory(
   key: string,
   windowMs: number,
   maxRequests: number
-): { success: true } | { success: false; error: string; resetIn: number } {
+): RateLimitResult {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
 
@@ -52,6 +48,73 @@ function checkAndIncrement(
   return { success: true };
 }
 
+function isUpstashConfigured(): boolean {
+  return Boolean(
+    process.env.UPSTASH_REDIS_REST_URL &&
+    process.env.UPSTASH_REDIS_REST_TOKEN
+  );
+}
+
+async function checkAndIncrementUpstash(
+  key: string,
+  windowMs: number,
+  maxRequests: number
+): Promise<RateLimitResult> {
+  const url = process.env.UPSTASH_REDIS_REST_URL!;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN!;
+  const windowSec = Math.ceil(windowMs / 1000);
+  const redisKey = `rl:${key}`;
+
+  let pipelineResult: Array<{ result?: number | string; error?: string }>;
+  try {
+    const res = await fetch(`${url}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["INCR", redisKey],
+        ["EXPIRE", redisKey, String(windowSec), "NX"],
+        ["PTTL", redisKey],
+      ]),
+      signal: AbortSignal.timeout(2000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Upstash returned HTTP ${res.status}`);
+    }
+
+    pipelineResult = await res.json();
+
+    // Validate pipeline shape — Upstash returns an array of arrays per command
+    if (!Array.isArray(pipelineResult) || pipelineResult.length < 3) {
+      console.error('[rate-limit] Unexpected Upstash pipeline response:', pipelineResult);
+      return { success: true };
+    }
+  } catch (err) {
+    console.error(
+      "[rate-limit] Upstash unreachable, allowing request:",
+      err instanceof Error ? err.message : err
+    );
+    return { success: true };
+  }
+
+  const count = Number(pipelineResult[0]?.result ?? 0);
+  const pttlMs = Number(pipelineResult[2]?.result ?? windowMs);
+
+  if (count > maxRequests) {
+    const resetIn = Math.max(1, Math.ceil(pttlMs / 1000));
+    return {
+      success: false,
+      error: `Too many attempts. Try again in ${resetIn} seconds.`,
+      resetIn,
+    };
+  }
+
+  return { success: true };
+}
+
 /**
  * Existing request-based middleware factory. Kept as-is for the existing
  * API-route caller (app/api/production-orders/route.ts).
@@ -66,30 +129,33 @@ export function rateLimit(options: RateLimitOptions) {
         return `${req.method}:${req.url}:${ip}`;
       });
 
-    return checkAndIncrement(
-      keyGenerator(request),
-      options.windowMs,
-      options.maxRequests
-    );
+    return checkRateLimitAsync(keyGenerator(request), {
+      windowMs: options.windowMs,
+      maxRequests: options.maxRequests,
+    });
   };
 }
 
 /**
- * Server Action-friendly rate limiter. Takes a string key directly because
- * Server Actions don't have access to a Request object.
- *
- * Usage:
- *   import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
- *
- *   const ip = await getClientIp()
- *   const rl = checkRateLimit(`login:${ip}`, { windowMs: 60_000, maxRequests: 5 })
- *   if (!rl.success) return { error: rl.error }
+ * Synchronous in-memory rate limiter kept for backwards compatibility.
+ * Prefer checkRateLimitAsync for new call sites so production can use Upstash.
  */
 export function checkRateLimit(
   key: string,
   options: { windowMs: number; maxRequests: number }
 ) {
-  return checkAndIncrement(key, options.windowMs, options.maxRequests);
+  return checkAndIncrementInMemory(key, options.windowMs, options.maxRequests);
+}
+
+export async function checkRateLimitAsync(
+  key: string,
+  options: { windowMs: number; maxRequests: number }
+): Promise<RateLimitResult> {
+  if (isUpstashConfigured()) {
+    return checkAndIncrementUpstash(key, options.windowMs, options.maxRequests);
+  }
+
+  return checkAndIncrementInMemory(key, options.windowMs, options.maxRequests);
 }
 
 /**

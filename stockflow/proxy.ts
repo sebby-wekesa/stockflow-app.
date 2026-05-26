@@ -38,6 +38,48 @@ type UserContextRow = {
   } | null
 }
 
+function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV === 'development'
+
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
+    `style-src 'self' 'nonce-${nonce}'`,
+    "style-src-attr 'unsafe-inline'",
+    "img-src 'self' blob: data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join('; ')
+}
+
+function createNonce(): string {
+  return btoa(crypto.randomUUID())
+}
+
+function createForwardedHeaders(request: NextRequest, nonce: string): Headers {
+  const forwardedHeaders = new Headers(request.headers)
+  forwardedHeaders.set('x-nonce', nonce)
+  return forwardedHeaders
+}
+
+function applySecurityHeaders(response: NextResponse, nonce: string): NextResponse {
+  const csp = buildCsp(nonce)
+
+  response.headers.set('x-nonce', nonce)
+  if (process.env.CSP_REPORT_ONLY === '1') {
+    response.headers.set('Content-Security-Policy-Report-Only', csp)
+  } else {
+    response.headers.set('Content-Security-Policy', csp)
+  }
+
+  return response
+}
+
 async function resolveUserContext(userId: string, fallbackRole?: string) {
   const supabaseAdmin = getSupabaseAdmin()
   if (!supabaseAdmin) {
@@ -72,21 +114,30 @@ async function resolveUserContext(userId: string, fallbackRole?: string) {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const nonce = createNonce()
 
-  // Skip proxy for API routes, static assets, and Next.js internals
+  // Skip auth/routing logic for API routes, static assets, and Next.js
+  // internals, but still attach CSP to the response.
   if (
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
     pathname.includes('.')
   ) {
-    return NextResponse.next()
+    return applySecurityHeaders(
+      NextResponse.next({
+        request: { headers: createForwardedHeaders(request, nonce) },
+      }),
+      nonce
+    )
   }
 
   const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
   const isStatusRoute = STATUS_ROUTES.some(route => pathname.startsWith(route))
 
   // Create Supabase client to read session cookies
-  const response = NextResponse.next()
+  const response = NextResponse.next({
+    request: { headers: createForwardedHeaders(request, nonce) },
+  })
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -110,12 +161,12 @@ export async function proxy(request: NextRequest) {
   // No session / invalid token
   if (!user) {
     if (isPublicRoute) {
-      return response // allow access
+      return applySecurityHeaders(response, nonce) // allow access
     }
     // Redirect to login, preserving the intended destination
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
-    return NextResponse.redirect(loginUrl)
+    return applySecurityHeaders(NextResponse.redirect(loginUrl), nonce)
   }
 
   // Has a valid user - look up role and org status
@@ -128,23 +179,32 @@ export async function proxy(request: NextRequest) {
   // explanation page and log out
   if (ctx.orgStatus === 'SUSPENDED') {
     if (pathname === '/account-suspended' || pathname === '/login') {
-      return response
+      return applySecurityHeaders(response, nonce)
     }
-    return NextResponse.redirect(new URL('/account-suspended', request.url))
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL('/account-suspended', request.url)),
+      nonce
+    )
   }
   if (ctx.orgStatus === 'CLOSED') {
     if (pathname === '/account-closed' || pathname === '/login') {
-      return response
+      return applySecurityHeaders(response, nonce)
     }
-    return NextResponse.redirect(new URL('/account-closed', request.url))
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL('/account-closed', request.url)),
+      nonce
+    )
   }
 
   // PENDING_APPROVAL users can only see the waiting screen and log out
   if (ctx.orgStatus === 'PENDING_APPROVAL') {
     if (pathname === '/awaiting-approval' || pathname === '/login') {
-      return response
+      return applySecurityHeaders(response, nonce)
     }
-    return NextResponse.redirect(new URL('/awaiting-approval', request.url))
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL('/awaiting-approval', request.url)),
+      nonce
+    )
   }
 
   // ACTIVE org from here on
@@ -153,22 +213,31 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/login') {
     const homePage = getRoleHomePage(ctx.role)
     if (homePage !== pathname) {
-      return NextResponse.redirect(new URL(homePage, request.url))
+      return applySecurityHeaders(
+        NextResponse.redirect(new URL(homePage, request.url)),
+        nonce
+      )
     }
   }
 
   // On status routes while ACTIVE -> no need, send to dashboard
   if (isStatusRoute && pathname !== '/signup') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL('/dashboard', request.url)),
+      nonce
+    )
   }
 
   // Admin route protection
   if (pathname.startsWith('/admin') && ctx.role !== 'ADMIN') {
     const homePage = getRoleHomePage(ctx.role)
-    return NextResponse.redirect(new URL(homePage, request.url))
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL(homePage, request.url)),
+      nonce
+    )
   }
 
-  return response
+  return applySecurityHeaders(response, nonce)
 }
 
 export const config = {

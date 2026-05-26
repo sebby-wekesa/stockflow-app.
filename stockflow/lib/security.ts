@@ -1,6 +1,12 @@
 // lib/security.ts
 // Security utilities and headers
 
+/**
+ * @deprecated Security headers are now applied globally via next.config.ts
+ * headers() and proxy.ts CSP nonce handling. API routes no longer need to
+ * call this helper. CSP is intentionally omitted here so it cannot shadow
+ * the nonce-based global policy.
+ */
 export function getSecurityHeaders() {
   return {
     'X-Content-Type-Options': 'nosniff',
@@ -8,16 +14,6 @@ export function getSecurityHeaders() {
     'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-    // Content Security Policy - adjust based on your needs
-    'Content-Security-Policy': [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self'",
-      "connect-src 'self'",
-      "frame-ancestors 'none'",
-    ].join('; '),
   };
 }
 

@@ -45,15 +45,13 @@ export function OrgActions({
       setError('Please provide a reason (at least 3 characters)')
       return
     }
-    const fd = new FormData()
-    fd.set('reason', reason)
     setError(null)
     startTransition(async () => {
       try {
         if (showReason === 'suspend') {
-          await suspendOrganization(orgId, fd)
+          await suspendOrganization(orgId, reason)
         } else if (showReason === 'reject') {
-          await rejectOrganization(orgId, fd)
+          await rejectOrganization(orgId, reason)
         }
         setShowReason(null)
         setReason('')
