@@ -83,22 +83,30 @@ export default async function BranchStockPage({
       // Branch summaries
       Promise.all(
         ALL_BRANCHES.map(async (branch) => {
+          // Build aggregate args and log them to diagnose Prisma error
+          const rawArgs = {
+            where: { Branch: { code: branch }, availableKg: { gt: 0 } },
+            _sum: { availableKg: true },
+            _count: true,
+          }
+
+          const finishedArgs = {
+            where: { Branch: { code: branch }, availableQty: { gt: 0 } },
+            _sum: { availableQty: true },
+            _count: true,
+          }
+
+          console.log('aggregate rawArgs:', JSON.stringify(rawArgs))
+          console.log('aggregate finishedArgs:', JSON.stringify(finishedArgs))
+
           const [rawAgg, finishedAgg] = await Promise.all([
-            db.inventoryRawMaterial.aggregate({
-              where: { Branch: { code: branch }, availableKg: { gt: 0 } },
-              _sum: { availableKg: true },
-              _count: { _all: true },
-            }),
-            db.inventoryFinishedGoods.aggregate({
-              where: { Branch: { code: branch }, availableQty: { gt: 0 } },
-              _sum: { availableQty: true },
-              _count: { _all: true },
-            }),
+            db.inventoryRawMaterial.aggregate(rawArgs),
+            db.inventoryFinishedGoods.aggregate(finishedArgs),
           ])
 
           const [rawLowStock, finishedLowStock] = await Promise.all([
-            db.inventoryRawMaterial.count({ where: { Branch: { code: branch }, availableKg: { gt: 0, lt: 5 } } }),
-            db.inventoryFinishedGoods.count({ where: { Branch: { code: branch }, availableQty: { gt: 0, lt: 5 } } }),
+            db.inventoryRawMaterial.count({ where: { Branch: { code: branch }, availableKg: { gt: 0, lt: 5, } } }),
+            db.inventoryFinishedGoods.count({ where: { Branch: { code: branch }, availableQty: { gt: 0, lt: 5, } } }),
           ])
 
           const [valuedRaw, valuedFinished] = await Promise.all([
@@ -127,8 +135,8 @@ export default async function BranchStockPage({
 
       // Global low stock count
       Promise.all([
-        db.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5 } } }),
-        db.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5 } } }),
+        db.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5, } } }),
+        db.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5, } } }),
       ]).then(([r, f]) => r + f),
 
       // All raw + finished stock (for per-product branch breakdown)
