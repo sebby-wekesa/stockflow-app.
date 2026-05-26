@@ -80,6 +80,7 @@ export async function createBranch(formData: FormData) {
         location: parsed.data.location ?? null,
         address: parsed.data.address ?? null,
         phone: parsed.data.phone ?? null,
+        organizationId: user.organizationId,
       },
     })
   } catch (err) {
