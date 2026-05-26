@@ -118,7 +118,9 @@ async function getAdminStats(db: any): Promise<AdminStats> {
   });
 
   // Department throughput for today (from StageLog + active ProductionOrders)
-  const knownDepts = ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding'];
+  // Load department list from tenant settings if present
+  const { getDepartmentsForOrg } = await import('@/lib/department-settings')
+  const knownDepts = (getDepartmentsForOrg(user.organizationId) || ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding']);
 
   const activeByDeptRaw = await withRetry<any[]>(() => db.productionOrder.groupBy({
     by: ['currentDept'],

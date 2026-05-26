@@ -1,4 +1,5 @@
 import InviteUserModal from "@/components/admin/InviteUserModal";
+import DeptEditor from '@/components/admin/DeptEditor'
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,11 @@ export default function SettingsPage() {
         <p className="text-muted">
           This page allows you to manage users and platform-wide settings.
         </p>
+      </div>
+
+      <div className="card mt-6">
+        <h2 className="section-title mb-4">Department configuration</h2>
+        <DeptEditor />
       </div>
     </>
   );
