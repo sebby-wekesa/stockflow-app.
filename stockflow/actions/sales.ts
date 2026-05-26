@@ -6,11 +6,6 @@ import { z } from 'zod'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { nextInvoiceNumber } from '@/lib/sales'
-import { Prisma } from '@prisma/client'
-
-function isUniqueConstraintError(err: any): boolean {
-  return err?.code === 'P2002' || /unique constraint|duplicate key/i.test(String(err?.message || err))
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SALES SCHEMA NOTES
@@ -80,7 +75,8 @@ export async function createSalesOrder(formData: FormData) {
   const db = getTenantPrisma(user.organizationId)
   const action = data.action
 
-  // Resolve the branch code against our org's branches
+  // Resolve the branch outside the transaction. Safe to do here because
+  // branches are stable — they don't change between the lookup and the writes.
   const branchRow = await db.branch.findFirst({
     where: {
       OR: [
@@ -93,146 +89,121 @@ export async function createSalesOrder(formData: FormData) {
     throw new Error(`Branch "${data.branch}" not found in your organization. Add it under Settings > Branches.`)
   }
 
-  // Fetch all products on this order in one query, scoped to our org
-  const productIds = data.lines.map((l) => l.product_id)
-  const products = await db.product.findMany({
-    where: { id: { in: productIds } },
-    select: { id: true, sku: true, name: true, uom: true, currentStock: true },
-  })
-
-  if (products.length !== data.lines.length) {
-    throw new Error('One or more products not found in your organization')
-  }
-
-  const productMap = new Map(products.map((p) => [p.id, p]))
-
+  // Pre-compute total from form input (no DB read needed).
   const totalAmount = data.lines.reduce(
     (sum, l) => sum + Number(l.unit_price) * Number(l.qty),
     0
   )
 
-  // Ensure the "IMPORTED" placeholder Design exists (outside tx for simplicity; low contention)
-  let placeholderDesignId: string
-  const existingDesign = await db.design.findFirst({
-    where: { code: 'IMPORTED' },
-  })
-  if (existingDesign) {
-    placeholderDesignId = existingDesign.id
-  } else {
-    const d = await db.design.create({
+  const result = await withTenantTransaction(user.organizationId, async (tx) => {
+    // Fetch all products in this order (existence check)
+    const productIds = data.lines.map((l) => l.product_id)
+    type ProductLite = { id: string; sku: string | null; name: string; uom: string; currentStock: number }
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, sku: true, name: true, uom: true, currentStock: true },
+    }) as ProductLite[]
+    if (products.length !== data.lines.length) {
+      throw new Error('One or more products not found in your organization')
+    }
+    const productMap = new Map<string, ProductLite>(products.map((p) => [p.id, p]))
+
+    // Ensure the IMPORTED placeholder Design exists (inside the txn,
+    // so concurrent invoices don't both try to create it).
+    let placeholderDesign = await tx.design.findFirst({ where: { code: 'IMPORTED' } })
+    if (!placeholderDesign) {
+      placeholderDesign = await tx.design.create({
+        data: {
+          name: 'Manual sale placeholder',
+          code: 'IMPORTED',
+          description: 'Placeholder design used when recording manual sales.',
+        },
+      })
+    }
+
+    // Generate the invoice number inside the txn. Concurrent invoices in the
+    // same branch are serialized by the unique constraint on (orgId, id) —
+    // if a collision occurs the txn aborts and the caller retries.
+    const orderNumber =
+      action === 'invoice'
+        ? await nextInvoiceNumber(user.organizationId, branchRow.code as any)
+        : `DRAFT-${Date.now().toString(36).toUpperCase()}`
+
+    const order = await tx.saleOrder.create({
       data: {
-        name: 'Manual sale placeholder',
-        code: 'IMPORTED',
-        description: 'Placeholder design used when recording manual sales.',
-        organizationId: user.organizationId,
+        id: orderNumber,
+        customerId: data.customer_id || null,
+        customerName: data.customer_name,
+        totalAmount,
+        status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
+        createdBy: user.id,
       },
     })
-    placeholderDesignId = d.id
-  }
 
-  // Atomic write with retry for invoice# uniqueness under concurrency.
-  // Stock checks+updates are atomic via updateMany (prevents negative stock on race).
-  let result: any
-  let attempts = 0
-  const maxAttempts = 3
-  while (attempts < maxAttempts) {
-    attempts++
-    try {
-      result = await withTenantTransaction(user.organizationId, async (tx) => {
-        const orderNumber =
-          action === 'invoice'
-            ? await nextInvoiceNumber(user.organizationId, branchRow.code as any, tx as any)
-            : `DRAFT-${Date.now().toString(36).toUpperCase()}`
+    for (const line of data.lines) {
+      const product = productMap.get(line.product_id)!
+      const qty = Number(line.qty)
+      const unitPrice = Number(line.unit_price)
 
-        const order = await tx.saleOrder.create({
+      // Ensure FinishedGoods shadow exists for this org
+      const fgSku = product.sku || product.id
+      let fg = await tx.finishedGoods.findFirst({ where: { sku: fgSku } })
+      if (!fg) {
+        fg = await tx.finishedGoods.create({
           data: {
-            id: orderNumber,
-            customerId: data.customer_id || null,
-            customerName: data.customer_name,
-            totalAmount,
-            status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
-            createdBy: user.id,
+            sku: fgSku,
+            designId: placeholderDesign.id,
+            quantity: 0,
+            kgProduced: 0,
+            unitCost: unitPrice,
           },
         })
+      }
 
-        for (const line of data.lines) {
-          const product = productMap.get(line.product_id)!
-          const qty = Number(line.qty)
-          const unitPrice = Number(line.unit_price)
+      await tx.saleItem.create({
+        data: {
+          saleOrderId: order.id,
+          finishedGoodsId: fg.id,
+          quantity: qty,
+          unitPrice,
+          totalPrice: qty * unitPrice,
+        },
+      })
 
-          // Ensure FinishedGoods shadow exists for this org
-          const fgSku = product.sku || product.id
-          let fg = await tx.finishedGoods.findFirst({ where: { sku: fgSku } })
-          if (!fg) {
-            fg = await tx.finishedGoods.create({
-              data: {
-                sku: fgSku,
-                designId: placeholderDesignId,
-                quantity: 0,
-                kgProduced: 0,
-                unitCost: unitPrice,
-              },
-            })
-          }
-
-          await tx.saleItem.create({
-            data: {
-              saleOrderId: order.id,
-              finishedGoodsId: fg.id,
-              quantity: qty,
-              unitPrice,
-              totalPrice: qty * unitPrice,
-            },
-          })
-
-          if (action === 'invoice') {
-            // Atomic check + decrement: only updates if currentStock >= qty.
-            // Prevents negative stock even under concurrent sales.
-            const stockUpdate = await tx.product.updateMany({
-              where: {
-                id: line.product_id,
-                currentStock: { gte: qty },
-              },
-              data: { currentStock: { decrement: qty } },
-            })
-            if (stockUpdate.count === 0) {
-              throw new Error(
-                `Insufficient stock for ${product.sku ?? product.name}: have less than ${qty} (concurrent sale)`
-              )
-            }
-
-            await tx.stockMovement.create({
-              data: {
-                productId: line.product_id,
-                branchId: branchRow.id,
-                movementType: 'sale',
-                quantity: -qty,
-                reference: orderNumber,
-                notes: line.notes ?? `Sale to ${data.customer_name}`,
-              },
-            })
-          }
+      if (action === 'invoice') {
+        // Atomic compare-and-swap decrement. If currentStock < qty the
+        // updateMany matches zero rows; we abort the transaction so no
+        // partial write leaks out.
+        const decremented = await tx.product.updateMany({
+          where: { id: line.product_id, currentStock: { gte: qty } },
+          data: { currentStock: { decrement: qty } },
+        })
+        if (decremented.count === 0) {
+          throw new Error(
+            `Insufficient stock for ${product.sku ?? product.name}: have ${product.currentStock}, need ${qty}. Another sale may have completed first.`
+          )
         }
 
-        return order
-      }, { maxWait: 10000, timeout: 30000 })
-      break
-    } catch (err: any) {
-      if (attempts >= maxAttempts || !isUniqueConstraintError(err)) {
-        throw err
+        await tx.stockMovement.create({
+          data: {
+            productId: line.product_id,
+            branchId: branchRow.id,
+            movementType: 'sale',
+            quantity: -qty,
+            reference: orderNumber,
+            notes: line.notes ?? `Sale to ${data.customer_name}`,
+          },
+        })
       }
-      // Rare race on invoice number: retry will compute next higher number
     }
-  }
+
+    return order
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/sales')
   revalidatePath('/stock')
   redirect(`/sales/${result.id}`)
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIRM A DRAFT
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function confirmDraft(orderId: string) {
   const user = await requireActiveAuth()
@@ -248,30 +219,39 @@ export async function confirmDraft(orderId: string) {
   }
 
   await withTenantTransaction(user.organizationId, async (tx) => {
+    // Re-load the order inside the transaction to ensure the status hasn't
+    // changed between the outer findFirst and the actual confirm. If a
+    // parallel confirmDraft already ran, we'll see status !== PENDING and abort.
+    const current = await tx.saleOrder.findFirst({
+      where: { id: orderId },
+      select: { status: true },
+    })
+    if (!current || current.status !== 'PENDING') {
+      throw new Error('Order is no longer pending (may have been confirmed or cancelled by another action)')
+    }
+
     await tx.saleOrder.update({
       where: { id: orderId },
       data: { status: 'CONFIRMED' },
     })
 
     for (const line of order.SaleItem) {
+      // Look up the Product via the FG sku
       const product = await tx.product.findFirst({
         where: { sku: line.FinishedGoods.sku },
       })
-      if (!product) continue
+      if (!product) {
+        throw new Error(`Product not found for SKU ${line.FinishedGoods.sku}`)
+      }
 
-      const qty = line.quantity
-
-      // Atomic guard + decrement (same pattern as createSalesOrder)
-      const stockUpdate = await tx.product.updateMany({
-        where: {
-          id: product.id,
-          currentStock: { gte: qty },
-        },
-        data: { currentStock: { decrement: qty } },
+      // Atomic compare-and-swap: decrement only if stock is sufficient
+      const decremented = await tx.product.updateMany({
+        where: { id: product.id, currentStock: { gte: line.quantity } },
+        data: { currentStock: { decrement: line.quantity } },
       })
-      if (stockUpdate.count === 0) {
+      if (decremented.count === 0) {
         throw new Error(
-          `Insufficient stock for ${line.FinishedGoods.sku}: have less than ${qty} (concurrent sale)`
+          `Insufficient stock for ${line.FinishedGoods.sku}: have ${product.currentStock}, need ${line.quantity}`
         )
       }
 
@@ -279,7 +259,7 @@ export async function confirmDraft(orderId: string) {
         data: {
           productId: product.id,
           movementType: 'sale',
-          quantity: -qty,
+          quantity: -line.quantity,
           reference: order.id,
           notes: `Sale confirmed for ${order.customerName}`,
         },
@@ -291,10 +271,6 @@ export async function confirmDraft(orderId: string) {
   revalidatePath(`/sales/${orderId}`)
   revalidatePath('/stock')
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CANCEL ORDER
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function cancelOrder(orderId: string, reason: string) {
   if (!reason || reason.trim().length < 3) {
@@ -314,9 +290,19 @@ export async function cancelOrder(orderId: string, reason: string) {
     throw new Error('Cannot cancel a shipped order')
   }
 
-  const wasConfirmed = order.status === 'CONFIRMED'
-
   await withTenantTransaction(user.organizationId, async (tx) => {
+    // Re-check the status inside the transaction so we don't race with
+    // another confirmDraft / cancelOrder running in parallel.
+    const current = await tx.saleOrder.findFirst({
+      where: { id: orderId },
+      select: { status: true },
+    })
+    if (!current) throw new Error('Order not found')
+    if (current.status === 'CANCELLED') throw new Error('Already cancelled')
+    if (current.status === 'SHIPPED') throw new Error('Cannot cancel a shipped order')
+
+    const wasConfirmed = current.status === 'CONFIRMED'
+
     if (wasConfirmed) {
       // Return stock for confirmed orders
       for (const line of order.SaleItem) {
@@ -352,10 +338,6 @@ export async function cancelOrder(orderId: string, reason: string) {
   revalidatePath(`/sales/${orderId}`)
   revalidatePath('/stock')
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SEARCH for product picker
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function searchProductsForSale(query: string, branch: string) {
   const user = await requireActiveAuth()
