@@ -211,7 +211,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
       })),
     };
   } catch (err) {
-    console.error('[AdminDashboard] DB unavailable, returning safe defaults', err?.message ?? err);
+    console.error('[AdminDashboard] DB unavailable, returning safe defaults', String(err));
     // Return safe defaults so the dashboard renders without total DB stats
     return {
       totalOrders: 0,
