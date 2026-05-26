@@ -8,7 +8,7 @@ import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES } from '@/lib/branch
 import ExportStockButton from './_components/ExportStockButton'
 import { CATEGORY_BADGE_CLASS, CATEGORY_SHORT } from '@/lib/products'
 import type { BranchCode as Branch } from '@/lib/branches'
-import type { ProductCategory } from '@prisma/client'
+import type { ProductCategory, Prisma } from '@prisma/client'
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -84,24 +84,24 @@ export default async function BranchStockPage({
       Promise.all(
         ALL_BRANCHES.map(async (branch) => {
           // Build aggregate args and log them to diagnose Prisma error
-          const rawArgs = {
+          const rawArgs: Prisma.InventoryRawMaterialAggregateArgs = {
             where: { Branch: { code: branch }, availableKg: { gt: 0 } },
             _sum: { availableKg: true },
-            _count: true,
+            _count: { _all: true },
           }
 
-          const finishedArgs = {
+          const finishedArgs: Prisma.InventoryFinishedGoodsAggregateArgs = {
             where: { Branch: { code: branch }, availableQty: { gt: 0 } },
             _sum: { availableQty: true },
-            _count: true,
+            _count: { _all: true },
           }
 
           console.log('aggregate rawArgs:', JSON.stringify(rawArgs))
           console.log('aggregate finishedArgs:', JSON.stringify(finishedArgs))
 
           const [rawAgg, finishedAgg] = await Promise.all([
-            db.inventoryRawMaterial.aggregate(rawArgs),
-            db.inventoryFinishedGoods.aggregate(finishedArgs),
+            db.inventoryRawMaterial.aggregate(rawArgs as any),
+            db.inventoryFinishedGoods.aggregate(finishedArgs as any),
           ])
 
           const [rawLowStock, finishedLowStock] = await Promise.all([
@@ -123,10 +123,13 @@ export default async function BranchStockPage({
           const rawValue = valuedRaw.reduce((sum, s) => sum + (Number(s.availableKg) * (Number(s.RawMaterial?.costPerKg) || 0)), 0)
           const finishedValue = valuedFinished.reduce((sum, s) => sum + (Number(s.availableQty) * (Number(s.FinishedGoods?.unitCost) || 0)), 0)
 
+          const rawCount = typeof rawAgg._count === 'number' ? rawAgg._count : ((rawAgg._count as any)?._all ?? 0)
+          const finishedCount = typeof finishedAgg._count === 'number' ? finishedAgg._count : ((finishedAgg._count as any)?._all ?? 0)
+
           return {
             branch,
-            totalUnits: Number(rawAgg._sum.availableKg ?? 0) + Number(finishedAgg._sum.availableQty ?? 0),
-            totalSkus: (rawAgg._count._all ?? 0) + (finishedAgg._count._all ?? 0),
+            totalUnits: Number((rawAgg._sum?.availableKg ?? 0)) + Number((finishedAgg._sum?.availableQty ?? 0)),
+            totalSkus: Number(rawCount) + Number(finishedCount),
             value: rawValue + finishedValue,
             lowStock: rawLowStock + finishedLowStock,
           }
