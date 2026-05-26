@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn, signUp } from '@/actions/auth';
 
@@ -10,22 +10,24 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
     setMessage(null);
     try {
+      const formData = new FormData(event.currentTarget);
       const action = isLogin ? signIn : signUp;
       const res = await action(formData);
       if (res?.error) {
         setError(res.error);
         return;
       }
-      if (res && typeof res === 'object' && 'message' in res && res.message) {
-        setMessage(String((res as any).message));
+      if (res && typeof res === 'object' && 'message' in res && typeof res.message === 'string') {
+        setMessage(res.message);
         setIsLogin(true);
         return;
       }
-      if (res && typeof res === 'object' && 'success' in res && (res as any).success) {
+      if (res && typeof res === 'object' && 'success' in res && res.success === true) {
         // Success - wait a moment for session to be established, then redirect
         setTimeout(() => {
           router.push('/dashboard');
@@ -77,7 +79,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <form action={handleSubmit}>
+        <form onSubmit={handleSubmit}>
           {error && (
             <div style={{
               background: 'rgba(224, 85, 85, 0.15)',

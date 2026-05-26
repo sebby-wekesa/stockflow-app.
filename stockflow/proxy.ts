@@ -61,15 +61,14 @@ function createNonce(): string {
   return btoa(crypto.randomUUID())
 }
 
-function createForwardedHeaders(request: NextRequest, nonce: string): Headers {
+function createForwardedHeaders(request: NextRequest, nonce: string, csp: string): Headers {
   const forwardedHeaders = new Headers(request.headers)
   forwardedHeaders.set('x-nonce', nonce)
+  forwardedHeaders.set('Content-Security-Policy', csp)
   return forwardedHeaders
 }
 
-function applySecurityHeaders(response: NextResponse, nonce: string): NextResponse {
-  const csp = buildCsp(nonce)
-
+function applySecurityHeaders(response: NextResponse, nonce: string, csp: string): NextResponse {
   response.headers.set('x-nonce', nonce)
   if (process.env.CSP_REPORT_ONLY === '1') {
     response.headers.set('Content-Security-Policy-Report-Only', csp)
@@ -115,6 +114,7 @@ async function resolveUserContext(userId: string, fallbackRole?: string) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const nonce = createNonce()
+  const csp = buildCsp(nonce)
 
   // Skip auth/routing logic for API routes, static assets, and Next.js
   // internals, but still attach CSP to the response.
@@ -125,9 +125,10 @@ export async function proxy(request: NextRequest) {
   ) {
     return applySecurityHeaders(
       NextResponse.next({
-        request: { headers: createForwardedHeaders(request, nonce) },
+        request: { headers: createForwardedHeaders(request, nonce, csp) },
       }),
-      nonce
+      nonce,
+      csp
     )
   }
 
@@ -136,7 +137,7 @@ export async function proxy(request: NextRequest) {
 
   // Create Supabase client to read session cookies
   const response = NextResponse.next({
-    request: { headers: createForwardedHeaders(request, nonce) },
+    request: { headers: createForwardedHeaders(request, nonce, csp) },
   })
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,12 +162,12 @@ export async function proxy(request: NextRequest) {
   // No session / invalid token
   if (!user) {
     if (isPublicRoute) {
-      return applySecurityHeaders(response, nonce) // allow access
+      return applySecurityHeaders(response, nonce, csp) // allow access
     }
     // Redirect to login, preserving the intended destination
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
-    return applySecurityHeaders(NextResponse.redirect(loginUrl), nonce)
+    return applySecurityHeaders(NextResponse.redirect(loginUrl), nonce, csp)
   }
 
   // Has a valid user - look up role and org status
@@ -179,31 +180,34 @@ export async function proxy(request: NextRequest) {
   // explanation page and log out
   if (ctx.orgStatus === 'SUSPENDED') {
     if (pathname === '/account-suspended' || pathname === '/login') {
-      return applySecurityHeaders(response, nonce)
+      return applySecurityHeaders(response, nonce, csp)
     }
     return applySecurityHeaders(
       NextResponse.redirect(new URL('/account-suspended', request.url)),
-      nonce
+      nonce,
+      csp
     )
   }
   if (ctx.orgStatus === 'CLOSED') {
     if (pathname === '/account-closed' || pathname === '/login') {
-      return applySecurityHeaders(response, nonce)
+      return applySecurityHeaders(response, nonce, csp)
     }
     return applySecurityHeaders(
       NextResponse.redirect(new URL('/account-closed', request.url)),
-      nonce
+      nonce,
+      csp
     )
   }
 
   // PENDING_APPROVAL users can only see the waiting screen and log out
   if (ctx.orgStatus === 'PENDING_APPROVAL') {
     if (pathname === '/awaiting-approval' || pathname === '/login') {
-      return applySecurityHeaders(response, nonce)
+      return applySecurityHeaders(response, nonce, csp)
     }
     return applySecurityHeaders(
       NextResponse.redirect(new URL('/awaiting-approval', request.url)),
-      nonce
+      nonce,
+      csp
     )
   }
 
@@ -215,7 +219,8 @@ export async function proxy(request: NextRequest) {
     if (homePage !== pathname) {
       return applySecurityHeaders(
         NextResponse.redirect(new URL(homePage, request.url)),
-        nonce
+        nonce,
+        csp
       )
     }
   }
@@ -224,7 +229,8 @@ export async function proxy(request: NextRequest) {
   if (isStatusRoute && pathname !== '/signup') {
     return applySecurityHeaders(
       NextResponse.redirect(new URL('/dashboard', request.url)),
-      nonce
+      nonce,
+      csp
     )
   }
 
@@ -233,11 +239,12 @@ export async function proxy(request: NextRequest) {
     const homePage = getRoleHomePage(ctx.role)
     return applySecurityHeaders(
       NextResponse.redirect(new URL(homePage, request.url)),
-      nonce
+      nonce,
+      csp
     )
   }
 
-  return applySecurityHeaders(response, nonce)
+  return applySecurityHeaders(response, nonce, csp)
 }
 
 export const config = {
