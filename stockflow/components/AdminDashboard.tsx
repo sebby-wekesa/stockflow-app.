@@ -45,7 +45,7 @@ interface AdminStats {
   recentOrders: RecentOrder[];
 }
 
-async function getAdminStats(db: any): Promise<AdminStats> {
+async function getAdminStats(db: any, organizationId: string): Promise<AdminStats> {
   const totalOrders = await withRetry(() => db.productionOrder.count(), undefined);
   const pendingOrders = await withRetry(() => db.productionOrder.count({ where: { status: "PENDING" } }), undefined);
   const inProduction = await withRetry(() => db.productionOrder.count({ where: { status: "IN_PRODUCTION" } }), undefined);
@@ -120,7 +120,7 @@ async function getAdminStats(db: any): Promise<AdminStats> {
   // Department throughput for today (from StageLog + active ProductionOrders)
   // Load department list from tenant settings if present
   const { getDepartmentsForOrg } = await import('@/lib/department-settings')
-  const knownDepts = (getDepartmentsForOrg(user.organizationId) || ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding']);
+  const knownDepts = (getDepartmentsForOrg(organizationId) || ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding']);
 
   const activeByDeptRaw = await withRetry<any[]>(() => db.productionOrder.groupBy({
     by: ['currentDept'],
@@ -218,7 +218,7 @@ export default async function AdminDashboard({ user }: AdminDashboardProps) {
 
   const { getTenantPrisma } = await import("@/lib/tenant-prisma");
   const db = getTenantPrisma(user.organizationId);
-  const stats = await getAdminStats(db);
+  const stats = await getAdminStats(db, user.organizationId);
 
   return (
     <div>
