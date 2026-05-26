@@ -46,17 +46,20 @@ interface AdminStats {
 }
 
 async function getAdminStats(db: any, organizationId: string): Promise<AdminStats> {
-  const totalOrders = await withRetry(() => db.productionOrder.count(), undefined);
-  const pendingOrders = await withRetry(() => db.productionOrder.count({ where: { status: "PENDING" } }), undefined);
-  const inProduction = await withRetry(() => db.productionOrder.count({ where: { status: "IN_PRODUCTION" } }), undefined);
-  const completed = await withRetry(() => db.productionOrder.count({ where: { status: "COMPLETED" } }), undefined);
-  const designs = await withRetry(() => db.design.count(), undefined);
+  try {
+    const totalOrders = await withRetry(() => db.productionOrder.count(), undefined);
+    const pendingOrders = await withRetry(() => db.productionOrder.count({ where: { status: "PENDING" } }), undefined);
+    const inProduction = await withRetry(() => db.productionOrder.count({ where: { status: "IN_PRODUCTION" } }), undefined);
+    const completed = await withRetry(() => db.productionOrder.count({ where: { status: "COMPLETED" } }), undefined);
+    const designs = await withRetry(() => db.design.count(), undefined);
 
-  // Count users from Prisma User table
-  const users = await withRetry(() => db.user.count(), undefined);
+    // Count users from Prisma User table
+    const users = await withRetry(() => db.user.count(), undefined);
 
 
-  const inventory = await withRetry<any[]>(() => db.rawMaterial.findMany(), undefined);
+    const inventory = await withRetry<any[]>(() => db.rawMaterial.findMany(), undefined);
+  
+  // Calculate dashboard stats continued below...
 
   // Calculate dashboard stats
   const rawMaterialStock = (inventory as any[]).reduce(
@@ -68,23 +71,25 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
     0
   );
 
-  const activeOrdersCount = await withRetry<number>(() => db.productionOrder.count({
-    where: { status: { in: ["APPROVED", "IN_PRODUCTION"] } },
-  }), undefined);
-  const pendingApprovalsCount = pendingOrders;
+    const activeOrdersCount = await withRetry<number>(() => db.productionOrder.count({
+      where: { status: { in: ["APPROVED", "IN_PRODUCTION"] } },
+    }), undefined);
+    const pendingApprovalsCount = pendingOrders;
 
-  const finishedGoodsAgg = await withRetry<any>(() => db.finishedGoods.aggregate({
-    _sum: {
-      kgProduced: true,
-      quantity: true,
-    },
-  }), undefined);
-  const finishedGoods = {
-    _sum: {
-      kgProduced: finishedGoodsAgg._sum.kgProduced?.toNumber() ?? 0,
-      quantity: finishedGoodsAgg._sum.quantity ?? 0,
-    }
-  };
+    const finishedGoodsAgg = await withRetry<any>(() => db.finishedGoods.aggregate({
+      _sum: {
+        kgProduced: true,
+        quantity: true,
+      },
+    }), undefined);
+    const finishedGoods = {
+      _sum: {
+        kgProduced: finishedGoodsAgg._sum.kgProduced?.toNumber() ?? 0,
+        quantity: finishedGoodsAgg._sum.quantity ?? 0,
+      }
+    };
+
+    // Continue with data transforms below...
 
   // ── Real data for previously hardcoded sections ──────────────────────────────
   const now = new Date();
@@ -180,31 +185,53 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
     include: { design: true },
   });
 
-  return {
-    totalOrders: Number(totalOrders ?? 0),
-    pendingOrders: Number(pendingOrders ?? 0),
-    inProduction: Number(inProduction ?? 0),
-    completed: Number(completed ?? 0),
-    designs: Number(designs ?? 0),
-    users: Number(users ?? 0),
-    inventory: (inventory as any[]) ?? [],
-    rawMaterialStock: Number(rawMaterialStock ?? 0),
-    totalFree: Number(totalFree ?? 0),
-    activeOrdersCount: Number(activeOrdersCount ?? 0),
-    pendingApprovalsCount: Number(pendingApprovalsCount ?? 0),
-    finishedGoods: finishedGoods as any,
-    scrapThisWeek: Number(scrapThisWeek ?? 0),
-    scrapByDept: scrapByDept as any[],
-    departmentThroughput: departmentThroughput as DeptThroughput[],
-    recentOrders: (recentOrders as any[]).map((o: any) => ({
-      id: o.orderNumber,
-      design: o.design?.name ?? '—',
-      kg: o.targetKg?.toNumber?.() ?? Number(o.targetKg) ?? 0,
-      status: o.status === "PENDING" ? "Pending approval" :
-              o.status === "APPROVED" || o.status === "IN_PRODUCTION" ? "In production" : "Complete",
-      dept: o.currentDept,
-    })),
-  };
+    return {
+      totalOrders: Number(totalOrders ?? 0),
+      pendingOrders: Number(pendingOrders ?? 0),
+      inProduction: Number(inProduction ?? 0),
+      completed: Number(completed ?? 0),
+      designs: Number(designs ?? 0),
+      users: Number(users ?? 0),
+      inventory: (inventory as any[]) ?? [],
+      rawMaterialStock: Number(rawMaterialStock ?? 0),
+      totalFree: Number(totalFree ?? 0),
+      activeOrdersCount: Number(activeOrdersCount ?? 0),
+      pendingApprovalsCount: Number(pendingApprovalsCount ?? 0),
+      finishedGoods: finishedGoods as any,
+      scrapThisWeek: Number(scrapThisWeek ?? 0),
+      scrapByDept: scrapByDept as any[],
+      departmentThroughput: departmentThroughput as DeptThroughput[],
+      recentOrders: (recentOrders as any[]).map((o: any) => ({
+        id: o.orderNumber,
+        design: o.design?.name ?? '—',
+        kg: o.targetKg?.toNumber?.() ?? Number(o.targetKg) ?? 0,
+        status: o.status === "PENDING" ? "Pending approval" :
+                o.status === "APPROVED" || o.status === "IN_PRODUCTION" ? "In production" : "Complete",
+        dept: o.currentDept,
+      })),
+    };
+  } catch (err) {
+    console.error('[AdminDashboard] DB unavailable, returning safe defaults', err?.message ?? err);
+    // Return safe defaults so the dashboard renders without total DB stats
+    return {
+      totalOrders: 0,
+      pendingOrders: 0,
+      inProduction: 0,
+      completed: 0,
+      designs: 0,
+      users: 0,
+      inventory: [],
+      rawMaterialStock: 0,
+      totalFree: 0,
+      activeOrdersCount: 0,
+      pendingApprovalsCount: 0,
+      finishedGoods: { _sum: { kgProduced: 0, quantity: 0 } },
+      scrapThisWeek: 0,
+      scrapByDept: [],
+      departmentThroughput: [],
+      recentOrders: [],
+    };
+  }
 }
 
 interface AdminDashboardProps {
