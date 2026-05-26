@@ -114,42 +114,10 @@ export async function signIn(formData: FormData) {
   }
 
   // Verify session is properly set in cookies
-  try {
-    const { data: { session: verifySession } } = await supabase.auth.getSession();
-    if (!verifySession) {
-      // Log a diagnostic snapshot of cookie names (no token values) to help debug missing refresh token issues.
-      try {
-        const cookieStoreDiag = (await cookies()).getAll().map(c => ({ name: c.name, hasValue: !!c.value, len: c.value?.length ?? 0 }));
-        console.error('Session not established properly. Cookie snapshot (names+lengths):', cookieStoreDiag);
-      } catch (cErr) {
-        console.error('Session not established and failed to read cookies for diagnostics', String(cErr));
-      }
-
-      return { error: "Authentication failed. Session not established (missing auth cookies). Ensure cookies are enabled and you are on HTTPS." };
-    }
-  } catch (getSessionErr) {
-    // If Supabase throws a known auth error (eg. refresh_token_not_found), surface a helpful message and log details.
-    console.error('supabase.auth.getSession error during sign-in:', String(getSessionErr));
-    // Avoid leaking tokens; include code/status if available for diagnostics.
-    const isAuthErr = (getSessionErr as any)?.__isAuthError;
-    const code = (getSessionErr as any)?.code || (getSessionErr as any)?.status || 'unknown';
-    if (isAuthErr) {
-      // If refresh token missing, clear any stale cookies to avoid stuck sessions.
-      try {
-        const cookieStore = await cookies();
-        const names = cookieStore.getAll().map(c => c.name);
-        console.warn('Clearing stale auth cookies due to auth error:', names);
-        // Clear typical auth cookie names
-        cookieStore.set('auth-token', '', { expires: new Date(0), path: '/' });
-        cookieStore.set('refresh-token', '', { expires: new Date(0), path: '/' });
-      } catch (cErr) {
-        console.error('Failed to clear cookies after auth error:', String(cErr));
-      }
-
-      return { error: `Authentication failed (auth error: ${code}). Verify that your Supabase keys and cookie configuration are correct.` };
-    }
-
-    return { error: 'Authentication failed. Please try again later.' };
+  const { data: { session: verifySession } } = await supabase.auth.getSession();
+  if (!verifySession) {
+    console.error("Session not established properly");
+    return { error: "Authentication failed. Please try again." };
   }
 
   // Verify the user has a fully-set-up account in our Prisma database.

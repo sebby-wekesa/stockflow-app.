@@ -17,8 +17,7 @@ function getCookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    // In production allow cross-site cookies (Supabase may set auth cookies with None)
-    sameSite: process.env.NODE_ENV === "production" ? 'none' as const : 'lax' as const,
+    sameSite: "lax" as const,
     path: "/",
     maxAge,
   };
