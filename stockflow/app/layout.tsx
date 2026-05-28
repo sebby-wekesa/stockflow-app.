@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { DM_Mono, DM_Sans, Syne } from "next/font/google";
+import { headers } from "next/headers";
 import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -26,11 +29,13 @@ export const metadata: Metadata = {
   description: "Manufacturing ERP",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await headers();
+
   return (
     <html lang="en" className={`${dmSans.variable} ${dmMono.variable} ${syne.variable}`}>
       <body>
