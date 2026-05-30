@@ -65,12 +65,17 @@ async function main() {
   // 1. Create Organization
   const org = await prisma.organization.upsert({
     where: { code: 'SF' },
-    update: {},
+    update: {
+      status: 'ACTIVE',
+      approvedAt: new Date(),
+    },
     create: {
       id: 'org-stockflow-001',
       name: 'StockFlow Manufacturing',
       code: 'SF',
       slug: 'stockflow-manufacturing',
+      status: 'ACTIVE',
+      approvedAt: new Date(),
       updatedAt: new Date(),
     }
   });

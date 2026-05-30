@@ -168,8 +168,17 @@ ALTER TABLE "public"."Product" DROP CONSTRAINT IF EXISTS "Product_barcode_key";
 DO $$ BEGIN
   ALTER TABLE "public"."Product" ADD CONSTRAINT "Product_org_sku_key" UNIQUE ("organizationId", sku);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  ALTER TABLE "public"."Product" ADD CONSTRAINT "Product_org_barcode_key" UNIQUE ("organizationId", barcode);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'Product'
+      AND column_name = 'barcode'
+  ) THEN
+    ALTER TABLE "public"."Product" ADD CONSTRAINT "Product_org_barcode_key" UNIQUE ("organizationId", barcode);
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- RawMaterial.sku and .barcode

@@ -52,8 +52,7 @@ export async function getUser(): Promise<AuthUser | null> {
   if (!authUser) return null;
 
   try {
-    // Use the authPrisma client for auth lookups to improve reliability
-    // (authPrisma uses DIRECT_URL or falls back to main prisma). Wrap calls
+    // Use the shared Prisma singleton for auth lookups. Wrap calls
     // with withRetry to tolerate transient pooler errors in dev.
     if (!authPrisma || !authPrisma.user) {
       console.error("Auth Prisma client or User model not available");
