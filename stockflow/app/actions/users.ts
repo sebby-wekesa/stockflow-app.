@@ -87,6 +87,36 @@ export async function updateUserRole(userId: string, newRole: string) {
   });
 
   revalidatePath('/admin/users');
+  revalidatePath('/users');
+}
+
+export async function verifyUser(userId: string) {
+  const currentUser = await assertAdminAccess();
+  const db = getTenantPrisma(currentUser.organizationId);
+
+  const user = await db.user.findFirst({
+    where: { id: userId, organizationId: currentUser.organizationId },
+    select: { id: true, name: true, role: true },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    email_confirm: true,
+    user_metadata: {
+      name: user.name,
+      role: user.role,
+    },
+  });
+
+  if (authError) {
+    throw new Error(`Failed to verify user: ${authError.message}`);
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/admin/users");
 }
 
 export async function deleteUser(userId: string) {
@@ -120,10 +150,11 @@ export async function deleteUser(userId: string) {
   }
 }
 
-export async function updateUser(_prevState: unknown, formData: FormData) {
+export async function updateUser(_prevState: unknown, maybeFormData?: FormData) {
   try {
     const currentUser = await assertAdminAccess();
     const db = getTenantPrisma(currentUser.organizationId);
+    const formData = maybeFormData ?? (_prevState as FormData);
 
     const userId = formData.get('userId') as string;
     const name = formData.get('name') as string;
@@ -164,6 +195,7 @@ export async function updateUser(_prevState: unknown, formData: FormData) {
     }
 
     revalidatePath("/users");
+    revalidatePath("/admin/users");
   } catch (error) {
     console.error("Update user error:", error);
     throw error;

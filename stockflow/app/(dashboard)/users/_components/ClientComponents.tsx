@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useTransition, useActionState, useEffect } from 'react'
-import { inviteUser, updateUser } from '@/app/actions/users'
+import { inviteUser, updateUser, verifyUser } from '@/app/actions/users'
 import { UserForm } from '@/components/users/UserForm'
 import type { User } from '@prisma/client'
 
@@ -110,9 +110,32 @@ interface UserTableProps {
 
 function UserTable({ users }: UserTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [verifyingId, setVerifyingId] = useState<string | null>(null)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
+
+  function handleVerify(userId: string) {
+    setVerifyError(null)
+    setVerifyingId(userId)
+    startTransition(async () => {
+      try {
+        await verifyUser(userId)
+      } catch (err) {
+        setVerifyError((err as Error).message || 'Failed to verify user.')
+      } finally {
+        setVerifyingId(null)
+      }
+    })
+  }
 
   return (
     <div className="card">
+      {verifyError && (
+        <div className="alert alert-error mb-4">
+          <span>{verifyError}</span>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="table table-zebra w-full">
           <thead>
@@ -151,11 +174,25 @@ function UserTable({ users }: UserTableProps) {
                   )}
                 </td>
                 <td>
-                  <span className="badge badge-primary badge-sm">
-                    Active
+                  <span className={`badge ${user.isVerified ? 'badge-primary' : 'badge-warning'} badge-sm`}>
+                    {user.isVerified ? 'Verified' : 'Unverified'}
                   </span>
+                  {user.role === 'PENDING' && (
+                    <span className="badge badge-neutral badge-sm ml-2">
+                      Pending role
+                    </span>
+                  )}
                 </td>
-                <td>
+                <td className="flex gap-2">
+                  {!user.isVerified && (
+                    <button
+                      className="btn btn-primary btn-xs"
+                      onClick={() => handleVerify(user.id)}
+                      disabled={verifyingId === user.id}
+                    >
+                      {verifyingId === user.id ? 'Verifying...' : 'Verify'}
+                    </button>
+                  )}
                   <button
                     className="btn btn-ghost btn-xs"
                     onClick={() => setEditingId(user.id)}

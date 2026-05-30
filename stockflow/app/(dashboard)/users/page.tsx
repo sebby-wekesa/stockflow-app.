@@ -3,6 +3,7 @@ import { requireActiveAuth } from '@/lib/auth'
 import { InviteButton } from './_components/InviteButton'
 import { UserTable } from './_components/ClientComponents'
 import { withRetry } from '@/lib/prisma'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,11 +23,24 @@ export default async function UsersPage() {
      },
    }), undefined)
 
+  const authUsers = await Promise.all(
+    users.map(async (user) => {
+      const { data, error } = await supabaseAdmin.auth.admin.getUserById(user.id)
+      if (error) {
+        console.error(`Failed to fetch auth user ${user.id}:`, error.message)
+        return [user.id, null] as const
+      }
+      return [user.id, data.user] as const
+    })
+  )
+  const authUsersById = new Map(authUsers)
+
   // Transform users for frontend compatibility
   const usersWithBranches = users.map(user => ({
     ...user,
     branches: user.Branch ? [user.Branch.name] : [],
     branchId: user.Branch?.id || '',
+    isVerified: Boolean(authUsersById.get(user.id)?.email_confirmed_at),
   }))
 
   return (
