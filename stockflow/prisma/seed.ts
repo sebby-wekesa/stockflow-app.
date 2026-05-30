@@ -123,6 +123,17 @@ async function main() {
     if (existingAuthUser) {
       console.log(`User already exists in Auth: ${userData.email}`);
       userId = existingAuthUser.id;
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        email: userData.email,
+        password: userData.password,
+        email_confirm: true,
+        user_metadata: { name: userData.name, role: userData.role },
+      });
+
+      if (updateError) {
+        console.error(`Error updating auth user ${userData.email}:`, updateError.message);
+        throw updateError;
+      }
     } else {
       // Create in Auth
       const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({

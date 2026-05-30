@@ -2,6 +2,7 @@
   "name": "stockflow-production",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.2.2",
   "scripts": {
     "dev": "next dev",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=32768 TURBOPACK=false prisma generate --schema=./prisma/schema.prisma && next build",
