@@ -126,7 +126,7 @@ export async function signUpOrganization(formData: FormData) {
   // bail out BEFORE we ask Supabase to create an auth user. This avoids the
   // race where we create an auth user, then fail the Prisma transaction, and
   // have to clean up.
-  const existingUser = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findFirst({
     where: { email: data.email },
     select: { id: true },
   })
