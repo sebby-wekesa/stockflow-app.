@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireSuperAdmin } from '@/lib/super-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import {
   sendOrgApprovedEmail,
   sendOrgRejectedEmail,
@@ -88,6 +89,21 @@ export async function approveOrganization(orgId: string) {
   if (!org) throw new Error('Organization not found')
   if (org.status !== 'PENDING_APPROVAL') {
     throw new Error(`Cannot approve an organization with status ${org.status}`)
+  }
+
+  if (org.ownerUserId) {
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) {
+      throw new Error('Supabase admin client is not configured')
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(org.ownerUserId, {
+      email_confirm: true,
+    })
+
+    if (error) {
+      throw new Error(`Owner verification failed: ${error.message}`)
+    }
   }
 
   await prisma.organization.update({

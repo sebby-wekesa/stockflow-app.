@@ -2,8 +2,9 @@
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUserRole, USER_ROLES } from "@/lib/types";
+import { prisma } from "@/lib/prisma";
 
 type UserFormPayload = FormData | Record<string, FormDataEntryValue | null | undefined>;
 
@@ -119,32 +120,186 @@ export async function updateUserRole(userId: string, newRole: string) {
 }
 
 export async function verifyUser(userId: string) {
-  const currentUser = await assertAdminAccess();
-  const db = getTenantPrisma(currentUser.organizationId);
+  try {
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
+    const adminClient = getSupabaseAdmin();
 
-  const user = await db.user.findFirst({
-    where: { id: userId, organizationId: currentUser.organizationId },
-    select: { id: true, name: true, role: true },
-  });
+    if (!adminClient) {
+      return { success: false, error: "Supabase admin client is not configured" };
+    }
 
-  if (!user) {
-    throw new Error("User not found");
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: currentUser.organizationId },
+      select: { id: true, name: true, role: true },
+    });
+
+    if (!user) {
+      return { success: false, error: "User not found in this organization" };
+    }
+
+    const { data, error: authError } = await adminClient.auth.admin.updateUserById(user.id, {
+      email_confirm: true,
+      user_metadata: {
+        name: user.name,
+        role: user.role,
+      },
+    });
+
+    if (authError) {
+      return { success: false, error: `Failed to verify user: ${authError.message}` };
+    }
+
+    if (!data.user.email_confirmed_at) {
+      return { success: false, error: "Supabase did not mark the email as verified" };
+    }
+
+    revalidatePath("/users");
+    return { success: true };
+  } catch (error) {
+    console.error("Verify user error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to verify user",
+    };
   }
+}
 
-  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-    email_confirm: true,
-    user_metadata: {
-      name: user.name,
-      role: user.role,
-    },
-  });
+export async function linkAndVerifyAuthUser(authUserId: string) {
+  try {
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
+    const adminClient = getSupabaseAdmin();
 
-  if (authError) {
-    throw new Error(`Failed to verify user: ${authError.message}`);
+    if (!adminClient) {
+      return { success: false, error: "Supabase admin client is not configured" };
+    }
+
+    const { data, error } = await adminClient.auth.admin.getUserById(authUserId);
+    if (error || !data.user) {
+      return { success: false, error: `Supabase user not found: ${error?.message ?? "Unknown error"}` };
+    }
+
+    const authUser = data.user;
+    if (!authUser.email) {
+      return { success: false, error: "Supabase user does not have an email address" };
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: authUser.id },
+          { email: authUser.email },
+        ],
+      },
+      select: { id: true, organizationId: true, role: true },
+    });
+
+    if (existingUser?.organizationId && existingUser.organizationId !== currentUser.organizationId) {
+      return { success: false, error: "This user is already linked to another organization." };
+    }
+
+    if (!existingUser) {
+      const name =
+        typeof authUser.user_metadata?.name === "string"
+          ? authUser.user_metadata.name
+          : typeof authUser.user_metadata?.full_name === "string"
+            ? authUser.user_metadata.full_name
+            : authUser.email.split("@")[0];
+
+      await db.user.create({
+        data: {
+          id: authUser.id,
+          email: authUser.email,
+          name,
+          role: "PENDING",
+          organizationId: currentUser.organizationId,
+        },
+      });
+    } else if (!existingUser.organizationId) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { organizationId: currentUser.organizationId },
+      });
+    }
+
+    const role = existingUser?.role ?? "PENDING";
+    const { data: updatedAuthUser, error: authError } = await adminClient.auth.admin.updateUserById(authUser.id, {
+      email_confirm: true,
+      user_metadata: {
+        ...authUser.user_metadata,
+        role,
+      },
+    });
+
+    if (authError) {
+      return { success: false, error: `Failed to verify user: ${authError.message}` };
+    }
+
+    if (!updatedAuthUser.user.email_confirmed_at) {
+      return { success: false, error: "Supabase did not mark the email as verified" };
+    }
+
+    revalidatePath("/users");
+    return { success: true };
+  } catch (error) {
+    console.error("Add and verify auth user error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to add and verify user",
+    };
   }
+}
 
-  revalidatePath("/users");
-  revalidatePath("/admin/users");
+export async function verifyAuthUserEmail(authUserId: string) {
+  try {
+    const currentUser = await assertAdminAccess();
+    const adminClient = getSupabaseAdmin();
+
+    if (!adminClient) {
+      return { success: false, error: "Supabase admin client is not configured" };
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: { id: authUserId },
+      select: { id: true, organizationId: true },
+    });
+
+    if (!existingUser) {
+      return { success: false, error: "App user record was not found" };
+    }
+
+    if (
+      existingUser.organizationId &&
+      existingUser.organizationId !== currentUser.organizationId
+    ) {
+      return {
+        success: false,
+        error: "This user belongs to another organization. Use the organization approval flow for that tenant.",
+      };
+    }
+
+    const { data, error } = await adminClient.auth.admin.updateUserById(authUserId, {
+      email_confirm: true,
+    });
+
+    if (error) {
+      return { success: false, error: `Failed to verify user: ${error.message}` };
+    }
+
+    if (!data.user.email_confirmed_at) {
+      return { success: false, error: "Supabase did not mark the email as verified" };
+    }
+
+    revalidatePath("/users");
+    return { success: true };
+  } catch (error) {
+    console.error("Verify auth user email error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to verify user",
+    };
+  }
 }
 
 export async function deleteUser(userId: string) {

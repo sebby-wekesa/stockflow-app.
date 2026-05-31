@@ -1,7 +1,15 @@
 // @ts-nocheck
-"use client";
+'use client';
 
-import { updateUserRole, deleteUser, updateUser } from "@/app/actions/users";
+import {
+  updateUserRole,
+  deleteUser,
+  updateUser,
+  verifyUser,
+  linkAndVerifyAuthUser,
+  verifyAuthUserEmail,
+} from "@/app/actions/users";
+import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import type { UserRole } from "@/lib/types";
 
@@ -13,10 +21,12 @@ interface UserRowProps {
     email: string;
     role: UserRole;
     department?: string | null;
+    isVerified?: boolean;
   }
 }
 
 export function UserRow({ user }: UserRowProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +55,22 @@ export function UserRow({ user }: UserRowProps) {
         }
       });
     }
+  };
+
+  const handleVerify = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await verifyUser(user.id);
+        if (!result.success) {
+          setError(result.error || "Failed to verify user. Please try again.");
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setError((err as Error).message || "Failed to verify user. Please try again.");
+      }
+    });
   };
 
   const handleEdit = () => {
@@ -108,6 +134,20 @@ export function UserRow({ user }: UserRowProps) {
           Edit
         </button>
         <button
+          disabled={isPending || user.isVerified}
+          onClick={handleVerify}
+          className="btn btn-primary"
+          style={{
+            padding: '4px 8px',
+            fontSize: '11px',
+            fontWeight: 600,
+            opacity: user.isVerified ? 0.55 : 1,
+            cursor: user.isVerified ? 'default' : 'pointer',
+          }}
+        >
+          {user.isVerified ? 'Verified' : isPending ? 'Verifying...' : 'Verify'}
+        </button>
+        <button
           disabled={isPending}
           onClick={handleDelete}
           className="btn-red"
@@ -120,6 +160,104 @@ export function UserRow({ user }: UserRowProps) {
           Delete
         </button>
       </div>
+      {error && (
+        <div style={{
+          color: 'var(--red)',
+          fontSize: '11px',
+          marginTop: '4px'
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AuthOnlyUserRow({
+  user,
+}: {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    isVerified: boolean;
+    linkStatus?: "UNLINKED" | "LINKED_ELSEWHERE";
+    organizationName?: string | null;
+  };
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLinkAndVerify = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await linkAndVerifyAuthUser(user.id);
+        if (!result.success) {
+          setError(result.error || "Failed to add and verify user.");
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setError((err as Error).message || "Failed to add and verify user.");
+      }
+    });
+  };
+
+  const handleVerifyOnly = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await verifyAuthUserEmail(user.id);
+        if (!result.success) {
+          setError(result.error || "Failed to verify user.");
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setError((err as Error).message || "Failed to verify user.");
+      }
+    });
+  };
+
+  const isLinkedElsewhere = user.linkStatus === "LINKED_ELSEWHERE";
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+      {isLinkedElsewhere ? (
+        <button
+          disabled={isPending || user.isVerified}
+          onClick={handleVerifyOnly}
+          className="btn btn-ghost"
+          style={{
+            padding: '4px 8px',
+            fontSize: '11px',
+            fontWeight: 600,
+            opacity: user.isVerified ? 0.55 : 1,
+          }}
+        >
+          {user.isVerified ? 'Verified' : isPending ? 'Verifying...' : 'Verify email'}
+        </button>
+      ) : (
+        <button
+          disabled={isPending}
+          onClick={handleLinkAndVerify}
+          className="btn btn-primary"
+          style={{
+            padding: '4px 8px',
+            fontSize: '11px',
+            fontWeight: 600
+          }}
+        >
+          {isPending ? 'Adding...' : 'Add & Verify'}
+        </button>
+      )}
+      {isLinkedElsewhere && (
+        <div style={{ color: 'var(--muted)', fontSize: '11px' }}>
+          Linked to {user.organizationName || 'another organization'}
+        </div>
+      )}
       {error && (
         <div style={{
           color: 'var(--red)',

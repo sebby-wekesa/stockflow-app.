@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useTransition, useActionState, useEffect } from 'react'
-import { inviteUser, updateUser, verifyUser } from '@/app/actions/users'
+import { inviteUser, linkAndVerifyAuthUser, updateUser, verifyUser } from '@/app/actions/users'
 import { UserForm } from '@/components/users/UserForm'
 import type { User } from '@prisma/client'
 
@@ -10,7 +10,7 @@ interface InviteModalProps {
   onClose: () => void
 }
 
-function InviteModal({ onClose }: InviteModalProps) {
+export function InviteModal({ onClose }: InviteModalProps) {
   const [state, formAction, isPending] = useActionState(inviteUser, null)
 
   // Close modal on successful invite
@@ -108,7 +108,7 @@ interface UserTableProps {
   users: User[]
 }
 
-function UserTable({ users }: UserTableProps) {
+export function UserTable({ users }: UserTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
   const [verifyError, setVerifyError] = useState<string | null>(null)
@@ -232,4 +232,87 @@ function UserTable({ users }: UserTableProps) {
   )
 }
 
-export { InviteModal, UserTable }
+interface AuthOnlyUsersTableProps {
+  users: Array<{
+    id: string
+    email: string
+    name: string | null
+    isVerified: boolean
+    createdAt: string | null
+  }>
+}
+
+export function AuthOnlyUsersTable({ users }: AuthOnlyUsersTableProps) {
+  const [linkingId, setLinkingId] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
+
+  function handleLinkAndVerify(userId: string) {
+    setLinkError(null)
+    setLinkingId(userId)
+    startTransition(async () => {
+      try {
+        await linkAndVerifyAuthUser(userId)
+        window.location.reload()
+      } catch (err) {
+        setLinkError((err as Error).message || 'Failed to add and verify user.')
+      } finally {
+        setLinkingId(null)
+      }
+    })
+  }
+
+  return (
+    <div className="card">
+      <div className="mb-4">
+        <h2 className="font-head text-lg font-bold">Unlinked Supabase users</h2>
+        <p className="text-muted text-sm mt-1">
+          These accounts exist in Supabase Auth but are not linked to this organization yet.
+        </p>
+      </div>
+
+      {linkError && (
+        <div className="alert alert-error mb-4">
+          <span>{linkError}</span>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="table table-zebra w-full">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="font-medium">{user.name || 'Unnamed User'}</td>
+                <td>{user.email}</td>
+                <td>
+                  <span className={`badge ${user.isVerified ? 'badge-primary' : 'badge-warning'} badge-sm`}>
+                    {user.isVerified ? 'Verified' : 'Unverified'}
+                  </span>
+                </td>
+                <td>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
+                <td>
+                  <button
+                    className="btn btn-primary btn-xs"
+                    onClick={() => handleLinkAndVerify(user.id)}
+                    disabled={linkingId === user.id}
+                  >
+                    {linkingId === user.id ? 'Adding...' : 'Add & Verify'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
