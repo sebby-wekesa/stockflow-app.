@@ -4,6 +4,7 @@ import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { redirect } from 'next/navigation'
 import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
+import { DeleteProductButton } from './_components/delete-product-button'
 
 export const dynamic = 'force-dynamic';
 
@@ -203,12 +204,17 @@ export default async function ProductsPage({
                       </span>
                     </td>
                     <td>
-                      <Link 
-                        href={`/products/${p.id}/edit`} 
-                        className="btn btn-ghost btn-sm"
-                      >
-                        Edit
-                      </Link>
+                      <div className="flex items-start gap-2">
+                        <Link 
+                          href={`/products/${p.id}/edit`} 
+                          className="btn btn-ghost btn-sm"
+                        >
+                          Edit
+                        </Link>
+                        {user.role === 'ADMIN' && (
+                          <DeleteProductButton productId={p.id} productName={p.name} />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
