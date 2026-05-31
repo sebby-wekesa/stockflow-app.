@@ -8,7 +8,6 @@ import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES } from '@/lib/branch
 import ExportStockButton from './_components/ExportStockButton'
 import { CATEGORY_BADGE_CLASS, CATEGORY_SHORT } from '@/lib/products'
 import type { BranchCode as Branch } from '@/lib/branches'
-import type { ProductCategory, Prisma } from '@prisma/client'
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -70,88 +69,60 @@ export default async function BranchStockPage({
     productWhere.stockStatus = params.status
   }
 
-    // Fetch all the dashboard data in parallel
-    const [products, total, branchSummaries, lowStockCount, allRawStock, allFinishedStock] = await Promise.all([
-      db.product.findMany({
-        where: productWhere,
-        orderBy: { sku: 'asc' },
-        take: PAGE_SIZE,
-        skip: (page - 1) * PAGE_SIZE,
-      }),
-      db.product.count({ where: productWhere }),
+  // Fetch the page data with a small fixed query count. The branch summary
+  // is reduced in memory to avoid a per-branch aggregate/count fan-out.
+  const [products, total, allRawStock, allFinishedStock] = await Promise.all([
+    db.product.findMany({
+      where: productWhere,
+      orderBy: { sku: 'asc' },
+      take: PAGE_SIZE,
+      skip: (page - 1) * PAGE_SIZE,
+    }),
+    db.product.count({ where: productWhere }),
 
-      // Branch summaries
-      Promise.all(
-        ALL_BRANCHES.map(async (branch) => {
-          // Build aggregate args and log them to diagnose Prisma error
-          const rawArgs: Prisma.InventoryRawMaterialAggregateArgs = {
-            where: { Branch: { code: branch }, availableKg: { gt: 0 } },
-            _sum: { availableKg: true },
-            _count: { _all: true },
-          }
+    // All raw + finished stock (for per-product branch breakdown)
+    db.inventoryRawMaterial.findMany({
+      where: { availableKg: { gt: 0 } },
+      include: {
+        Branch: { select: { code: true } },
+        RawMaterial: { select: { id: true, costPerKg: true } },
+      },
+    }),
+    db.inventoryFinishedGoods.findMany({
+      where: { availableQty: { gt: 0 } },
+      include: {
+        Branch: { select: { code: true } },
+        FinishedGoods: { select: { id: true, unitCost: true } },
+      },
+    }),
+  ])
 
-          const finishedArgs: Prisma.InventoryFinishedGoodsAggregateArgs = {
-            where: { Branch: { code: branch }, availableQty: { gt: 0 } },
-            _sum: { availableQty: true },
-            _count: { _all: true },
-          }
+  const branchSummaries = ALL_BRANCHES.map((branch) => {
+    const rawStock = allRawStock.filter((stock) => stock.Branch.code === branch)
+    const finishedStock = allFinishedStock.filter((stock) => stock.Branch.code === branch)
+    const rawValue = rawStock.reduce(
+      (sum, stock) => sum + Number(stock.availableKg) * (Number(stock.RawMaterial?.costPerKg) || 0),
+      0
+    )
+    const finishedValue = finishedStock.reduce(
+      (sum, stock) => sum + Number(stock.availableQty) * (Number(stock.FinishedGoods?.unitCost) || 0),
+      0
+    )
 
-          console.log('aggregate rawArgs:', JSON.stringify(rawArgs))
-          console.log('aggregate finishedArgs:', JSON.stringify(finishedArgs))
+    return {
+      branch,
+      totalUnits:
+        rawStock.reduce((sum, stock) => sum + Number(stock.availableKg), 0) +
+        finishedStock.reduce((sum, stock) => sum + Number(stock.availableQty), 0),
+      totalSkus: rawStock.length + finishedStock.length,
+      value: rawValue + finishedValue,
+      lowStock:
+        rawStock.filter((stock) => Number(stock.availableKg) < 5).length +
+        finishedStock.filter((stock) => Number(stock.availableQty) < 5).length,
+    }
+  })
 
-          const [rawAgg, finishedAgg] = await Promise.all([
-            db.inventoryRawMaterial.aggregate(rawArgs as any),
-            db.inventoryFinishedGoods.aggregate(finishedArgs as any),
-          ])
-
-          const [rawLowStock, finishedLowStock] = await Promise.all([
-            db.inventoryRawMaterial.count({ where: { Branch: { code: branch }, availableKg: { gt: 0, lt: 5, } } }),
-            db.inventoryFinishedGoods.count({ where: { Branch: { code: branch }, availableQty: { gt: 0, lt: 5, } } }),
-          ])
-
-          const [valuedRaw, valuedFinished] = await Promise.all([
-            db.inventoryRawMaterial.findMany({
-              where: { Branch: { code: branch }, availableKg: { gt: 0 } },
-              include: { RawMaterial: { select: { costPerKg: true } } },
-            }),
-            db.inventoryFinishedGoods.findMany({
-              where: { Branch: { code: branch }, availableQty: { gt: 0 } },
-              include: { FinishedGoods: { select: { unitCost: true } } },
-            }),
-          ])
-
-          const rawValue = valuedRaw.reduce((sum, s) => sum + (Number(s.availableKg) * (Number(s.RawMaterial?.costPerKg) || 0)), 0)
-          const finishedValue = valuedFinished.reduce((sum, s) => sum + (Number(s.availableQty) * (Number(s.FinishedGoods?.unitCost) || 0)), 0)
-
-          const rawCount = typeof rawAgg._count === 'number' ? rawAgg._count : ((rawAgg._count as any)?._all ?? 0)
-          const finishedCount = typeof finishedAgg._count === 'number' ? finishedAgg._count : ((finishedAgg._count as any)?._all ?? 0)
-
-          return {
-            branch,
-            totalUnits: Number((rawAgg._sum?.availableKg ?? 0)) + Number((finishedAgg._sum?.availableQty ?? 0)),
-            totalSkus: Number(rawCount) + Number(finishedCount),
-            value: rawValue + finishedValue,
-            lowStock: rawLowStock + finishedLowStock,
-          }
-        })
-      ),
-
-      // Global low stock count
-      Promise.all([
-        db.inventoryRawMaterial.count({ where: { availableKg: { gt: 0, lt: 5, } } }),
-        db.inventoryFinishedGoods.count({ where: { availableQty: { gt: 0, lt: 5, } } }),
-      ]).then(([r, f]) => r + f),
-
-      // All raw + finished stock (for per-product branch breakdown)
-      db.inventoryRawMaterial.findMany({
-        where: { availableKg: { gt: 0 } },
-        include: { RawMaterial: { select: { id: true } } },
-      }),
-      db.inventoryFinishedGoods.findMany({
-        where: { availableQty: { gt: 0 } },
-        include: { FinishedGoods: { select: { id: true } } },
-      }),
-    ])
+  const lowStockCount = branchSummaries.reduce((sum, summary) => sum + summary.lowStock, 0)
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
@@ -166,14 +137,14 @@ export default async function BranchStockPage({
     // Add raw material stock
     allRawStock.forEach(stock => {
       if (stock.RawMaterial.id === productId) {
-        stockByBranch[stock.branchId as Branch] = Number(stock.availableKg)
+        stockByBranch[stock.Branch.code as Branch] = Number(stock.availableKg)
       }
     })
 
     // Add finished goods stock
     allFinishedStock.forEach(stock => {
       if (stock.FinishedGoods.id === productId) {
-        stockByBranch[stock.branchId as Branch] = Number(stock.availableQty)
+        stockByBranch[stock.Branch.code as Branch] = Number(stock.availableQty)
       }
     })
 
