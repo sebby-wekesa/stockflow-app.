@@ -5,6 +5,33 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUserRole, USER_ROLES } from "@/lib/types";
 
+type UserFormPayload = FormData | Record<string, FormDataEntryValue | null | undefined>;
+
+function isFormData(value: unknown): value is FormData {
+  return typeof FormData !== "undefined" && value instanceof FormData;
+}
+
+function resolveFormPayload(
+  prevStateOrPayload: unknown,
+  maybeFormData?: FormData
+): UserFormPayload {
+  const payload = maybeFormData ?? prevStateOrPayload;
+
+  if (isFormData(payload)) {
+    return payload;
+  }
+
+  if (payload && typeof payload === "object") {
+    return payload as Record<string, FormDataEntryValue | null | undefined>;
+  }
+
+  throw new Error("Invalid form submission");
+}
+
+function getPayloadValue(payload: UserFormPayload, name: string) {
+  return isFormData(payload) ? payload.get(name) : payload[name];
+}
+
 async function assertAdminAccess() {
   const currentUser = await requireActiveAuth();
 
@@ -19,11 +46,12 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
   try {
     const currentUser = await assertAdminAccess();
     const db = getTenantPrisma(currentUser.organizationId);
+    const payload = resolveFormPayload(_prevState, formData);
 
-    const email = formData.get('email') as string;
-    const name = formData.get('name') as string;
-    const role = formData.get('role') as string;
-    const branchId = formData.get('branchId') as string | null;
+    const email = getPayloadValue(payload, 'email') as string;
+    const name = getPayloadValue(payload, 'name') as string;
+    const role = getPayloadValue(payload, 'role') as string;
+    const branchId = getPayloadValue(payload, 'branchId') as string | null;
 
     if (!email || !name || !role) {
       return { success: false, error: "Email, name and role are required" };
@@ -154,12 +182,12 @@ export async function updateUser(_prevState: unknown, maybeFormData?: FormData) 
   try {
     const currentUser = await assertAdminAccess();
     const db = getTenantPrisma(currentUser.organizationId);
-    const formData = maybeFormData ?? (_prevState as FormData);
+    const payload = resolveFormPayload(_prevState, maybeFormData);
 
-    const userId = formData.get('userId') as string;
-    const name = formData.get('name') as string;
-    const role = formData.get('role') as string;
-    const branchId = formData.get('branchId') as string | null;
+    const userId = getPayloadValue(payload, 'userId') as string;
+    const name = getPayloadValue(payload, 'name') as string;
+    const role = getPayloadValue(payload, 'role') as string;
+    const branchId = getPayloadValue(payload, 'branchId') as string | null;
 
     if (!userId || !name || !role) {
       throw new Error("userId, name and role are required");

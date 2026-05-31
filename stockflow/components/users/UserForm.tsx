@@ -65,10 +65,11 @@ export function UserForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    const formData = new FormData(e.currentTarget)
     setError(null)
     startTransition(async () => {
       try {
-        await action(new FormData(e.currentTarget))
+        await action(formData)
       } catch (err) {
         setError((err as Error).message)
       }
