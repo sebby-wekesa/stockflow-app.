@@ -45,21 +45,30 @@ export function UserRow({ user }: UserRowProps) {
   };
 
   const handleDelete = () => {
-    if (confirm(`Delete user ${user.email}?`)) {
-      setError(null);
-      startTransition(async () => {
-        try {
-          const result = await deleteUser(user.id);
-          if (!result.success) {
-            setError(result.error || "Failed to delete user. Please try again.");
-            return;
-          }
-          router.refresh();
-        } catch (err) {
-          setError((err as Error).message || "Failed to delete user. Please try again.");
-        }
-      });
+    const confirmation = window.prompt(
+      `Delete ${user.email}?\n\nThis cannot be undone. Type the user's email address to confirm.`
+    );
+
+    if (confirmation === null) return;
+
+    if (confirmation.trim().toLowerCase() !== user.email.toLowerCase()) {
+      setError("Delete cancelled. Email confirmation did not match.");
+      return;
     }
+
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await deleteUser(user.id);
+        if (!result.success) {
+          setError(result.error || "Failed to delete user. Please try again.");
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setError((err as Error).message || "Failed to delete user. Please try again.");
+      }
+    });
   };
 
   const handleVerify = () => {
