@@ -20,7 +20,7 @@ export function DeleteProductButton({
 
     if (
       !window.confirm(
-        `Delete "${productName}"? This cannot be undone. Products with stock movements or receipts cannot be deleted.`
+        `Delete "${productName}"? This cannot be undone. Stock movements for this product will also be deleted. Products with receipts cannot be deleted.`
       )
     ) {
       return

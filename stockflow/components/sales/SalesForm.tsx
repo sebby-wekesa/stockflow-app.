@@ -480,7 +480,7 @@ function ProductSearch({
         )}
       </div>
 
-      <div className="border rounded-lg max-h-52 overflow-auto bg-white">
+      <div className="border border-[var(--border2)] rounded-lg max-h-52 overflow-auto bg-[var(--surface2)] text-[var(--text)]">
         {searching ? (
           <div className="text-sm text-muted px-3 py-3">Searching...</div>
         ) : query.length < 2 ? (
@@ -495,19 +495,19 @@ function ProductSearch({
               key={r.id}
               type="button"
               onClick={() => onPick(r)}
-              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-gray-50 text-sm border-b last:border-b-0 ${
+              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-[var(--surface)] text-sm border-b border-[var(--border)] last:border-b-0 ${
                 index === 0 ? 'rounded-t-lg' : ''
               }`}
             >
               <div className="min-w-0 flex-1 pr-3">
-                <div className="font-mono text-[13px] text-amber-600">{r.product_code}</div>
-                <div className="text-foreground truncate">{r.canonical_name}</div>
+                <div className="font-mono text-[13px] text-[var(--accent)]">{r.product_code}</div>
+                <div className="text-[var(--text)] truncate">{r.canonical_name}</div>
               </div>
 
               <div className="text-right flex-shrink-0 text-sm">
-                <div className="font-medium tabular-nums">{formatKES(r.selling_price)}</div>
+                <div className="font-medium tabular-nums text-[var(--text)]">{formatKES(r.selling_price)}</div>
                 {r.category !== 'service' && (
-                  <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-[var(--teal)]' : 'text-[var(--red)]'}`}>
                     {r.stock_at_branch ?? 0} in stock
                   </div>
                 )}
@@ -568,7 +568,7 @@ function CustomerSearch({
         </button>
       </div>
 
-      <div className="border rounded-lg max-h-44 overflow-auto bg-white">
+      <div className="border border-[var(--border2)] rounded-lg max-h-44 overflow-auto bg-[var(--surface2)] text-[var(--text)]">
         {searching ? (
           <div className="text-sm text-muted px-3 py-2.5">Searching...</div>
         ) : query.length < 2 ? (
@@ -581,9 +581,9 @@ function CustomerSearch({
               key={c.id}
               type="button"
               onClick={() => onPick(c)}
-              className="w-full text-left px-3 py-2.5 border-b last:border-b-0 hover:bg-gray-50 text-sm"
+              className="w-full text-left px-3 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] text-sm"
             >
-              <div className="font-medium">{c.name}</div>
+              <div className="font-medium text-[var(--text)]">{c.name}</div>
               {c.phone && (
                 <div className="text-xs text-muted font-mono">{c.phone}</div>
               )}

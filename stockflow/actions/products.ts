@@ -171,7 +171,7 @@ export async function updateProduct(productId: string, formData: FormData) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DELETE — only allowed if no stock movements or receipts exist
+// DELETE — allowed if no receipts exist. Movement history is removed with the product.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function deleteProduct(productId: string) {
@@ -179,25 +179,22 @@ export async function deleteProduct(productId: string) {
   if (user.role !== 'ADMIN') {
     throw new Error('Only admins can delete products')
   }
-  const db = getTenantPrisma(user.organizationId)
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    // Existence + tenant check
+    const product = await tx.product.findFirst({ where: { id: productId } })
+    if (!product) throw new Error('Product not found')
 
-  // Existence + tenant check
-  const product = await db.product.findFirst({ where: { id: productId } })
-  if (!product) throw new Error('Product not found')
+    const receiptCount = await tx.productReceipt.count({ where: { productId } })
+    if (receiptCount > 0) {
+      throw new Error(
+        `Cannot delete: product has ${receiptCount} receipts. Remove receipts first.`
+      )
+    }
 
-  const [movementCount, receiptCount] = await Promise.all([
-    db.stockMovement.count({ where: { productId } }),
-    db.productReceipt.count({ where: { productId } }),
-  ])
-
-  if (movementCount + receiptCount > 0) {
-    throw new Error(
-      `Cannot delete: product has ${movementCount} stock movements and ${receiptCount} receipts. Remove history first.`
-    )
-  }
-
-  await db.productAlias.deleteMany({ where: { product_id: productId } })
-  await db.product.delete({ where: { id: productId } })
+    await tx.stockMovement.deleteMany({ where: { productId } })
+    await tx.productAlias.deleteMany({ where: { product_id: productId } })
+    await tx.product.delete({ where: { id: productId } })
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/products')
   redirect('/products')

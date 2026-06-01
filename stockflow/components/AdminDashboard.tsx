@@ -251,7 +251,7 @@ export default async function AdminDashboard({ user }: AdminDashboardProps) {
     <div>
       <div className="section-header mb-16">
         <div><div className="section-title">Overview</div><div className="section-sub">Today — {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}</div></div>
-        <Link href="/orders/new" className="btn btn-primary">+ New production order</Link>
+        <Link href="/production/new" className="btn btn-primary">+ New production order</Link>
       </div>
       <div className="stats-grid">
         <div className="stat-card amber">
