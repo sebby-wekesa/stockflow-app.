@@ -18,6 +18,7 @@ type AdminUserRow = {
   department: string | null;
   lastSeenAt: Date | null;
   isVerified: boolean;
+  authMissing: boolean;
 };
 
 type AuthOnlyUser = {
@@ -54,7 +55,9 @@ async function getUsers() {
           users.map(async (user) => {
             const { data, error } = await supabaseAdmin.auth.admin.getUserById(user.id);
             if (error) {
-              console.error(`Failed to fetch auth user ${user.id}:`, error.message);
+              if (!error.message.toLowerCase().includes("not found")) {
+                console.error(`Failed to fetch auth user ${user.id}:`, error.message);
+              }
               return [user.id, null] as const;
             }
             return [user.id, data.user] as const;
@@ -71,6 +74,7 @@ async function getUsers() {
       department: user.department,
       lastSeenAt: user.lastSeenAt,
       isVerified: Boolean(authUsersById.get(user.id)?.email_confirmed_at),
+      authMissing: Boolean(supabaseAdmin && !authUsersById.get(user.id)),
     })) as AdminUserRow[];
   } catch (error) {
     console.error('Failed to fetch users:', error);
@@ -205,7 +209,7 @@ export default async function UsersPage() {
                 <td>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <span className={`badge ${user.isVerified ? 'badge-green' : 'badge-amber'}`}>
-                      {user.isVerified ? 'Verified' : 'Unverified'}
+                      {user.authMissing ? 'Missing auth' : user.isVerified ? 'Verified' : 'Unverified'}
                     </span>
                     {isUserOnline(user.lastSeenAt) ? (
                       <span className="badge badge-green flex items-center gap-1.5">

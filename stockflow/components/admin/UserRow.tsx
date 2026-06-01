@@ -49,9 +49,14 @@ export function UserRow({ user }: UserRowProps) {
       setError(null);
       startTransition(async () => {
         try {
-          await deleteUser(user.id);
-        } catch {
-          setError("Failed to delete user. Please try again.");
+          const result = await deleteUser(user.id);
+          if (!result.success) {
+            setError(result.error || "Failed to delete user. Please try again.");
+            return;
+          }
+          router.refresh();
+        } catch (err) {
+          setError((err as Error).message || "Failed to delete user. Please try again.");
         }
       });
     }

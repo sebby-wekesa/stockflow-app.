@@ -29,6 +29,10 @@ export async function GET() {
 
     return NextResponse.json(transformedDeliveries)
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     console.error('Recent deliveries error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch recent deliveries' },

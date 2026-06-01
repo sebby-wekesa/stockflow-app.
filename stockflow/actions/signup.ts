@@ -14,7 +14,7 @@ import { checkRateLimitAsync, getClientIp } from '@/lib/rate-limit'
 import { validatePassword } from '@/lib/security'
 
 const signUpSchema = z.object({
-  organizationId: z.string().uuid('Select a valid organization'),
+  organizationId: z.string().trim().min(1, 'Select a valid organization'),
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8).max(128),
   fullName: z.string().trim().min(2).max(120),
@@ -140,7 +140,7 @@ export async function signUpOrganization(formData: FormData) {
     const msg = (err as Error).message
     if (msg.includes('Unique') || msg.toLowerCase().includes('unique')) {
       return {
-        error: 'A signup race occurred. Please try again with a different company name.',
+        error: 'A signup race occurred. Please try again with a different email.',
       }
     }
     console.error('[signup] User creation failed:', err)

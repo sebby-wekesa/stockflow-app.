@@ -46,6 +46,10 @@ export default function WarehousePage() {
       try {
         // Fetch stats
         const statsResponse = await fetch('/api/warehouse/stats');
+        if (statsResponse.status === 401) {
+          router.push('/login');
+          return;
+        }
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
           setStats(statsData);
@@ -53,6 +57,10 @@ export default function WarehousePage() {
 
         // Fetch recent deliveries
         const deliveriesResponse = await fetch('/api/warehouse/recent-deliveries');
+        if (deliveriesResponse.status === 401) {
+          router.push('/login');
+          return;
+        }
         if (deliveriesResponse.ok) {
           const deliveriesData = await deliveriesResponse.json();
           setRecentDeliveries(deliveriesData);
@@ -60,6 +68,10 @@ export default function WarehousePage() {
 
         // Fetch low stock alerts
         const lowStockResponse = await fetch('/api/warehouse/low-stock');
+        if (lowStockResponse.status === 401) {
+          router.push('/login');
+          return;
+        }
         if (lowStockResponse.ok) {
           const lowStockData = await lowStockResponse.json();
           setLowStockAlerts(lowStockData);

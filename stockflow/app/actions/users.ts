@@ -131,14 +131,14 @@ export async function verifyUser(userId: string) {
 
     const user = await db.user.findFirst({
       where: { id: userId, organizationId: currentUser.organizationId },
-      select: { id: true, name: true, role: true },
+      select: { id: true, email: true, name: true, role: true },
     });
 
     if (!user) {
       return { success: false, error: "User not found in this organization" };
     }
 
-    const { data, error: authError } = await adminClient.auth.admin.updateUserById(user.id, {
+    const { error: authError } = await adminClient.auth.admin.updateUserById(user.id, {
       email_confirm: true,
       user_metadata: {
         name: user.name,
@@ -148,10 +148,6 @@ export async function verifyUser(userId: string) {
 
     if (authError) {
       return { success: false, error: `Failed to verify user: ${authError.message}` };
-    }
-
-    if (!data.user.email_confirmed_at) {
-      return { success: false, error: "Supabase did not mark the email as verified" };
     }
 
     revalidatePath("/users");
@@ -303,33 +299,65 @@ export async function verifyAuthUserEmail(authUserId: string) {
 }
 
 export async function deleteUser(userId: string) {
-  const currentUser = await assertAdminAccess();
-  const db = getTenantPrisma(currentUser.organizationId);
-
-  // First delete related records that reference this user (tenant-scoped)
-  await db.auditLog.deleteMany({
-    where: { userId, organizationId: currentUser.organizationId },
-  });
-
-  await db.stageLog.deleteMany({
-    where: { operatorId: userId, organizationId: currentUser.organizationId },
-  });
-
-  await db.notificationSettings.deleteMany({
-    where: { userId, organizationId: currentUser.organizationId },
-  });
-
   try {
-    // Delete from Supabase Auth
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (authError) {
-      throw new Error(`Failed to delete from auth: ${authError.message}`);
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
+
+    if (userId === currentUser.id) {
+      return { success: false, error: "You cannot delete your own account." };
     }
 
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: currentUser.organizationId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return { success: false, error: "User not found in this organization." };
+    }
+
+    await db.$transaction([
+      db.auditLog.deleteMany({
+        where: { userId, organizationId: currentUser.organizationId },
+      }),
+      db.stageLog.deleteMany({
+        where: { operatorId: userId, organizationId: currentUser.organizationId },
+      }),
+      db.notificationSettings.deleteMany({
+        where: { userId, organizationId: currentUser.organizationId },
+      }),
+      db.importBatch.deleteMany({
+        where: { created_by: userId, organizationId: currentUser.organizationId },
+      }),
+      db.invitation.deleteMany({
+        where: { invitedBy: userId, organizationId: currentUser.organizationId },
+      }),
+      db.saleOrder.updateMany({
+        where: { createdBy: userId, organizationId: currentUser.organizationId },
+        data: { createdBy: null },
+      }),
+      db.user.delete({
+        where: { id: userId, organizationId: currentUser.organizationId },
+      }),
+    ]);
+
+    const adminClient = getSupabaseAdmin();
+    if (adminClient) {
+      const { error: authError } = await adminClient.auth.admin.deleteUser(userId);
+      if (authError && !authError.message.toLowerCase().includes("not found")) {
+        console.error("Delete auth user error:", authError.message);
+      }
+    }
+
+    revalidatePath("/users");
     revalidatePath("/admin/users");
+    return { success: true };
   } catch (error) {
     console.error("Delete user error:", error);
-    throw error;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete user.",
+    };
   }
 }
 
