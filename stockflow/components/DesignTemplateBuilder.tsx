@@ -4,14 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createDesign } from '@/app/actions/designs';
 import { getRawMaterials } from '@/app/actions/materials';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Plus, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { designSchema } from '@/lib/schemas';
 
@@ -219,290 +215,304 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
   );
 
   return (
-    <Card className="w-full max-w-4xl">
-      <CardHeader>
-        <CardTitle>Design Template Builder</CardTitle>
-        <CardDescription>
-          Create standardized product designs with sequential production stages and material requirements
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    <form onSubmit={handleSubmit} className="design-builder">
+      {error && (
+        <div className="design-error">
+          {error}
+        </div>
+      )}
 
-          {/* Basic Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">Design Name *</Label>
+      <div className="card design-card">
+        <div className="design-card-header">
+          <div>
+            <div className="section-title">Template details</div>
+            <div className="section-sub">Product identity, dimensions, yield, and material consumption</div>
+          </div>
+        </div>
+
+        <div className="design-form-grid two">
+          <div className="form-group">
+            <Label htmlFor="name" className="form-label">Design name *</Label>
               <Input
                 id="name"
+                className="form-input"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Hex Bolt M12"
                 required
               />
-            </div>
-            <div>
-              <Label htmlFor="code">Design Code *</Label>
+          </div>
+          <div className="form-group">
+            <Label htmlFor="code" className="form-label">Design code *</Label>
               <Input
                 id="code"
+                className="form-input"
                 value={formData.code}
                 onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
                 placeholder="e.g. HB-M12"
                 required
               />
-            </div>
-            <div>
-              <Label htmlFor="category">Category</Label>
+          </div>
+          <div className="form-group">
+            <Label htmlFor="category" className="form-label">Category</Label>
               <Input
                 id="category"
+                className="form-input"
                 value={formData.category}
                 onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                 placeholder="e.g. Bolt"
               />
-            </div>
           </div>
+          <div className="form-group">
+            <Label htmlFor="rawMaterial" className="form-label">Raw material</Label>
+            <Select
+              value={formData.rawMaterialId || NO_RAW_MATERIAL_VALUE}
+              onValueChange={(value) => setFormData(prev => ({
+                ...prev,
+                rawMaterialId: value === NO_RAW_MATERIAL_VALUE ? '' : value
+              }))}
+            >
+              <SelectTrigger className="form-input design-select-trigger">
+                <SelectValue placeholder={loading ? "Loading materials..." : "Select raw material"} />
+              </SelectTrigger>
+              <SelectContent className="design-select-content">
+                <SelectItem className="design-select-item" value={NO_RAW_MATERIAL_VALUE}>No specific material</SelectItem>
+                {rawMaterials.map((material) => (
+                  <SelectItem className="design-select-item" key={material.id} value={material.id}>
+                    {material.materialName} ({material.diameter}, {material.length || '—'} L / {material.width || '—'} W/D / {material.height || '—'} H)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
+        <div className="form-group">
+          <Label htmlFor="description" className="form-label">Description</Label>
             <Textarea
               id="description"
+              className="form-input design-textarea"
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Optional description of the design..."
               rows={2}
             />
-          </div>
+        </div>
 
-          {/* Material Information */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="rawMaterial">Raw Material</Label>
-              <Select
-                value={formData.rawMaterialId || NO_RAW_MATERIAL_VALUE}
-                onValueChange={(value) => setFormData(prev => ({
-                  ...prev,
-                  rawMaterialId: value === NO_RAW_MATERIAL_VALUE ? '' : value
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select raw material" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_RAW_MATERIAL_VALUE}>No specific material</SelectItem>
-                  {rawMaterials.map((material) => (
-                    <SelectItem key={material.id} value={material.id}>
-                      {material.materialName} ({material.diameter}, {material.length || '—'} L / {material.width || '—'} W/D / {material.height || '—'} H)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="targetDimensions">Target Dimensions</Label>
+        <div className="design-form-grid three">
+          <div className="form-group">
+            <Label htmlFor="targetDimensions" className="form-label">Target dimensions</Label>
               <Input
                 id="targetDimensions"
+                className="form-input"
                 value={formData.targetDimensions}
                 onChange={(e) => setFormData(prev => ({ ...prev, targetDimensions: e.target.value }))}
                 placeholder="e.g. M12 × 70mm"
               />
-            </div>
-            <div>
-              <Label htmlFor="targetWeight">Target Weight (kg)</Label>
+          </div>
+          <div className="form-group">
+            <Label htmlFor="targetWeight" className="form-label">Target weight (kg)</Label>
               <Input
                 id="targetWeight"
                 type="number"
                 step="0.001"
+                className="form-input"
                 value={formData.targetWeight}
                 onChange={(e) => setFormData(prev => ({ ...prev, targetWeight: parseFloat(e.target.value) || 0 }))}
                 placeholder="0.000"
               />
-            </div>
           </div>
-
-          {/* Product Specifications */}
-          <div>
-            <Label>Product Specifications</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-              <div>
-                <Label htmlFor="rodDiameter" className="text-xs text-gray-600">Rod Diameter</Label>
-                <Input
-                  id="rodDiameter"
-                  value={formData.rodDiameter}
-                  onChange={(e) => setFormData(prev => ({ ...prev, rodDiameter: e.target.value }))}
-                  placeholder="e.g. 12 mm"
-                />
-              </div>
-              <div>
-                <Label htmlFor="length" className="text-xs text-gray-600">Length</Label>
-                <Input
-                  id="length"
-                  value={formData.length}
-                  onChange={(e) => setFormData(prev => ({ ...prev, length: e.target.value }))}
-                  placeholder="e.g. 70 mm"
-                />
-              </div>
-              <div>
-                <Label htmlFor="threadSize" className="text-xs text-gray-600">Thread Size</Label>
-                <Input
-                  id="threadSize"
-                  value={formData.threadSize}
-                  onChange={(e) => setFormData(prev => ({ ...prev, threadSize: e.target.value }))}
-                  placeholder="e.g. M12"
-                />
-              </div>
-              <div>
-                <Label htmlFor="headType" className="text-xs text-gray-600">Head Type</Label>
-                <Input
-                  id="headType"
-                  value={formData.headType}
-                  onChange={(e) => setFormData(prev => ({ ...prev, headType: e.target.value }))}
-                  placeholder="e.g. Hex"
-                />
-              </div>
-              <div>
-                <Label htmlFor="finish" className="text-xs text-gray-600">Finish</Label>
-                <Input
-                  id="finish"
-                  value={formData.finish}
-                  onChange={(e) => setFormData(prev => ({ ...prev, finish: e.target.value }))}
-                  placeholder="e.g. Hot Dip Galvanized"
-                />
-              </div>
-              <div>
-                <Label htmlFor="expectedYield" className="text-xs text-gray-600">Expected Yield (%)</Label>
-                <Input
-                  id="expectedYield"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={formData.expectedYield}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expectedYield: parseFloat(e.target.value) || 0 }))}
-                  placeholder="88"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="kgPerUnit">Kg per Finished Unit *</Label>
+          <div className="form-group">
+            <Label htmlFor="kgPerUnit" className="form-label">Kg per finished unit *</Label>
             <Input
               id="kgPerUnit"
               type="number"
               step="0.001"
+              className="form-input"
               value={formData.kgPerUnit}
               onChange={(e) => setFormData(prev => ({ ...prev, kgPerUnit: parseFloat(e.target.value) || 0 }))}
               placeholder="0.000"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">
-              The material consumption rate for producing one finished unit
-            </p>
           </div>
+        </div>
+      </div>
 
-          {/* Production Stages */}
+      <div className="card design-card">
+        <div className="design-card-header">
           <div>
-            <Label>Production Stages *</Label>
-            <p className="text-xs text-gray-500 mb-3">
-              Define the sequential production stages required for this design
-            </p>
+            <div className="section-title">Product specifications</div>
+            <div className="section-sub">Optional attributes used by production and reporting</div>
+          </div>
+        </div>
 
-            {/* Current Stages */}
-            <div className="space-y-2 mb-4">
-              {formData.stages.map((stage, index) => (
-                <div key={stage.id} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <GripVertical className="h-4 w-4 text-gray-400" />
-                    <Badge variant="outline">{stage.sequence}</Badge>
-                    <div className="flex-1">
-                      <span className="font-medium">{stage.name}</span>
-                      <span className="text-sm text-gray-500 ml-2">({stage.department})</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => moveStage(stage.id, 'up')}
-                        disabled={index === 0}
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => moveStage(stage.id, 'down')}
-                        disabled={index === formData.stages.length - 1}
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeStage(stage.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+        <div className="design-form-grid three">
+          <div className="form-group">
+            <Label htmlFor="rodDiameter" className="form-label">Rod diameter</Label>
+            <Input
+              id="rodDiameter"
+              className="form-input"
+              value={formData.rodDiameter}
+              onChange={(e) => setFormData(prev => ({ ...prev, rodDiameter: e.target.value }))}
+              placeholder="e.g. 12 mm"
+            />
+          </div>
+          <div className="form-group">
+            <Label htmlFor="length" className="form-label">Length</Label>
+            <Input
+              id="length"
+              className="form-input"
+              value={formData.length}
+              onChange={(e) => setFormData(prev => ({ ...prev, length: e.target.value }))}
+              placeholder="e.g. 70 mm"
+            />
+          </div>
+          <div className="form-group">
+            <Label htmlFor="threadSize" className="form-label">Thread size</Label>
+            <Input
+              id="threadSize"
+              className="form-input"
+              value={formData.threadSize}
+              onChange={(e) => setFormData(prev => ({ ...prev, threadSize: e.target.value }))}
+              placeholder="e.g. M12"
+            />
+          </div>
+          <div className="form-group">
+            <Label htmlFor="headType" className="form-label">Head type</Label>
+            <Input
+              id="headType"
+              className="form-input"
+              value={formData.headType}
+              onChange={(e) => setFormData(prev => ({ ...prev, headType: e.target.value }))}
+              placeholder="e.g. Hex"
+            />
+          </div>
+          <div className="form-group">
+            <Label htmlFor="finish" className="form-label">Finish</Label>
+            <Input
+              id="finish"
+              className="form-input"
+              value={formData.finish}
+              onChange={(e) => setFormData(prev => ({ ...prev, finish: e.target.value }))}
+              placeholder="e.g. Hot Dip Galvanized"
+            />
+          </div>
+          <div className="form-group">
+            <Label htmlFor="expectedYield" className="form-label">Expected yield (%)</Label>
+            <Input
+              id="expectedYield"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              className="form-input"
+              value={formData.expectedYield}
+              onChange={(e) => setFormData(prev => ({ ...prev, expectedYield: parseFloat(e.target.value) || 0 }))}
+              placeholder="88"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="card design-card">
+        <div className="design-card-header">
+          <div>
+            <div className="section-title">Production stages *</div>
+            <div className="section-sub">Add stages in the sequence operators should follow</div>
+          </div>
+          <span className="badge badge-purple">{formData.stages.length} selected</span>
+        </div>
+
+        <div className="design-stage-list">
+          {formData.stages.length === 0 ? (
+            <div className="design-empty-stage">No stages selected yet.</div>
+          ) : (
+            formData.stages.map((stage, index) => (
+              <div key={stage.id} className="design-stage-row">
+                <div className="design-stage-main">
+                  <GripVertical className="design-stage-grip" />
+                  <span className="chip-num">{stage.sequence}</span>
+                  <div className="design-stage-copy">
+                    <div className="design-stage-name">{stage.name}</div>
+                    <div className="design-stage-dept">{stage.department}</div>
                   </div>
-                  <Textarea
-                    className="mt-3"
-                    value={stage.specificationText || ''}
-                    onChange={(e) => updateStageSpecificationText(stage.id, e.target.value)}
-                    placeholder={`Stage specifications, one per line. Example:\nInput Diameter: 12 mm\nOutput Length: 70 mm`}
-                    rows={2}
-                  />
+                  <div className="design-stage-actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => moveStage(stage.id, 'up')}
+                      disabled={index === 0}
+                      aria-label={`Move ${stage.name} up`}
+                    >
+                      <ArrowUp />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => moveStage(stage.id, 'down')}
+                      disabled={index === formData.stages.length - 1}
+                      aria-label={`Move ${stage.name} down`}
+                    >
+                      <ArrowDown />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn danger"
+                      onClick={() => removeStage(stage.id)}
+                      aria-label={`Remove ${stage.name}`}
+                    >
+                      <X />
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Available Stages */}
-            <div>
-              <Label className="text-sm text-gray-600">Available Stages</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {availableStages.map((stage) => (
-                  <Button
-                    key={`${stage.name}-${stage.department}`}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addStage(stage)}
-                    className="text-xs"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    {stage.name}
-                  </Button>
-                ))}
+                <Textarea
+                  className="form-input design-textarea"
+                  value={stage.specificationText || ''}
+                  onChange={(e) => updateStageSpecificationText(stage.id, e.target.value)}
+                  placeholder={`Stage specifications, one per line. Example:\nInput Diameter: 12 mm\nOutput Length: 70 mm`}
+                  rows={2}
+                />
               </div>
-              {availableStages.length === 0 && (
-                <p className="text-sm text-gray-500 mt-2">All available stages have been added</p>
-              )}
-            </div>
-          </div>
+            ))
+          )}
+        </div>
 
-          {/* Submit */}
-          <div className="flex justify-end gap-4">
-            <Button type="submit" disabled={saving || formData.stages.length === 0}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creating Design...
-                </>
-              ) : (
-                'Create Design Template'
-              )}
-            </Button>
+        <div className="design-available">
+          <div className="form-label">Available stages</div>
+          <div className="stage-builder">
+            {availableStages.map((stage) => (
+              <button
+                key={`${stage.name}-${stage.department}`}
+                type="button"
+                className="stage-chip off"
+                onClick={() => addStage(stage)}
+              >
+                <Plus />
+                {stage.name}
+              </button>
+            ))}
+            {availableStages.length === 0 && (
+              <span className="design-muted">All available stages have been added</span>
+            )}
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+
+      <div className="design-actions">
+        <button type="button" className="btn btn-ghost" onClick={() => router.push('/designs')}>
+          Cancel
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={saving || formData.stages.length === 0}>
+          {saving ? (
+            <>
+              <Loader2 className="spin-icon" />
+              Creating design
+            </>
+          ) : (
+            'Create design template'
+          )}
+        </button>
+      </div>
+    </form>
   );
 }

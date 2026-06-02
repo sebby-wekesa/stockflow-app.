@@ -157,6 +157,58 @@ select.form-input option { background: var(--surface2); }
 .stage-chip.on .chip-num { background: var(--purple); color: #fff; }
 .chip-num { width: 16px; height: 16px; border-radius: 50%; background: var(--border2); color: var(--muted); font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
+/* DESIGN TEMPLATE BUILDER */
+.design-builder { display: flex; flex-direction: column; gap: 14px; max-width: 1120px; }
+.design-card { display: flex; flex-direction: column; gap: 16px; }
+.design-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.design-form-grid { display: grid; gap: 12px; }
+.design-form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.design-form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.design-textarea { min-height: 78px; resize: vertical; }
+.design-select-trigger { height: 38px; }
+.design-select-content { background: var(--surface); color: var(--text); border: 1px solid var(--border2); border-radius: var(--radius-sm); box-shadow: 0 16px 40px rgba(0,0,0,0.35); }
+.design-select-item { color: var(--text); border-radius: 4px; }
+.design-select-item:focus { background: var(--surface2); color: var(--accent); }
+.design-error { background: rgba(224,85,85,0.12); border: 1px solid rgba(224,85,85,0.35); color: var(--red); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; }
+.design-stage-list { display: flex; flex-direction: column; gap: 10px; }
+.design-empty-stage { background: var(--surface2); border: 1px dashed var(--border2); color: var(--muted); border-radius: var(--radius-sm); padding: 18px; font-size: 12px; text-align: center; }
+.design-stage-row { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; }
+.design-stage-main { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.design-stage-grip { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+.design-stage-copy { flex: 1; min-width: 0; }
+.design-stage-name { font-weight: 600; font-size: 13px; color: var(--text); }
+.design-stage-dept { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.design-stage-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.icon-btn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.icon-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-btn.danger:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+.icon-btn svg, .stage-chip svg, .spin-icon { width: 14px; height: 14px; }
+.design-available { display: flex; flex-direction: column; gap: 8px; }
+.design-muted { color: var(--muted); font-size: 12px; padding: 4px 0; }
+.design-actions { display: flex; justify-content: flex-end; gap: 10px; padding-bottom: 8px; }
+.design-actions .btn { display: inline-flex; align-items: center; gap: 8px; }
+.design-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.spin-icon { animation: spin 1s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 900px) {
+  .design-form-grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .content { padding: 18px; }
+  .design-builder { max-width: none; }
+  .design-card-header { flex-direction: column; align-items: flex-start; }
+  .design-form-grid.two,
+  .design-form-grid.three { grid-template-columns: 1fr; }
+  .design-stage-main { align-items: flex-start; }
+  .design-stage-actions { margin-left: auto; }
+  .design-actions { flex-direction: column-reverse; }
+  .design-actions .btn { width: 100%; justify-content: center; }
+}
+
 /* JOB QUEUE */
 .job-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s; }
 .job-card:hover { border-color: var(--border2); }
