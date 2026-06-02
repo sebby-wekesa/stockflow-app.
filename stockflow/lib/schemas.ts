@@ -46,13 +46,17 @@ export const bomItemSchema = z.object({
 export const designSchema = z.object({
   name: z.string().min(1).max(100),
   code: z.string().min(1).max(50),
+  category: z.string().max(100).optional(),
   description: z.string().optional(),
   targetDimensions: z.string().optional(),
   targetWeight: z.number().min(0).max(999999.9999).optional(),
+  expectedYield: z.number().min(0).max(100).optional(),
+  specifications: z.record(z.string(), z.string()).optional(),
   stages: z.array(z.object({
     name: z.string().min(1),
     department: z.string().min(1),
-    sequence: z.number().int().min(1)
+    sequence: z.number().int().min(1),
+    specifications: z.record(z.string(), z.string()).optional()
   })).min(1),
   bomItems: z.array(bomItemSchema).optional().default([])
 }).refine(

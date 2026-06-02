@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createDesign } from '@/app/actions/designs';
 import { getRawMaterials } from '@/app/actions/materials';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,8 @@ interface Stage {
   name: string;
   department: string;
   sequence: number;
+  specifications?: Record<string, string>;
+  specificationText?: string;
 }
 
 interface DesignTemplateBuilderProps {
@@ -26,9 +29,12 @@ interface DesignTemplateBuilderProps {
   initialData?: Partial<{
     name: string;
     code: string;
+    category: string;
     description: string;
     targetDimensions: string;
     targetWeight: number;
+    expectedYield: number;
+    specifications: Record<string, string>;
     rawMaterialId: string;
     kgPerUnit: number;
     stages: Stage[];
@@ -51,6 +57,7 @@ const AVAILABLE_STAGES = [
 ];
 
 export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplateBuilderProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,9 +66,16 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     code: initialData?.code || '',
+    category: initialData?.category || '',
     description: initialData?.description || '',
     targetDimensions: initialData?.targetDimensions || '',
     targetWeight: initialData?.targetWeight || 0,
+    expectedYield: initialData?.expectedYield || 88,
+    rodDiameter: initialData?.specifications?.rodDiameter || '',
+    length: initialData?.specifications?.length || '',
+    threadSize: initialData?.specifications?.threadSize || '',
+    headType: initialData?.specifications?.headType || '',
+    finish: initialData?.specifications?.finish || '',
     rawMaterialId: initialData?.rawMaterialId || '',
     kgPerUnit: initialData?.kgPerUnit || 0,
     stages: initialData?.stages || [] as Stage[]
@@ -88,12 +102,33 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
       id: crypto.randomUUID(),
       name: stageTemplate.name,
       department: stageTemplate.department,
-      sequence: formData.stages.length + 1
+      sequence: formData.stages.length + 1,
+      specificationText: ''
     };
 
     setFormData(prev => ({
       ...prev,
       stages: [...prev.stages, newStage].map((s, i) => ({ ...s, sequence: i + 1 }))
+    }));
+  };
+
+  const parseSpecificationText = (text?: string) => {
+    const specs: Record<string, string> = {};
+    for (const line of (text || '').split('\n')) {
+      const [rawKey, ...rawValue] = line.split(':');
+      const key = rawKey?.trim();
+      const value = rawValue.join(':').trim();
+      if (key && value) specs[key] = value;
+    }
+    return specs;
+  };
+
+  const updateStageSpecificationText = (stageId: string, specificationText: string) => {
+    setFormData(prev => ({
+      ...prev,
+      stages: prev.stages.map(stage =>
+        stage.id === stageId ? { ...stage, specificationText } : stage
+      )
     }));
   };
 
@@ -138,15 +173,25 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
       const designData = {
         name: formData.name,
         code: formData.code,
+        category: formData.category || undefined,
         description: formData.description || undefined,
         targetDimensions: formData.targetDimensions || undefined,
         targetWeight: formData.targetWeight || undefined,
+        expectedYield: formData.expectedYield || undefined,
+        specifications: {
+          rodDiameter: formData.rodDiameter,
+          length: formData.length,
+          threadSize: formData.threadSize,
+          headType: formData.headType,
+          finish: formData.finish
+        },
         rawMaterialId: formData.rawMaterialId || undefined,
         kgPerUnit: formData.kgPerUnit,
         stages: formData.stages.map(s => ({
           name: s.name,
           department: s.department,
-          sequence: s.sequence
+          sequence: s.sequence,
+          specifications: parseSpecificationText(s.specificationText)
         }))
       };
 
@@ -157,6 +202,8 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
 
       if (onComplete) {
         onComplete(result);
+      } else {
+        router.push('/designs');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create design template');
@@ -205,6 +252,15 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                 onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
                 placeholder="e.g. HB-M12"
                 required
+              />
+            </div>
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                placeholder="e.g. Bolt"
               />
             </div>
           </div>
@@ -263,6 +319,71 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
             </div>
           </div>
 
+          {/* Product Specifications */}
+          <div>
+            <Label>Product Specifications</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+              <div>
+                <Label htmlFor="rodDiameter" className="text-xs text-gray-600">Rod Diameter</Label>
+                <Input
+                  id="rodDiameter"
+                  value={formData.rodDiameter}
+                  onChange={(e) => setFormData(prev => ({ ...prev, rodDiameter: e.target.value }))}
+                  placeholder="e.g. 12 mm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="length" className="text-xs text-gray-600">Length</Label>
+                <Input
+                  id="length"
+                  value={formData.length}
+                  onChange={(e) => setFormData(prev => ({ ...prev, length: e.target.value }))}
+                  placeholder="e.g. 70 mm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="threadSize" className="text-xs text-gray-600">Thread Size</Label>
+                <Input
+                  id="threadSize"
+                  value={formData.threadSize}
+                  onChange={(e) => setFormData(prev => ({ ...prev, threadSize: e.target.value }))}
+                  placeholder="e.g. M12"
+                />
+              </div>
+              <div>
+                <Label htmlFor="headType" className="text-xs text-gray-600">Head Type</Label>
+                <Input
+                  id="headType"
+                  value={formData.headType}
+                  onChange={(e) => setFormData(prev => ({ ...prev, headType: e.target.value }))}
+                  placeholder="e.g. Hex"
+                />
+              </div>
+              <div>
+                <Label htmlFor="finish" className="text-xs text-gray-600">Finish</Label>
+                <Input
+                  id="finish"
+                  value={formData.finish}
+                  onChange={(e) => setFormData(prev => ({ ...prev, finish: e.target.value }))}
+                  placeholder="e.g. Hot Dip Galvanized"
+                />
+              </div>
+              <div>
+                <Label htmlFor="expectedYield" className="text-xs text-gray-600">Expected Yield (%)</Label>
+                <Input
+                  id="expectedYield"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.expectedYield}
+                  onChange={(e) => setFormData(prev => ({ ...prev, expectedYield: parseFloat(e.target.value) || 0 }))}
+                  placeholder="88"
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="kgPerUnit">Kg per Finished Unit *</Label>
             <Input
@@ -289,42 +410,51 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
             {/* Current Stages */}
             <div className="space-y-2 mb-4">
               {formData.stages.map((stage, index) => (
-                <div key={stage.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                  <GripVertical className="h-4 w-4 text-gray-400" />
-                  <Badge variant="outline">{stage.sequence}</Badge>
-                  <div className="flex-1">
-                    <span className="font-medium">{stage.name}</span>
-                    <span className="text-sm text-gray-500 ml-2">({stage.department})</span>
+                <div key={stage.id} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-gray-400" />
+                    <Badge variant="outline">{stage.sequence}</Badge>
+                    <div className="flex-1">
+                      <span className="font-medium">{stage.name}</span>
+                      <span className="text-sm text-gray-500 ml-2">({stage.department})</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => moveStage(stage.id, 'up')}
+                        disabled={index === 0}
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => moveStage(stage.id, 'down')}
+                        disabled={index === formData.stages.length - 1}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeStage(stage.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => moveStage(stage.id, 'up')}
-                      disabled={index === 0}
-                    >
-                      <ArrowUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => moveStage(stage.id, 'down')}
-                      disabled={index === formData.stages.length - 1}
-                    >
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeStage(stage.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  <Textarea
+                    className="mt-3"
+                    value={stage.specificationText || ''}
+                    onChange={(e) => updateStageSpecificationText(stage.id, e.target.value)}
+                    placeholder={`Stage specifications, one per line. Example:\nInput Diameter: 12 mm\nOutput Length: 70 mm`}
+                    rows={2}
+                  />
                 </div>
               ))}
             </div>

@@ -9,13 +9,17 @@ import { Prisma } from '@prisma/client';
 export async function createDesign(data: {
   name: string;
   code: string;
+  category?: string;
   description?: string;
   targetDimensions?: string;
   targetWeight?: number;
+  expectedYield?: number;
+  specifications?: Record<string, string>;
   stages: {
     name: string;
     department: string;
     sequence: number;
+    specifications?: Record<string, string>;
   }[];
   bomItems?: {
     rawMaterialId: string;
@@ -55,9 +59,12 @@ export async function createDesign(data: {
       data: {
         name: validatedData.name,
         code: validatedData.code,
+        category: validatedData.category,
         description: validatedData.description,
         targetDimensions: validatedData.targetDimensions,
         targetWeight: validatedData.targetWeight,
+        expectedYield: validatedData.expectedYield,
+        specifications: validatedData.specifications || Prisma.JsonNull,
         organizationId: user.organizationId
       }
     });
@@ -69,6 +76,7 @@ export async function createDesign(data: {
             name: stageData.name,
             department: stageData.department,
             sequence: stageData.sequence,
+            specifications: stageData.specifications || Prisma.JsonNull,
             designId: design.id,
             organizationId: user.organizationId
           }
@@ -114,13 +122,17 @@ export async function createDesign(data: {
 export async function updateDesign(id: string, data: {
   name?: string;
   code?: string;
+  category?: string;
   description?: string;
   targetDimensions?: string;
   targetWeight?: number;
+  expectedYield?: number;
+  specifications?: Record<string, string>;
   stages?: {
     name: string;
     department: string;
     sequence: number;
+    specifications?: Record<string, string>;
   }[];
   bomItems?: {
     rawMaterialId: string;
@@ -141,9 +153,12 @@ export async function updateDesign(id: string, data: {
       data: {
         ...(data.name && { name: data.name }),
         ...(data.code && { code: data.code }),
+        ...(data.category !== undefined && { category: data.category }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.targetDimensions !== undefined && { targetDimensions: data.targetDimensions }),
-        ...(data.targetWeight !== undefined && { targetWeight: data.targetWeight })
+        ...(data.targetWeight !== undefined && { targetWeight: data.targetWeight }),
+        ...(data.expectedYield !== undefined && { expectedYield: data.expectedYield }),
+        ...(data.specifications !== undefined && { specifications: data.specifications || Prisma.JsonNull })
       }
     });
 
@@ -155,6 +170,7 @@ export async function updateDesign(id: string, data: {
             name: stageData.name,
             department: stageData.department,
             sequence: stageData.sequence,
+            specifications: stageData.specifications || Prisma.JsonNull,
             designId: id,
             organizationId: user.organizationId
           }

@@ -194,9 +194,12 @@ model Design {
   organizationId   String
   name             String
   code             String
+  category         String?
   description      String?
   targetDimensions String?
   targetWeight     Decimal?          @db.Decimal(10, 4)
+  expectedYield    Float?
+  specifications   Json?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   lastSeenAt       DateTime?
@@ -629,6 +632,7 @@ model Stage {
   name                   String
   department             String
   sequence               Int
+  specifications         Json?
   designId               String
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
