@@ -37,6 +37,7 @@ export default function ReceivePage() {
           kgReceived: parseFloat(kgReceived),
           piecesReceived: Number(piecesReceived),
           supplier,
+          reference,
         }),
       });
 
@@ -147,11 +148,11 @@ export default function ReceivePage() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Width</label>
+              <label className="form-label">Width / Diameter</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. 50mm"
+                placeholder="e.g. 50mm width or 20mm diameter"
                 value={width}
                 onChange={(e) => setWidth(e.target.value)}
                 required

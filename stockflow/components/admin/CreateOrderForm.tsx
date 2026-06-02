@@ -157,7 +157,7 @@ export function CreateOrderForm({ designs }: { designs: Design[] }) {
                     value={m.id}
                     className={materialHasInsufficient ? 'text-red-400' : ''}
                   >
-                    {m.materialName} ({m.diameter}, {m.length || "—"} L / {m.width || "—"} W / {m.height || "—"} H) - {m.availableKg}kg, {m.availablePieces} pcs available
+                    {m.materialName} ({m.diameter}, {m.length || "—"} L / {m.width || "—"} W/D / {m.height || "—"} H) - {m.availableKg}kg, {m.availablePieces} pcs available
                     {materialRequiredKg > 0 && materialHasInsufficient && " ⚠️ INSUFFICIENT"}
                   </option>
                 );

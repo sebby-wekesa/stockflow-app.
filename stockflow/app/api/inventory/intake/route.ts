@@ -8,19 +8,19 @@ import { normalizeRawMaterialCategory } from '@/lib/raw-materials'
 export async function POST(request: NextRequest) {
   try {
     const user = await requireActiveAuth()
-    if (!['ADMIN', 'MANAGER', 'OPERATOR'].includes(user.role)) {
+    if (!['ADMIN', 'MANAGER', 'OPERATOR', 'WAREHOUSE'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     const db = getTenantPrisma(user.organizationId)
     const body = await request.json()
-    const { materialName, diameter, length, width, height, kgReceived, supplierId } = body
+    const { materialName, diameter, length, width, height, kgReceived, supplierId, reference } = body
     const piecesReceived = Number(body.piecesReceived)
     const category = normalizeRawMaterialCategory(body.category)
 
     // Validate required fields
     if (!materialName || !diameter || !length || !width || !height || !kgReceived || !body.piecesReceived) {
       return NextResponse.json(
-        { error: 'Missing required fields: materialName, diameter, length, width, height, kgReceived, piecesReceived' },
+        { error: 'Missing required fields: materialName, diameter, length, width/diameter, height, kgReceived, piecesReceived' },
         { status: 400 }
       )
     }
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
           kgReceived,
           piecesReceived,
           supplierId,
+          reference: reference || null,
         },
       })
     })

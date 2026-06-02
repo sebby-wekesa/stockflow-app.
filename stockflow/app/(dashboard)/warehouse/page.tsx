@@ -123,7 +123,7 @@ export default function WarehousePage() {
               <tbody>
                 {recentDeliveries.slice(0, 4).map((delivery) => (
                   <tr key={delivery.id}>
-                    <td>{delivery.material.materialName} {delivery.material.diameter} · {delivery.material.length || "—"} L · {delivery.material.width || "—"} W · {delivery.material.height || "—"} H</td>
+                    <td>{delivery.material.materialName} {delivery.material.diameter} · {delivery.material.length || "—"} L · {delivery.material.width || "—"} W/D · {delivery.material.height || "—"} H</td>
                     <td><span className="job-kg">{delivery.kgReceived} kg</span></td>
                     <td>{delivery.piecesReceived}</td>
                     <td>{new Date(delivery.createdAt).toLocaleDateString()}</td>
@@ -141,7 +141,7 @@ export default function WarehousePage() {
               <tbody>
                 {lowStockAlerts.slice(0, 4).map((item) => (
                   <tr key={item.id}>
-                    <td>{item.materialName} {item.diameter} · {item.length || "—"} L · {item.width || "—"} W · {item.height || "—"} H</td>
+                    <td>{item.materialName} {item.diameter} · {item.length || "—"} L · {item.width || "—"} W/D · {item.height || "—"} H</td>
                     <td><span className="job-kg">{item.availableKg} kg</span></td>
                     <td>{item.availablePieces}</td>
                     <td><span className={`badge ${item.availableKg < 100 ? 'badge-red' : 'badge-teal'}`}>{item.availableKg < 100 ? 'Low' : 'Good'}</span></td>
@@ -175,7 +175,7 @@ export default function WarehousePage() {
                   <div>
                     <p className="font-medium" style={{color: 'var(--text)'}}>{item.materialName}</p>
                     <p className="text-sm" style={{color: 'var(--muted)'}}>
-                      Size: {item.diameter} · {item.length || "—"} L · {item.width || "—"} W · {item.height || "—"} H
+                      Size: {item.diameter} · {item.length || "—"} L · {item.width || "—"} W/D · {item.height || "—"} H
                     </p>
                   </div>
                   <span className="badge badge-red">
@@ -208,7 +208,7 @@ export default function WarehousePage() {
                   <div>
                     <p className="font-medium" style={{color: 'var(--text)'}}>{delivery.material.materialName}</p>
                     <p className="text-sm" style={{color: 'var(--muted)'}}>
-                      {new Date(delivery.createdAt).toLocaleDateString()} · {delivery.material.diameter} · {delivery.material.length || "—"} L · {delivery.material.width || "—"} W · {delivery.material.height || "—"} H
+                      {new Date(delivery.createdAt).toLocaleDateString()} · {delivery.material.diameter} · {delivery.material.length || "—"} L · {delivery.material.width || "—"} W/D · {delivery.material.height || "—"} H
                     </p>
                   </div>
                   <span className="badge badge-muted">

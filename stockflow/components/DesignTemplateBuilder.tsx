@@ -235,7 +235,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                   <SelectItem value="">No specific material</SelectItem>
                   {rawMaterials.map((material) => (
                     <SelectItem key={material.id} value={material.id}>
-                      {material.materialName} ({material.diameter}, {material.length || '—'} L / {material.width || '—'} W / {material.height || '—'} H)
+                      {material.materialName} ({material.diameter}, {material.length || '—'} L / {material.width || '—'} W/D / {material.height || '—'} H)
                     </SelectItem>
                   ))}
                 </SelectContent>

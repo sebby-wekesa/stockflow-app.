@@ -235,7 +235,7 @@ export default function InventoryPage() {
                         <td style={{ fontWeight: 600 }}>{m.materialName}</td>
                         <td><span className="badge badge-muted">{m.category}</span></td>
                         <td><span className="badge badge-muted">{m.diameter}</span></td>
-                        <td>{m.length || "—"} L · {m.width || "—"} W · {m.height || "—"} H</td>
+                        <td>{m.length || "—"} L · {m.width || "—"} W/D · {m.height || "—"} H</td>
                         <td>{fmt(Number(m.availablePieces ?? 0))}</td>
                         <td><span className="job-kg">{fmt(avail, 1)} kg</span></td>
                         <td style={{ color: "var(--muted)" }}>{fmt(reserved, 1)} kg</td>

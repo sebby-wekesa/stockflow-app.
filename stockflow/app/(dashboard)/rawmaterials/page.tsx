@@ -47,7 +47,7 @@ export default async function RawmaterialsPage() {
                   return (
                     <div key={m.id} className={`stat-card ${trend}`}>
                       <div className="stat-label">{m.materialName}</div>
-                      <div className="stat-sub">{m.length || '—'} L · {m.width || '—'} W · {m.height || '—'} H · {m.diameter}</div>
+                      <div className="stat-sub">{m.length || '—'} L · {m.width || '—'} W/D · {m.height || '—'} H · {m.diameter}</div>
                       <div className="stat-value">{availableNum.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
                       <div className="stat-sub"><span>{m.availablePieces.toLocaleString()} pieces</span> · {Math.max(0, free).toLocaleString()} kg free · {reservedNum.toLocaleString()} kg reserved</div>
                     </div>
@@ -74,7 +74,7 @@ export default async function RawmaterialsPage() {
                 <td>{r.createdAt.toLocaleDateString()}</td>
                 <td>{r.RawMaterial.category}</td>
                 <td>{r.RawMaterial.materialName}</td>
-                <td>{r.RawMaterial.length || '—'} L · {r.RawMaterial.width || '—'} W · {r.RawMaterial.height || '—'} H</td>
+                <td>{r.RawMaterial.length || '—'} L · {r.RawMaterial.width || '—'} W/D · {r.RawMaterial.height || '—'} H</td>
                 <td><span className="job-kg">{r.kgReceived.toNumber().toFixed(2)} kg</span></td>
                 <td>{r.piecesReceived.toLocaleString()}</td>
                 <td>{r.reference || '—'}</td>

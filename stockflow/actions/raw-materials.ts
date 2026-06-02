@@ -18,7 +18,8 @@ async function requireWarehouseAccess(): Promise<AuthUser> {
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE A NEW RAW MATERIAL TYPE
 //
-// Schema fields: sku, materialName, category, diameter, length, width, height,
+// Schema fields: sku, materialName, category, diameter, length,
+// width/diameter, height,
 // supplierId?, batchNumber?,
 // availableKg, reservedKg, availablePieces, costPerKg
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,7 +142,7 @@ export async function receiveRawMaterial(formData: FormData) {
 //
 // Called from components/inventory/ExcelRawMaterialUpload.tsx. Each row is
 // expected to be a flat object with at least { sku, materialName, diameter,
-// length, width, height, kgReceived, piecesReceived }. Missing materials are auto-created.
+// length, width/diameter, height, kgReceived, piecesReceived }. Missing materials are auto-created.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type RawMaterialBatchResult = {
@@ -192,7 +193,7 @@ export async function receiveRawMaterialsBatch(
       const categoryVal = pick(row, 'category', 'material_category', 'materialCategory')
       const diameterVal = pick(row, 'diameter', 'size', 'spec')
       const lengthVal = pick(row, 'length', 'material_length', 'materialLength')
-      const widthVal = pick(row, 'width', 'material_width', 'materialWidth')
+      const widthVal = pick(row, 'width', 'width_diameter', 'widthDiameter', 'width/diameter', 'material_width', 'materialWidth')
       const heightVal = pick(row, 'height', 'material_height', 'materialHeight')
       const kgVal = pick(row, 'kg_received', 'kgReceived', 'quantity', 'qty', 'kg')
       const piecesVal = pick(row, 'pieces_received', 'piecesReceived', 'pieces', 'piece_count', 'pieceCount', 'pcs')
@@ -210,7 +211,7 @@ export async function receiveRawMaterialsBatch(
 
       if (!sku || !name || !diameter || !length || !width || !height) {
         errors.push(
-          `Row ${rowNum}: missing required fields (sku, materialName, diameter, length, width, height)`
+          `Row ${rowNum}: missing required fields (sku, materialName, diameter, length, width/diameter, height)`
         )
         continue
       }
