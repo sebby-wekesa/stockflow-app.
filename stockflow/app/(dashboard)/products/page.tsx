@@ -155,6 +155,7 @@ export default async function ProductsPage({
               <tr>
                 <th>SKU</th>
                 <th>Product Name</th>
+                <th>Category</th>
                 <th>Origin</th>
                 <th>UOM</th>
                 <th>Current Stock</th>
@@ -165,7 +166,7 @@ export default async function ProductsPage({
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={8} className="py-12 text-center text-muted text-sm">
                     {q || origin ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -192,6 +193,11 @@ export default async function ProductsPage({
                       </Link>
                     </td>
                      <td className="truncate max-w-xs">{p.name}</td>
+                     <td>
+                       <span className={`badge ${CATEGORY_BADGE_CLASS[p.category] || 'badge-muted'}`}>
+                         {CATEGORY_SHORT[p.category] || p.category}
+                       </span>
+                     </td>
                      <td>
                        <span className={`badge ${ORIGIN_BADGE_CLASS[p.origin] || 'badge-muted'}`}>
                          {ORIGIN_SHORT[p.origin] || p.origin}
