@@ -1,0 +1,2 @@
+ALTER TABLE "RawMaterial" ADD COLUMN "availablePieces" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "MaterialReceipt" ADD COLUMN "piecesReceived" INTEGER NOT NULL DEFAULT 0;

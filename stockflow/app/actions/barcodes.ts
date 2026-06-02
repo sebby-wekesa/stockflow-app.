@@ -120,7 +120,7 @@ export async function getBarcodeData(barcode: string) {
       barcode,
       batchNumber: rawMaterial.batchNumber,
       name: rawMaterial.materialName,
-      details: `${rawMaterial.diameter} - ${rawMaterial.availableKg}kg available`,
+      details: `${rawMaterial.diameter} - ${rawMaterial.availableKg}kg / ${rawMaterial.availablePieces} pcs available`,
       supplier: rawMaterial.Supplier?.name || 'Unknown',
       createdAt: rawMaterial.createdAt,
     };

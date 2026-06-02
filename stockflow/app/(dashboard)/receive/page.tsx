@@ -7,7 +7,11 @@ export default function ReceivePage() {
   const [category, setCategory] = useState<RawMaterialCategory>("Flat Bars");
   const [materialName, setMaterialName] = useState("Flat bar 16mm");
   const [diameter, setDiameter] = useState("16mm");
+  const [length, setLength] = useState("");
+  const [width, setWidth] = useState("");
+  const [height, setHeight] = useState("");
   const [kgReceived, setKgReceived] = useState("");
+  const [piecesReceived, setPiecesReceived] = useState("");
   const [supplier, setSupplier] = useState("Steel Masters Ltd");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -27,7 +31,11 @@ export default function ReceivePage() {
           materialName,
           category,
           diameter,
+          length,
+          width,
+          height,
           kgReceived: parseFloat(kgReceived),
+          piecesReceived: Number(piecesReceived),
           supplier,
         }),
       });
@@ -38,6 +46,10 @@ export default function ReceivePage() {
         setMessage(result.message);
         // Reset form
         setKgReceived("");
+        setPiecesReceived("");
+        setLength("");
+        setWidth("");
+        setHeight("");
         setReference("");
         setNotes("");
       } else {
@@ -106,6 +118,56 @@ export default function ReceivePage() {
                 required
                 min="0.01"
                 step="0.01"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Amount (pieces)</label>
+              <input
+                type="number"
+                className="form-input"
+                placeholder="e.g. 25"
+                value={piecesReceived}
+                onChange={(e) => setPiecesReceived(e.target.value)}
+                required
+                min="1"
+                step="1"
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Length</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. 6m"
+                value={length}
+                onChange={(e) => setLength(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Width</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. 50mm"
+                value={width}
+                onChange={(e) => setWidth(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Height</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. 10mm"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                required
               />
             </div>
           </div>

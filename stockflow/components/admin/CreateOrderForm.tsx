@@ -8,7 +8,11 @@ interface RawMaterial {
   id: string;
   materialName: string;
   diameter: string;
+  length: string;
+  width: string;
+  height: string;
   availableKg: number;
+  availablePieces: number;
   reservedKg: number;
   supplier?: string;
 }
@@ -153,7 +157,7 @@ export function CreateOrderForm({ designs }: { designs: Design[] }) {
                     value={m.id}
                     className={materialHasInsufficient ? 'text-red-400' : ''}
                   >
-                    {m.materialName} ({m.diameter}) - {m.availableKg}kg available
+                    {m.materialName} ({m.diameter}, {m.length || "—"} L / {m.width || "—"} W / {m.height || "—"} H) - {m.availableKg}kg, {m.availablePieces} pcs available
                     {materialRequiredKg > 0 && materialHasInsufficient && " ⚠️ INSUFFICIENT"}
                   </option>
                 );

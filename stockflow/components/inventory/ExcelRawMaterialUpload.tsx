@@ -120,7 +120,7 @@ export default function ExcelRawMaterialUpload() {
                   </div>
                   <h3 className="text-lg font-medium text-white mb-2">Click or drag Excel file here</h3>
                   <p className="text-sm text-gray-400 max-w-sm">
-                    Ensure your file contains SKU, Material Name, Category, Diameter, Kg Received, and Reference columns.
+                    Ensure your file contains SKU, Material Name, Category, Diameter, Length, Width, Height, Kg Received, Pieces Received, and Reference columns.
                   </p>
                   <input
                     type="file"

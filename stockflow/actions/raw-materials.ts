@@ -18,8 +18,9 @@ async function requireWarehouseAccess(): Promise<AuthUser> {
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE A NEW RAW MATERIAL TYPE
 //
-// Schema fields: sku, materialName, diameter, supplierId?, batchNumber?,
-// availableKg, reservedKg, costPerKg
+// Schema fields: sku, materialName, category, diameter, length, width, height,
+// supplierId?, batchNumber?,
+// availableKg, reservedKg, availablePieces, costPerKg
 // ─────────────────────────────────────────────────────────────────────────────
 
 const createRMSchema = z.object({
@@ -27,6 +28,10 @@ const createRMSchema = z.object({
   materialName: z.string().min(1).max(200),
   category: z.enum(RAW_MATERIAL_CATEGORIES).default('Flat Bars'),
   diameter: z.string().min(1).max(50),
+  length: z.string().min(1).max(50),
+  width: z.string().min(1).max(50),
+  height: z.string().min(1).max(50),
+  availablePieces: z.coerce.number().int().nonnegative().optional().default(0),
   supplierId: z.string().optional().nullable(),
   costPerKg: z.coerce.number().nonnegative().optional().nullable(),
 })
@@ -40,6 +45,10 @@ export async function createRawMaterial(formData: FormData) {
     materialName: formData.get('materialName'),
     category: formData.get('category') || 'Flat Bars',
     diameter: formData.get('diameter'),
+    length: formData.get('length'),
+    width: formData.get('width'),
+    height: formData.get('height'),
+    availablePieces: formData.get('availablePieces') || 0,
     supplierId: formData.get('supplierId') || null,
     costPerKg: formData.get('costPerKg') || null,
   }
@@ -58,6 +67,10 @@ export async function createRawMaterial(formData: FormData) {
       materialName: parsed.data.materialName,
       category: parsed.data.category,
       diameter: parsed.data.diameter,
+      length: parsed.data.length,
+      width: parsed.data.width,
+      height: parsed.data.height,
+      availablePieces: parsed.data.availablePieces,
       supplierId: parsed.data.supplierId ?? null,
       costPerKg: parsed.data.costPerKg ?? undefined,
       organizationId: user.organizationId,
@@ -74,6 +87,7 @@ export async function createRawMaterial(formData: FormData) {
 const receiveRMSchema = z.object({
   rawMaterialId: z.string().min(1),
   kgReceived: z.coerce.number().positive(),
+  piecesReceived: z.coerce.number().int().positive(),
   branchId: z.string().optional().nullable(),
   supplierId: z.string().optional().nullable(),
   reference: z.string().max(200).optional().nullable(),
@@ -85,6 +99,7 @@ export async function receiveRawMaterial(formData: FormData) {
   const raw = {
     rawMaterialId: formData.get('rawMaterialId'),
     kgReceived: formData.get('kgReceived'),
+    piecesReceived: formData.get('piecesReceived'),
     branchId: formData.get('branchId') || null,
     supplierId: formData.get('supplierId') || null,
     reference: formData.get('reference') || null,
@@ -101,6 +116,7 @@ export async function receiveRawMaterial(formData: FormData) {
           id: crypto.randomUUID(),
           materialId: data.rawMaterialId,
           kgReceived: new Prisma.Decimal(data.kgReceived),
+          piecesReceived: data.piecesReceived,
           branchId: data.branchId,
           supplierId: data.supplierId,
           reference: data.reference,
@@ -110,7 +126,10 @@ export async function receiveRawMaterial(formData: FormData) {
 
       await tx.rawMaterial.update({
         where: { id: data.rawMaterialId },
-        data: { availableKg: { increment: new Prisma.Decimal(data.kgReceived) } },
+        data: {
+          availableKg: { increment: new Prisma.Decimal(data.kgReceived) },
+          availablePieces: { increment: data.piecesReceived },
+        },
       })
   }, { maxWait: 10000, timeout: 30000 })
 
@@ -122,7 +141,7 @@ export async function receiveRawMaterial(formData: FormData) {
 //
 // Called from components/inventory/ExcelRawMaterialUpload.tsx. Each row is
 // expected to be a flat object with at least { sku, materialName, diameter,
-// kgReceived }. Missing materials are auto-created.
+// length, width, height, kgReceived, piecesReceived }. Missing materials are auto-created.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type RawMaterialBatchResult = {
@@ -172,23 +191,35 @@ export async function receiveRawMaterialsBatch(
       const nameVal = pick(row, 'material_name', 'materialName', 'name', 'description')
       const categoryVal = pick(row, 'category', 'material_category', 'materialCategory')
       const diameterVal = pick(row, 'diameter', 'size', 'spec')
+      const lengthVal = pick(row, 'length', 'material_length', 'materialLength')
+      const widthVal = pick(row, 'width', 'material_width', 'materialWidth')
+      const heightVal = pick(row, 'height', 'material_height', 'materialHeight')
       const kgVal = pick(row, 'kg_received', 'kgReceived', 'quantity', 'qty', 'kg')
+      const piecesVal = pick(row, 'pieces_received', 'piecesReceived', 'pieces', 'piece_count', 'pieceCount', 'pcs')
       const costVal = pick(row, 'cost_per_kg', 'costPerKg', 'unit_cost')
 
       const sku = String(skuVal ?? '').trim()
       const name = String(nameVal ?? '').trim()
       const category = normalizeRawMaterialCategory(String(categoryVal ?? '').trim())
       const diameter = String(diameterVal ?? '').trim()
+      const length = String(lengthVal ?? '').trim()
+      const width = String(widthVal ?? '').trim()
+      const height = String(heightVal ?? '').trim()
       const kg = Number(kgVal)
+      const pieces = Number(piecesVal)
 
-      if (!sku || !name || !diameter) {
+      if (!sku || !name || !diameter || !length || !width || !height) {
         errors.push(
-          `Row ${rowNum}: missing required fields (sku, materialName, diameter)`
+          `Row ${rowNum}: missing required fields (sku, materialName, diameter, length, width, height)`
         )
         continue
       }
       if (!Number.isFinite(kg) || kg <= 0) {
         errors.push(`Row ${rowNum}: invalid or missing kgReceived`)
+        continue
+      }
+      if (!Number.isInteger(pieces) || pieces <= 0) {
+        errors.push(`Row ${rowNum}: invalid or missing piecesReceived`)
         continue
       }
 
@@ -202,14 +233,21 @@ export async function receiveRawMaterialsBatch(
                 materialName: name,
                 category,
                 diameter,
+                length,
+                width,
+                height,
                 costPerKg: Number.isFinite(Number(costVal)) ? Number(costVal) : undefined,
                 availableKg: new Prisma.Decimal(kg),
+                availablePieces: pieces,
               },
             })
           } else {
             await tx.rawMaterial.update({
               where: { id: material.id },
-              data: { availableKg: { increment: new Prisma.Decimal(kg) } },
+              data: {
+                availableKg: { increment: new Prisma.Decimal(kg) },
+                availablePieces: { increment: pieces },
+              },
             })
           }
 
@@ -218,6 +256,7 @@ export async function receiveRawMaterialsBatch(
               id: crypto.randomUUID(),
               materialId: material.id,
               kgReceived: new Prisma.Decimal(kg),
+              piecesReceived: pieces,
               reference: `Excel upload row ${rowNum}`,
               loggedBy: user.id,
             },
@@ -263,6 +302,9 @@ export async function searchRawMaterials(query: string) {
         { materialName: { contains: query, mode: 'insensitive' } },
         { category: { contains: query, mode: 'insensitive' } },
         { diameter: { contains: query, mode: 'insensitive' } },
+        { length: { contains: query, mode: 'insensitive' } },
+        { width: { contains: query, mode: 'insensitive' } },
+        { height: { contains: query, mode: 'insensitive' } },
       ],
     },
     orderBy: { sku: 'asc' },

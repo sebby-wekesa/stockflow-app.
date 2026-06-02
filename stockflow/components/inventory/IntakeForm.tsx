@@ -63,6 +63,18 @@ export function RawMaterialIntake() {
               className="w-full bg-[#1e2023] border border-[#4a9eff]/30 rounded-xl p-4 text-2xl font-mono text-white focus:border-[#4a9eff] outline-none"
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-[#4a9eff] uppercase">Amount Received (Pieces)</label>
+            <input
+              name="pieces"
+              type="number"
+              step="1"
+              min="1"
+              placeholder="0"
+              className="w-full bg-[#1e2023] border border-[#4a9eff]/30 rounded-xl p-4 text-2xl font-mono text-white focus:border-[#4a9eff] outline-none"
+            />
+          </div>
         </div>
 
         <button className="w-full bg-[#4a9eff] hover:bg-[#3b8ae6] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all">

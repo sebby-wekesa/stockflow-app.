@@ -343,6 +343,7 @@ model MaterialReceipt {
   organizationId String
   materialId     String
   kgReceived     Decimal     @db.Decimal(10, 4)
+  piecesReceived Int         @default(0)
   reference      String?
   supplierId     String?
   branchId       String?
@@ -560,11 +561,15 @@ model RawMaterial {
   materialName           String
   category               String                   @default("Flat Bars")
   diameter               String
+  length                 String                   @default("")
+  width                  String                   @default("")
+  height                 String                   @default("")
   supplierId             String?
   barcode                String?
   batchNumber            String?
   availableKg            Decimal                  @default(0) @db.Decimal(10, 4)
   reservedKg             Decimal                  @default(0) @db.Decimal(10, 4)
+  availablePieces        Int                      @default(0)
   costPerKg              Float?
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt

@@ -12,7 +12,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
       include: {
         RawMaterial: {
-          select: { materialName: true, diameter: true }
+          select: { materialName: true, diameter: true, length: true, width: true, height: true }
         }
       }
     })
@@ -21,9 +21,13 @@ export async function GET() {
       id: delivery.id,
       material: {
         materialName: delivery.RawMaterial.materialName,
-        diameter: delivery.RawMaterial.diameter
+        diameter: delivery.RawMaterial.diameter,
+        length: delivery.RawMaterial.length,
+        width: delivery.RawMaterial.width,
+        height: delivery.RawMaterial.height
       },
       kgReceived: delivery.kgReceived,
+      piecesReceived: delivery.piecesReceived,
       createdAt: delivery.createdAt.toISOString()
     }))
 

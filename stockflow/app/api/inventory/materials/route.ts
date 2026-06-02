@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
         { category: 'asc' },
         { materialName: 'asc' },
         { diameter: 'asc' },
+        { length: 'asc' },
+        { width: 'asc' },
+        { height: 'asc' },
       ],
     })
 

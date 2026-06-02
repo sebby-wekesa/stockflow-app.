@@ -51,6 +51,10 @@ export async function createRawMaterial(data: {
   materialName: string;
   category?: RawMaterialCategory;
   diameter: string;
+  length: string;
+  width: string;
+  height: string;
+  availablePieces?: number;
   supplierId?: string;
 }) {
   const user = await requireActiveAuth();
@@ -71,12 +75,16 @@ export async function createRawMaterial(data: {
       materialName: data.materialName,
       category: normalizeRawMaterialCategory(data.category),
       diameter: data.diameter,
+      length: data.length,
+      width: data.width,
+      height: data.height,
+      availablePieces: data.availablePieces ?? 0,
       supplierId: data.supplierId || null
     }
   });
 }
 
-export async function updateRawMaterialStock(id: string, kgReceived: number, reference?: string, supplierId?: string) {
+export async function updateRawMaterialStock(id: string, kgReceived: number, reference?: string, supplierId?: string, piecesReceived = 0) {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
@@ -92,6 +100,7 @@ export async function updateRawMaterialStock(id: string, kgReceived: number, ref
         organizationId: user.organizationId,
         materialId: id,
         kgReceived,
+        piecesReceived,
         reference,
         supplierId,
         loggedBy: user.id
@@ -104,7 +113,10 @@ export async function updateRawMaterialStock(id: string, kgReceived: number, ref
       data: {
         availableKg: {
           increment: kgReceived
-        }
+        },
+        availablePieces: {
+          increment: piecesReceived
+        },
       }
     });
 

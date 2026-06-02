@@ -74,6 +74,7 @@ export async function processScan(data: {
             organizationId: user.organizationId,
             materialId: material.id,
             kgReceived: validatedData.kgIn,
+            piecesReceived: 0,
             loggedBy: user.id,
             reference: `SCAN-${Date.now()}`
           }

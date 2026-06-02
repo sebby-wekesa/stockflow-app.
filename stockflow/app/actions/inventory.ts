@@ -19,8 +19,12 @@ export async function getRawMaterials() {
     id: m.id,
     materialName: m.materialName,
     diameter: m.diameter,
+    length: m.length,
+    width: m.width,
+    height: m.height,
     availableKg: m.availableKg,
     reservedKg: m.reservedKg,
+    availablePieces: m.availablePieces,
     supplier: m.Supplier,
     createdAt: m.createdAt,
   }));
@@ -34,9 +38,10 @@ export async function addRawMaterial(formData: FormData) {
   const diameter = String(formData.get("diameter") || "").trim();
   const supplierName = String(formData.get("supplier") || "").trim();
   const kg = Number(formData.get("kg"));
+  const pieces = Number(formData.get("pieces"));
 
-  if (!materialName || !diameter || !Number.isFinite(kg) || kg <= 0) {
-    throw new Error("Material name, diameter, and received kilograms are required.");
+  if (!materialName || !diameter || !Number.isFinite(kg) || kg <= 0 || !Number.isInteger(pieces) || pieces <= 0) {
+    throw new Error("Material name, diameter, received kilograms, and pieces are required.");
   }
 
   let supplierId: string | undefined;
@@ -75,6 +80,7 @@ export async function addRawMaterial(formData: FormData) {
       diameter,
       supplierId,
       availableKg: { increment: kg },
+      availablePieces: { increment: pieces },
     },
     create: {
       organizationId: user.organizationId,
@@ -84,6 +90,7 @@ export async function addRawMaterial(formData: FormData) {
       supplierId,
       availableKg: kg,
       reservedKg: 0,
+      availablePieces: pieces,
     },
   });
 
@@ -92,6 +99,7 @@ export async function addRawMaterial(formData: FormData) {
       organizationId: user.organizationId,
       materialId: material.id,
       kgReceived: kg,
+      piecesReceived: pieces,
       supplierId,
       loggedBy: user.email || user.name || "System",
     },

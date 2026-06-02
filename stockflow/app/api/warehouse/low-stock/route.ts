@@ -15,7 +15,11 @@ export async function GET() {
         id: true,
         materialName: true,
         diameter: true,
+        length: true,
+        width: true,
+        height: true,
         availableKg: true,
+        availablePieces: true,
       },
       orderBy: { availableKg: 'asc' }
     })

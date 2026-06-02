@@ -39,7 +39,8 @@ const rawMaterialImportSchema = z.object({
   diameter: z.string().min(1),
   supplierCode: z.string().optional(),
   availableKg: z.number().min(0).default(0),
-  reservedKg: z.number().min(0).default(0)
+  reservedKg: z.number().min(0).default(0),
+  availablePieces: z.number().int().min(0).default(0)
 });
 
 const stockCountImportSchema = z.object({
@@ -254,7 +255,8 @@ async function importRawMaterial(tx: any, data: any[], rowNumber: number, result
     diameter: data[1]?.toString().trim(),
     supplierCode: data[2]?.toString().trim() || undefined,
     availableKg: parseFloat(data[3]?.toString()) || 0,
-    reservedKg: parseFloat(data[4]?.toString()) || 0
+    reservedKg: parseFloat(data[4]?.toString()) || 0,
+    availablePieces: parseInt(data[5]?.toString() || '0', 10) || 0
   };
 
   const validatedData = rawMaterialImportSchema.parse(materialData);
@@ -281,7 +283,8 @@ async function importRawMaterial(tx: any, data: any[], rowNumber: number, result
       diameter: validatedData.diameter,
       supplierId,
       availableKg: validatedData.availableKg,
-      reservedKg: validatedData.reservedKg
+      reservedKg: validatedData.reservedKg,
+      availablePieces: validatedData.availablePieces
     }
   });
 }
@@ -391,7 +394,8 @@ export async function generateImportTemplate(importType: 'suppliers' | 'customer
         { header: 'Diameter*', key: 'diameter', width: 15 },
         { header: 'Supplier Code', key: 'supplierCode', width: 15 },
         { header: 'Available KG', key: 'availableKg', width: 15 },
-        { header: 'Reserved KG', key: 'reservedKg', width: 15 }
+        { header: 'Reserved KG', key: 'reservedKg', width: 15 },
+        { header: 'Available Pieces', key: 'availablePieces', width: 18 }
       ];
       break;
 
@@ -465,6 +469,7 @@ export async function generateImportTemplate(importType: 'suppliers' | 'customer
       instructionsSheet.addRow(['- Diameter: Size specification (e.g., M12, 1/2")']);
       instructionsSheet.addRow(['- Supplier Code: Must match existing supplier']);
       instructionsSheet.addRow(['- Available/Reserved KG: Numeric values only']);
+      instructionsSheet.addRow(['- Available Pieces: Whole number only']);
       break;
     case 'stock-counts':
       instructionsSheet.addRow(['STOCK COUNT IMPORT REQUIREMENTS:']);
