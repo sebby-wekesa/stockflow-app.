@@ -349,13 +349,9 @@ function SalesLineRow({
               <div className="font-mono text-sm text-accent">{line.product.product_code}</div>
               <div className="text-xs text-muted truncate">{line.product.canonical_name}</div>
               <div className="text-[10px] text-muted mt-0.5">
-                {line.product.category === 'service' ? (
-                  <span>service · no stock</span>
-                ) : (
-                  <span className={exceedsStock ? 'text-red' : 'text-teal'}>
-                    {line.product.stock_at_branch} {line.product.uom} available
-                  </span>
-                )}
+                <span className={exceedsStock ? 'text-red' : 'text-teal'}>
+                  {line.product.stock_at_branch} {line.product.uom} available
+                </span>
               </div>
             </button>
           </div>
@@ -506,11 +502,9 @@ function ProductSearch({
 
               <div className="text-right flex-shrink-0 text-sm">
                 <div className="font-medium tabular-nums text-[var(--text)]">{formatKES(r.selling_price)}</div>
-                {r.category !== 'service' && (
-                  <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-[var(--teal)]' : 'text-[var(--red)]'}`}>
-                    {r.stock_at_branch ?? 0} in stock
-                  </div>
-                )}
+                <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-[var(--teal)]' : 'text-[var(--red)]'}`}>
+                  {r.stock_at_branch ?? 0} in stock
+                </div>
               </div>
             </button>
           ))

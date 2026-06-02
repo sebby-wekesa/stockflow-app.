@@ -38,8 +38,8 @@ export const UBOLT_STAGES: StageDefinition[] = [
 ]
 
 export function getStagesForCategory(category: ProductCategory): StageDefinition[] {
-  if (category === 'manufactured_spring') return SPRING_STAGES
-  if (category === 'manufactured_ubolt') return UBOLT_STAGES
+  if (category === 'springs') return SPRING_STAGES
+  if (category === 'ubolts' || category === 'center_bolts') return UBOLT_STAGES
   return []
 }
 

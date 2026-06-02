@@ -84,7 +84,7 @@ export async function importSalesData(rawText: string, branchName: string = "Nai
           data: {
             name: sale.productName,
             sku: `${branchName}-${sale.productName}`,
-            category: "local_purchase",
+            category: "break_linings",
             branchId: branch.id,
             currentStock: 0,
           },

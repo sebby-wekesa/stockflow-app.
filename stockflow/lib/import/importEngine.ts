@@ -38,11 +38,13 @@ export async function processInventoryAndSalesUpload(fileBuffer: Buffer, filenam
     if (rows.length === 0) continue;
 
     // Categorize elements accurately based on tab headers to match your ProductCategory Enum
-    let schemaCategory: ProductCategory = ProductCategory.local_purchase;
-    if (upperSheet.includes('CONSUMABLE')) schemaCategory = ProductCategory.local_purchase;
-    else if (upperSheet.includes('SPRING') || upperSheet.includes('FINISHED')) schemaCategory = ProductCategory.manufactured_spring;
-    else if (upperSheet.includes('UBOLT')) schemaCategory = ProductCategory.manufactured_ubolt;
-    else if (upperSheet.includes('RAW') || upperSheet.includes('BAR') || upperSheet.includes('BUSHES')) schemaCategory = ProductCategory.imported;
+    let schemaCategory: ProductCategory = ProductCategory.break_linings;
+    if (upperSheet.includes('CONSUMABLE')) schemaCategory = ProductCategory.trailer_parts;
+    else if (upperSheet.includes('SPRING') || upperSheet.includes('FINISHED')) schemaCategory = ProductCategory.springs;
+    else if (upperSheet.includes('UBOLT')) schemaCategory = ProductCategory.ubolts;
+    else if (upperSheet.includes('CENTER') || upperSheet.includes('CENTRE')) schemaCategory = ProductCategory.center_bolts;
+    else if (upperSheet.includes('BRAKE') || upperSheet.includes('BREAK')) schemaCategory = ProductCategory.break_linings;
+    else if (upperSheet.includes('RAW') || upperSheet.includes('BAR') || upperSheet.includes('BUSHES')) schemaCategory = ProductCategory.trailer_parts;
 
     // --- ARCHETYPE A: THREE-COLUMN HORIZONTAL MATRIX LEDGER ---
     let headerIdx = -1;
@@ -105,7 +107,7 @@ export async function processInventoryAndSalesUpload(fileBuffer: Buffer, filenam
                 uom: uom_string,
                 currentStock: current_stock,
                 branchId: branchId,
-                origin: schemaCategory === ProductCategory.manufactured_spring ? StockOrigin.FACTORY_MADE : StockOrigin.LOCAL_PURCHASE,
+                origin: schemaCategory === ProductCategory.springs || schemaCategory === ProductCategory.ubolts || schemaCategory === ProductCategory.center_bolts ? StockOrigin.FACTORY_MADE : StockOrigin.LOCAL_PURCHASE,
                 stockStatus: current_stock <= 0 ? StockStatus.OUT_OF_STOCK : StockStatus.AVAILABLE
               }
             });
@@ -211,7 +213,7 @@ export async function processInventoryAndSalesUpload(fileBuffer: Buffer, filenam
               data: {
                 name: product_name,
                 sku: `${branchName}-${product_name}`,
-                category: ProductCategory.local_purchase,
+                category: ProductCategory.break_linings,
                 branchId: branchId,
                 currentStock: 0
               }

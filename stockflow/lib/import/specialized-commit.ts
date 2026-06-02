@@ -64,12 +64,12 @@ export function clearBranchCache() {
 
 function mapCategory(
   cat: string
-): 'manufactured_spring' | 'manufactured_ubolt' | 'imported' | 'local_purchase' | 'service' {
-  if (cat === 'manufactured_spring') return 'manufactured_spring'
-  if (cat === 'manufactured_ubolt') return 'manufactured_ubolt'
-  if (cat === 'imported') return 'imported'
-  if (cat === 'local_purchase') return 'local_purchase'
-  return 'local_purchase'
+): 'springs' | 'ubolts' | 'trailer_parts' | 'break_linings' | 'center_bolts' {
+  if (cat === 'springs' || cat === 'manufactured_spring') return 'springs'
+  if (cat === 'ubolts' || cat === 'manufactured_ubolt') return 'ubolts'
+  if (cat === 'trailer_parts' || cat === 'imported') return 'trailer_parts'
+  if (cat === 'center_bolts') return 'center_bolts'
+  return 'break_linings'
 }
 
 function generateSku(productCode: string | null, name: string): string {
@@ -199,7 +199,7 @@ export async function commitSalesImport(
   // ─────────────────────────────────────────────────────────────────────────────
   // AUTO-CREATE MISSING PRODUCTS (for sales imports)
   // If a product name from the sales file does not exist, create it as
-  // local_purchase so the sale can still be recorded and stock reduced.
+  // break_linings so the sale can still be recorded and stock reduced.
   // ─────────────────────────────────────────────────────────────────────────────
   for (const name of Array.from(unmatched.keys())) {
     try {
@@ -208,7 +208,7 @@ export async function commitSalesImport(
         data: {
           name: name.trim(),
           sku,
-          category: 'local_purchase',
+          category: 'break_linings',
           origin: 'LOCAL_PURCHASE',
           uom: 'pcs',
           currentStock: 0,

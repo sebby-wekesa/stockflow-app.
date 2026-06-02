@@ -19,7 +19,6 @@ export default async function TransferPage() {
   // Get products with stock in any branch (tenant scoped)
   const productRecords = await db.product.findMany({
     where: {
-      category: { not: 'service' }, // Exclude service products from transfers
       OR: [
         { currentStock: { gt: 0 } },
         { ProductReceipt: { some: { qtyReceived: { gt: 0 } } } },

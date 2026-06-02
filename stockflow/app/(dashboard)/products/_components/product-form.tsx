@@ -40,13 +40,12 @@ export function ProductForm({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [category, setCategory] = useState<ProductCategory>(
-    initial?.category ?? 'manufactured_spring'
+    initial?.category ?? 'springs'
   )
 
   const productTypes = PRODUCT_TYPES_BY_CATEGORY[category]
-  const isSpring = category === 'manufactured_spring'
-  const isUbolt = category === 'manufactured_ubolt'
-  const isService = category === 'service'
+  const isSpring = category === 'springs'
+  const isUbolt = category === 'ubolts' || category === 'center_bolts'
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -325,21 +324,19 @@ export function ProductForm({
               className="input font-mono"
             />
           </div>
-          {!isService && (
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-                Reorder point
-              </label>
-              <input
-                  name="reorder_point"
-                  type="number"
-                  min="0"
-                  defaultValue={initial?.reorder_point ?? ''}
-                  className="input font-mono"
-                  placeholder="Alert when stock < this"
-                />
-            </div>
-          )}
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+              Reorder point
+            </label>
+            <input
+              name="reorder_point"
+              type="number"
+              min="0"
+              defaultValue={initial?.reorder_point ?? ''}
+              className="input font-mono"
+              placeholder="Alert when stock < this"
+            />
+          </div>
         </div>
       </div>
 

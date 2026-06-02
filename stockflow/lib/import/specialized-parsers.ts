@@ -44,7 +44,7 @@ export type ParsedProductRow = {
   source_row: number
   product_code: string | null
   canonical_name: string
-  category: 'manufactured_spring' | 'manufactured_ubolt' | 'imported' | 'local_purchase'
+  category: 'springs' | 'ubolts' | 'trailer_parts' | 'break_linings' | 'center_bolts'
   product_type: string
   uom: 'pcs' | 'set'
   vehicle_make: string | null
@@ -623,7 +623,7 @@ export function parseSpringsList(buffer: ArrayBuffer): ParsedProductRow[] {
       source_row: i + 1,
       product_code: code,
       canonical_name: name,
-      category: 'manufactured_spring',
+      category: 'springs',
       product_type,
       uom: 'pcs',
       vehicle_make: currentMake,
@@ -697,7 +697,7 @@ export function parseUBoltList(buffer: ArrayBuffer): ParsedProductRow[] {
       source_row: i + 1,
       product_code: code,
       canonical_name: name,
-      category: 'manufactured_ubolt',
+      category: 'ubolts',
       product_type: 'u-bolt',
       uom: 'pcs',
       vehicle_make: null,

@@ -2,29 +2,29 @@ import type { ProductCategory, ProductType, StockOrigin } from '@prisma/client'
 
 // Display labels for the 5 categories
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
-  manufactured_spring: 'Manufactured spring',
-  manufactured_ubolt: 'Manufactured U-bolt',
-  imported: 'Imported',
-  local_purchase: 'Local purchase',
-  service: 'Service',
+  springs: 'Springs',
+  ubolts: 'Ubolts',
+  trailer_parts: 'Trailer parts',
+  break_linings: 'Break linings',
+  center_bolts: 'Center bolts',
 }
 
 // Short labels for badges and tabs
 export const CATEGORY_SHORT: Record<ProductCategory, string> = {
-  manufactured_spring: 'Spring',
-  manufactured_ubolt: 'U-bolt',
-  imported: 'Imported',
-  local_purchase: 'Local purch',
-  service: 'Service',
+  springs: 'Springs',
+  ubolts: 'Ubolts',
+  trailer_parts: 'Trailer parts',
+  break_linings: 'Break linings',
+  center_bolts: 'Center bolts',
 }
 
 // Color theme per category
 export const CATEGORY_BADGE_CLASS: Record<ProductCategory, string> = {
-  manufactured_spring: 'bg-accent/15 text-accent',
-  manufactured_ubolt: 'bg-purple/15 text-purple',
-  imported: 'bg-surface2 text-muted',
-  local_purchase: 'bg-teal/15 text-teal',
-  service: 'bg-red/15 text-red',
+  springs: 'bg-accent/15 text-accent',
+  ubolts: 'bg-purple/15 text-purple',
+  trailer_parts: 'bg-surface2 text-muted',
+  break_linings: 'bg-teal/15 text-teal',
+  center_bolts: 'bg-red/15 text-red',
 }
 
 // Display labels for stock origins
@@ -50,11 +50,11 @@ export const ORIGIN_BADGE_CLASS: Record<StockOrigin, string> = {
 
 // Which product types are valid for each category
 export const PRODUCT_TYPES_BY_CATEGORY: Record<ProductCategory, ProductType[]> = {
-  manufactured_spring: ['leaf_spring', 'spring_assembly', 'helper_spring', 'auxiliary_spring'],
-  manufactured_ubolt: ['u_bolt', 'body_bolt', 'centre_bolt'],
-  imported: ['bearing', 'seal', 'assembly', 'bush', 'hub'],
-  local_purchase: ['brake_lining', 'brake_pad', 'brake_shoe', 'clamp', 'equalizer', 'hardware'],
-  service: ['repair', 'retention', 'rebonding', 'riveting', 'straightening', 'other_service'],
+  springs: ['leaf_spring', 'spring_assembly', 'helper_spring', 'auxiliary_spring'],
+  ubolts: ['u_bolt', 'body_bolt'],
+  trailer_parts: ['bearing', 'seal', 'assembly', 'bush', 'hub', 'clamp', 'equalizer', 'hardware'],
+  break_linings: ['brake_lining', 'brake_pad', 'brake_shoe'],
+  center_bolts: ['centre_bolt'],
 }
 
 export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
@@ -96,23 +96,23 @@ export function suggestProductCode(
   }
 ): string {
   switch (category) {
-    case 'manufactured_spring': {
+    case 'springs': {
       const make = (inputs.vehicle_make ?? '').toUpperCase().replace(/\s+/g, '')
       const pos = (inputs.spring_position ?? 'F')[0]?.toUpperCase() ?? 'F'
       const leaf = (inputs.leaf_position ?? 'ML').toUpperCase().replace(/\s+/g, '')
       return `${make}/${pos}S${leaf}`
     }
-    case 'manufactured_ubolt': {
+    case 'ubolts': {
       const make = (inputs.vehicle_make ?? '').toUpperCase().replace(/\s+/g, '')
       const pos = (inputs.spring_position ?? 'F')[0]?.toUpperCase() ?? 'F'
       return `UB-${make}-${pos}${inputs.shaft_size_mm ?? ''}`
     }
-    case 'imported':
-      return `IMP-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
-    case 'local_purchase':
+    case 'trailer_parts':
+      return `TP-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
+    case 'break_linings':
       return `BL-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
-    case 'service':
-      return `SVC-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 15)}`
+    case 'center_bolts':
+      return `CB-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
     default:
       return ''
   }

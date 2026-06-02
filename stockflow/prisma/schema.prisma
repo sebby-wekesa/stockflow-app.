@@ -432,7 +432,7 @@ model Product {
   organizationId String
   name           String
   sku            String?
-  category       ProductCategory  @default(manufactured_spring)
+  category       ProductCategory  @default(springs)
   origin         StockOrigin      @default(FACTORY_MADE)
   uom            String           @default("PCS")
   currentStock   Float            @default(0)
@@ -797,11 +797,11 @@ enum StockOrigin {
 }
 
 enum ProductCategory {
-  manufactured_spring
-  manufactured_ubolt
-  imported
-  local_purchase
-  service
+  springs
+  ubolts
+  trailer_parts
+  break_linings
+  center_bolts
 }
 
 enum ProductType {

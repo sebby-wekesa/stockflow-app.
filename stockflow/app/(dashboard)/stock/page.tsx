@@ -229,11 +229,11 @@ export default async function BranchStockPage({
             <label className="form-label">Category</label>
             <select name="category" defaultValue={params.category} className="form-input">
               <option value="">All Categories</option>
-              <option value="manufactured_spring">Spring</option>
-              <option value="manufactured_ubolt">U-bolt</option>
-              <option value="imported">Imported</option>
-              <option value="local_purchase">Local Purchase</option>
-              <option value="service">Service</option>
+              <option value="springs">Springs</option>
+              <option value="ubolts">Ubolts</option>
+              <option value="trailer_parts">Trailer parts</option>
+              <option value="break_linings">Break linings</option>
+              <option value="center_bolts">Center bolts</option>
             </select>
           </div>
 
