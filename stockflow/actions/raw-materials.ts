@@ -138,6 +138,78 @@ export async function receiveRawMaterial(formData: FormData) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// UPDATE A RECEIPT AND KEEP RAW MATERIAL BALANCES IN SYNC
+// ─────────────────────────────────────────────────────────────────────────────
+
+const updateReceiptSchema = z.object({
+  receiptId: z.string().min(1),
+  kgReceived: z.coerce.number().positive(),
+  piecesReceived: z.coerce.number().int().positive(),
+  reference: z.string().max(200).optional().nullable(),
+})
+
+export async function updateRawMaterialReceipt(formData: FormData) {
+  const user = await requireWarehouseAccess()
+
+  const parsed = updateReceiptSchema.safeParse({
+    receiptId: formData.get('receiptId'),
+    kgReceived: formData.get('kgReceived'),
+    piecesReceived: formData.get('piecesReceived'),
+    reference: formData.get('reference') || null,
+  })
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+  const data = parsed.data
+
+  const { withTenantTransaction } = await import('@/lib/tenant-prisma')
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const receipt = await tx.materialReceipt.findUnique({
+      where: { id: data.receiptId },
+      include: { RawMaterial: true },
+    })
+
+    if (!receipt) {
+      throw new Error('Receipt not found')
+    }
+
+    const oldKg = Number(receipt.kgReceived)
+    const oldPieces = Number(receipt.piecesReceived)
+    const kgDelta = data.kgReceived - oldKg
+    const piecesDelta = data.piecesReceived - oldPieces
+    const nextAvailableKg = Number(receipt.RawMaterial.availableKg) + kgDelta
+    const nextAvailablePieces = Number(receipt.RawMaterial.availablePieces) + piecesDelta
+
+    if (nextAvailableKg < 0) {
+      throw new Error('Cannot reduce received kg below current available stock')
+    }
+    if (nextAvailablePieces < 0) {
+      throw new Error('Cannot reduce received pieces below current available stock')
+    }
+
+    await tx.materialReceipt.update({
+      where: { id: data.receiptId },
+      data: {
+        kgReceived: new Prisma.Decimal(data.kgReceived),
+        piecesReceived: data.piecesReceived,
+        reference: data.reference,
+      },
+    })
+
+    await tx.rawMaterial.update({
+      where: { id: receipt.materialId },
+      data: {
+        availableKg: { increment: new Prisma.Decimal(kgDelta) },
+        availablePieces: { increment: piecesDelta },
+      },
+    })
+  }, { maxWait: 10000, timeout: 30000 })
+
+  revalidatePath('/rawmaterials')
+  revalidatePath('/raw-materials')
+  revalidatePath('/inventory')
+  revalidatePath('/warehouse')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RECEIVE BATCH FROM EXCEL UPLOAD
 //
 // Called from components/inventory/ExcelRawMaterialUpload.tsx. Each row is
