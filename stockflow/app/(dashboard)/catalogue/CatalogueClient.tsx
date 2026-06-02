@@ -7,12 +7,14 @@ type SortOption = 'name' | 'code' | 'price' | 'quantity' | 'date';
 
 interface Product {
   id: string;
+  designId?: string;
   name: string;
   code: string;
   availableQty: number;
   kgProduced: number;
   price: number;
   createdAt: string;
+  source?: 'manufactured' | 'product' | 'design';
 }
 
 interface CatalogueProduct {
@@ -26,7 +28,8 @@ interface CatalogueProduct {
   kgProduced: number;
   price: number | null;
   createdAt: string;
-  source?: 'manufactured' | 'product';
+  source?: 'manufactured' | 'product' | 'design';
+  designId?: string;
 }
 
 export default function CatalogueClient({ products }: { products: CatalogueProduct[] }) {
@@ -38,12 +41,14 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
 
   const formattedProducts = products.map(p => ({
     id: p.id,
+    designId: p.designId,
     name: p.design.name,
     code: p.design.code,
     availableQty: p.quantity,
     kgProduced: p.kgProduced,
     price: p.price || 0, // Default price if not set
-    createdAt: p.createdAt
+    createdAt: p.createdAt,
+    source: p.source,
   }));
 
   const filteredAndSortedProducts = useMemo(() => {

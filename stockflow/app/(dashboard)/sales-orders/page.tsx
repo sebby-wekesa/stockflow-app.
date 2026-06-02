@@ -7,7 +7,7 @@ export default async function SalesOrdersPage() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
-  const [rawSaleOrders, stock, products] = await Promise.all([
+  const [rawSaleOrders, stock, products, designs] = await Promise.all([
     db.saleOrder.findMany({
       include: {
         SaleItem: {
@@ -45,6 +45,18 @@ export default async function SalesOrdersPage() {
         origin: true,
         unitCost: true,
         createdAt: true,
+      },
+      orderBy: { name: 'asc' },
+    }),
+    db.design.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        targetWeight: true,
+        createdAt: true,
+        billOfMaterials: { select: { id: true }, take: 1 },
+        stages: { select: { id: true }, take: 1 },
       },
       orderBy: { name: 'asc' },
     })
@@ -86,7 +98,21 @@ export default async function SalesOrdersPage() {
     uom: p.uom,
   }));
 
-  const formattedProducts = [...manufactured, ...otherProducts];
+  const madeToOrder = designs.map(d => ({
+    id: d.id,
+    designId: d.id,
+    name: d.name,
+    code: d.code,
+    availableQty: 999999,
+    kgProduced: d.targetWeight ? Number(d.targetWeight) : 0,
+    price: undefined,
+    createdAt: d.createdAt,
+    source: 'design' as const,
+    origin: d.billOfMaterials.length > 0 && d.stages.length > 0 ? 'Made to order' : 'Setup incomplete',
+    uom: 'units',
+  }));
+
+  const formattedProducts = [...manufactured, ...madeToOrder, ...otherProducts];
 
   return (
     <div className="p-8 bg-[#0f1113] min-h-screen">

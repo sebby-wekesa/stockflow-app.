@@ -10,9 +10,10 @@ export async function createSalesOrder(data: {
   items: {
     finishedGoodsId?: string;
     productId?: string;
+    designId?: string;
     quantity: number;
     unitPrice: number;
-    source?: 'manufactured' | 'product';
+    source?: 'manufactured' | 'product' | 'design';
   }[];
 }) {
   // Validate input data
@@ -25,8 +26,8 @@ export async function createSalesOrder(data: {
   }
 
   for (const item of data.items) {
-    if (!item.finishedGoodsId && !item.productId) {
-      throw new Error('Each item must reference either a finished good or a product');
+    if (!item.finishedGoodsId && !item.productId && !item.designId) {
+      throw new Error('Each item must reference a finished good, product, or design');
     }
     if (item.quantity <= 0) {
       throw new Error('Item quantities must be positive');
@@ -70,10 +71,15 @@ export async function createSalesOrder(data: {
       placeholderDesignId = d.id
     }
 
-    // Resolve every line to a valid finishedGoodsId (creating shadow records for general Products)
+    // Resolve every line to a valid finishedGoodsId. Made-to-order design
+    // lines get a zero-stock FinishedGoods placeholder so the sale line can
+    // be linked immediately, then production fills that exact record.
     const resolvedItems = await Promise.all(
       data.items.map(async (item) => {
         let fgId = item.finishedGoodsId
+        let designId = item.designId
+        let requiresProduction = item.source === 'design'
+        let targetKg = 0
 
         if (!fgId && item.productId) {
           // General Product → create/lookup shadow FinishedGoods
@@ -108,10 +114,46 @@ export async function createSalesOrder(data: {
           fgId = fg.id
         }
 
+        if (!fgId && item.designId) {
+          const design = await tx.design.findUnique({
+            where: { id: item.designId },
+            include: {
+              stages: { orderBy: { sequence: 'asc' } },
+              billOfMaterials: true,
+            },
+          })
+          if (!design) throw new Error('Referenced design not found')
+          if (design.stages.length === 0) {
+            throw new Error(`Design "${design.name}" has no production stages configured`)
+          }
+          if (!design.targetWeight || Number(design.targetWeight) <= 0) {
+            throw new Error(`Design "${design.name}" is missing kg per unit`)
+          }
+          if (design.billOfMaterials.length === 0) {
+            throw new Error(`Design "${design.name}" has no raw material BOM configured`)
+          }
+
+          targetKg = Number(design.targetWeight) * item.quantity
+          const fg = await tx.finishedGoods.create({
+            data: {
+              organizationId: user.organizationId,
+              sku: `MTO-${design.code}-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+              designId: design.id,
+              quantity: 0,
+              kgProduced: 0,
+              unitCost: item.unitPrice,
+            },
+          })
+
+          fgId = fg.id
+          designId = design.id
+          requiresProduction = true
+        }
+
         if (!fgId) throw new Error('Could not resolve item to a finished good')
 
         // Validate stock for manufactured items (shadow items have qty=0 and are decremented on Product instead)
-        if (item.source !== 'product') {
+        if (item.source !== 'product' && item.source !== 'design') {
           const fg = await tx.finishedGoods.findUnique({
             where: { id: fgId },
             include: { design: true },
@@ -123,6 +165,9 @@ export async function createSalesOrder(data: {
 
         return {
           finishedGoodsId: fgId,
+          designId,
+          requiresProduction,
+          targetKg,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
         }
@@ -163,8 +208,43 @@ export async function createSalesOrder(data: {
         }
     });
 
+    for (const item of resolvedItems) {
+      if (!item.requiresProduction || !item.designId) continue
+
+      const saleItem = salesOrder.SaleItem.find((line: any) =>
+        line.finishedGoodsId === item.finishedGoodsId
+      )
+      if (!saleItem) throw new Error('Could not link sale item to production order')
+
+      const design = await tx.design.findUnique({
+        where: { id: item.designId },
+        include: { stages: { orderBy: { sequence: 'asc' } } },
+      })
+      if (!design || design.stages.length === 0) {
+        throw new Error('Design no longer has production stages configured')
+      }
+
+      await tx.productionOrder.create({
+        data: {
+          organizationId: user.organizationId,
+          saleOrderId: salesOrder.id,
+          saleItemId: saleItem.id,
+          orderNumber: `PO-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`,
+          designId: item.designId,
+          quantity: item.quantity,
+          targetKg: item.targetKg,
+          priority: 'MEDIUM',
+          status: 'PENDING',
+          currentStage: design.stages[0].sequence,
+          currentDept: design.stages[0].department,
+        },
+      })
+    }
+
     revalidatePath('/catalogue');
     revalidatePath('/sales');
+    revalidatePath('/approvals');
+    revalidatePath('/jobs');
 
     return {
       id: salesOrder.id,

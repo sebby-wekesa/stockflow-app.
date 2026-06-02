@@ -495,6 +495,8 @@ model ProductReceipt {
 model ProductionOrder {
   id                     String                   @id @default(uuid())
   organizationId         String
+  saleOrderId            String?
+  saleItemId             String?                  @unique
   orderNumber            String
   designId               String
   quantity               Int                      @default(1)
@@ -511,12 +513,15 @@ model ProductionOrder {
   updatedAt              DateTime                 @updatedAt
   MaterialConsumptionLog MaterialConsumptionLog[]
   design                 Design                   @relation(fields: [designId], references: [id])
+  saleOrder              SaleOrder?               @relation(fields: [saleOrderId], references: [id])
+  saleItem               SaleItem?                @relation(fields: [saleItemId], references: [id])
   StageLog               StageLog[]
 
   Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, orderNumber])
   @@index([organizationId])
+  @@index([saleOrderId])
 }
 
 model PurchaseOrder {
@@ -600,6 +605,7 @@ model SaleItem {
   unitPrice       Decimal       @db.Decimal(10, 2)
   totalPrice      Decimal       @db.Decimal(10, 2)
   FinishedGoods   FinishedGoods @relation(fields: [finishedGoodsId], references: [id])
+  ProductionOrder ProductionOrder?
   SaleOrder       SaleOrder     @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
 
   Organization Organization @relation(fields: [organizationId], references: [id])
@@ -618,6 +624,7 @@ model SaleOrder {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   SaleItem       SaleItem[]
+  ProductionOrder ProductionOrder[]
   Customer       Customer?  @relation(fields: [customerId], references: [id])
   createdByUser  User?      @relation(fields: [createdBy], references: [id])
 

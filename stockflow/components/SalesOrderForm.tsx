@@ -19,7 +19,8 @@ interface SellableItem {
   kgProduced: number
   price?: number
   createdAt: Date | string
-  source?: 'manufactured' | 'product'
+  source?: 'manufactured' | 'product' | 'design'
+  designId?: string
   origin?: string               // FACTORY_MADE | LOCAL_PURCHASE | IMPORTED | etc.
   uom?: string
 }
@@ -41,6 +42,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
     price: p.price ?? p.unitCost ?? undefined,
     createdAt: p.createdAt,
     source: p.source,
+    designId: p.designId,
     origin: p.origin || p.design?.origin,
     uom: p.uom,
   }));
@@ -59,6 +61,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
         name: normalized.name || normalized.design?.name || 'Item',
         code: normalized.code || normalized.design?.code || '',
         source: normalized.source,
+        designId: normalized.designId,
         origin: normalized.origin,
         maxQty,
         quantity: 1,
@@ -72,7 +75,8 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
     itemId: string
     name: string
     code: string
-    source?: 'manufactured' | 'product'
+    source?: 'manufactured' | 'product' | 'design'
+    designId?: string
     origin?: string
     maxQty: number
     quantity: number
@@ -100,7 +104,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
     if (orderLines.some(l => l.itemId === item.id)) return
 
     const unitPrice = item.price ?? 0
-    const maxQty = item.availableQty
+    const maxQty = item.source === 'design' ? 999999 : item.availableQty
 
     setOrderLines(prev => [
       ...prev,
@@ -109,6 +113,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
         name: item.name,
         code: item.code,
         source: item.source,
+        designId: item.designId,
         origin: item.origin,
         maxQty,
         quantity: 1,
@@ -122,7 +127,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
     setOrderLines(prev =>
       prev.map(line =>
         line.itemId === itemId
-          ? { ...line, quantity: Math.max(1, Math.min(newQty, line.maxQty)) }
+          ? { ...line, quantity: Math.max(1, Math.min(newQty, line.maxQty || 999999)) }
           : line
       )
     )
@@ -159,6 +164,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
           // product → Product id (server will create shadow FinishedGoods)
           finishedGoodsId: line.source === 'manufactured' ? line.itemId : undefined,
           productId: line.source === 'product' ? line.itemId : undefined,
+          designId: line.source === 'design' ? (line.designId || line.itemId) : undefined,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           source: line.source,
@@ -251,10 +257,15 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
                             {item.origin || 'Product'}
                           </span>
                         )}
+                        {item.source === 'design' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Made to order</span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 font-mono">{item.code}</div>
                       <div className="text-xs text-gray-600">
-                        {item.availableQty} {item.uom || 'units'} available
+                        {item.source === 'design'
+                          ? 'Creates production order'
+                          : `${item.availableQty} ${item.uom || 'units'} available`}
                       </div>
                     </div>
                     <div className="text-right">
@@ -284,6 +295,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
                           {line.name}
                           {line.source === 'manufactured' && <span className="text-[10px] bg-teal-100 text-teal-700 px-1 rounded">Design</span>}
                           {line.source === 'product' && <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">{line.origin || 'Product'}</span>}
+                          {line.source === 'design' && <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded">Made to order</span>}
                         </div>
                         <div className="text-xs text-gray-500 font-mono">{line.code}</div>
                       </div>

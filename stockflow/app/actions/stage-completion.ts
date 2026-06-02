@@ -26,7 +26,7 @@ export async function completeStage(data: {
   }
 
   // Validate input data
-  const validatedData = stageLogSchema.parse(data);
+  const validatedData = stageLogSchema.parse({ ...data, operatorId: user.id });
 
   // Use database transaction for atomicity (tenant-scoped)
   return await withTenantTransaction(user.organizationId, async (tx) => {
@@ -38,8 +38,14 @@ export async function completeStage(data: {
           include: {
             stages: {
               orderBy: { sequence: 'asc' }
-            }
+            },
+            billOfMaterials: true
           }
+        },
+        saleItem: {
+          include: {
+            FinishedGoods: true,
+          },
         },
         StageLog: {
           orderBy: { sequence: 'desc' },
@@ -109,24 +115,80 @@ export async function completeStage(data: {
         }
       });
 
-      // Create finished goods entry
-      const sku = `FG-${order.design.code}-${order.quantity}-${Date.now().toString().slice(-6)}`;
-      await tx.finishedGoods.create({
-        data: {
-          organizationId: user.organizationId,
-          sku,
-          designId: order.design.id,
-          quantity: order.quantity,
-          kgProduced: validatedData.kgOut
-        }
-      });
-    }
+      for (const bomItem of order.design.billOfMaterials) {
+        const requiredKg = Number(bomItem.quantity) * order.quantity;
+        const material = await tx.rawMaterial.findUnique({
+          where: { id: bomItem.rawMaterialId },
+        });
+        const reservedKg = Number(material?.reservedKg || 0);
 
-    // If this was the final stage, we might want to release reserved materials
-    // For now, we'll keep them reserved in case of returns/rework
+        if (reservedKg > 0) {
+          await tx.rawMaterial.update({
+            where: { id: bomItem.rawMaterialId },
+            data: {
+              reservedKg: { decrement: Math.min(reservedKg, requiredKg) },
+            },
+          });
+        }
+
+        await tx.materialConsumptionLog.create({
+          data: {
+            productionOrderId: order.id,
+            rawMaterialId: bomItem.rawMaterialId,
+            quantityConsumed: requiredKg,
+            notes: 'Consumed from reserved material on final stage completion',
+            organizationId: user.organizationId,
+          },
+        });
+      }
+
+      if (order.saleItem?.FinishedGoods) {
+        await tx.finishedGoods.update({
+          where: { id: order.saleItem.finishedGoodsId },
+          data: {
+            quantity: { increment: order.quantity },
+            kgProduced: { increment: validatedData.kgOut },
+          },
+        });
+
+        if (order.saleOrderId) {
+          const openLinkedOrders = await tx.productionOrder.count({
+            where: {
+              saleOrderId: order.saleOrderId,
+              id: { not: order.id },
+              status: { not: 'COMPLETED' },
+            },
+          });
+
+          if (openLinkedOrders === 0) {
+            await tx.saleOrder.update({
+              where: { id: order.saleOrderId },
+              data: { status: 'CONFIRMED' },
+            });
+          }
+        }
+      } else {
+        // Create finished goods entry for production orders not linked to a sale.
+        const sku = `FG-${order.design.code}-${order.quantity}-${Date.now().toString().slice(-6)}`;
+        await tx.finishedGoods.create({
+          data: {
+            organizationId: user.organizationId,
+            sku,
+            designId: order.design.id,
+            quantity: order.quantity,
+            kgProduced: validatedData.kgOut
+          }
+        });
+      }
+    }
 
     revalidatePath('/dashboard');
     revalidatePath('/production');
+    revalidatePath('/jobs');
+    revalidatePath('/operator');
+    revalidatePath('/operator_queue');
+    revalidatePath('/packaging');
+    revalidatePath('/sales');
 
     return {
       success: true,

@@ -185,6 +185,13 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
         },
         rawMaterialId: formData.rawMaterialId || undefined,
         kgPerUnit: formData.kgPerUnit,
+        bomItems: formData.rawMaterialId && formData.kgPerUnit > 0
+          ? [{
+              rawMaterialId: formData.rawMaterialId,
+              quantity: formData.kgPerUnit,
+              unitOfMeasure: 'kg'
+            }]
+          : [],
         stages: formData.stages.map(s => ({
           name: s.name,
           department: s.department,
