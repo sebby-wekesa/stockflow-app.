@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
+import { withRetry } from '@/lib/prisma'
 
 const LOW_STOCK_THRESHOLD = 50
 
@@ -9,20 +10,19 @@ export async function GET() {
     const user = await requireActiveAuth()
     const db = getTenantPrisma(user.organizationId)
 
-    // Parallel — these four counts have no dependencies on each other
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const [totalRawMaterials, lowStockItems, recentDeliveries, pendingOrders] = await Promise.all([
-      db.rawMaterial.count(),
-      db.rawMaterial.count({ where: { availableKg: { lt: LOW_STOCK_THRESHOLD } } }),
-      db.materialReceipt.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      db.productionOrder.count({ where: { status: 'PENDING' } }),
-    ])
+    const stats = await withRetry(async () => ({
+      totalRawMaterials: await db.rawMaterial.count(),
+      lowStockItems: await db.rawMaterial.count({ where: { availableKg: { lt: LOW_STOCK_THRESHOLD } } }),
+      recentDeliveries: await db.materialReceipt.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      pendingOrders: await db.productionOrder.count({ where: { status: 'PENDING' } }),
+    }))
 
     return NextResponse.json({
-      totalRawMaterials,
-      lowStockItems,
-      recentDeliveries,
-      pendingOrders
+      totalRawMaterials: stats.totalRawMaterials,
+      lowStockItems: stats.lowStockItems,
+      recentDeliveries: stats.recentDeliveries,
+      pendingOrders: stats.pendingOrders
     })
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

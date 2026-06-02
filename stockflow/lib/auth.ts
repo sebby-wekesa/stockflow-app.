@@ -22,7 +22,7 @@
  */
 
 import { supabaseServerComponent } from "./supabase-admin";
-import { prisma, authPrisma, withRetry } from "./prisma";
+import { authPrisma, withRetry } from "./prisma";
 import { type UserRole } from "./types";
 import type { OrgStatus } from "@prisma/client";
 
@@ -71,21 +71,8 @@ export async function getUser(): Promise<AuthUser | null> {
         },
       }), undefined)
     } catch (e: any) {
-      console.warn('authPrisma lookup failed, falling back to main prisma:', e?.message || e)
-      try {
-        user = await withRetry(() => prisma.user.findUnique({
-          where: { id: authUser.id },
-          include: {
-            Branch: true,
-            Organization: {
-              select: { id: true, name: true, slug: true, status: true },
-            },
-          },
-        }), undefined)
-      } catch (e2: any) {
-        console.error('Fallback prisma lookup also failed:', e2?.message || e2)
-        return null
-      }
+      console.error('authPrisma lookup failed:', e?.message || e)
+      return null
     }
 
 

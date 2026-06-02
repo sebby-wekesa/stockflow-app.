@@ -1,7 +1,20 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
+import { Pool } from 'pg'
 
 const databaseUrl = process.env.DATABASE_URL
+
+function getPoolMax() {
+  const configured = Number(process.env.DB_POOL_MAX || process.env.DB_CONNECTION_LIMIT)
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured
+  }
+
+  // The pg adapter owns a node-postgres pool per server process. Keep the
+  // default small so multiple warm Next.js workers do not exhaust low
+  // session-mode pooler caps such as Supabase's 15-client limit.
+  return process.env.NODE_ENV === 'production' ? 2 : 1
+}
 
 function getConnectionString(url: string) {
   const parsed = new URL(url)
@@ -24,7 +37,7 @@ function getConnectionString(url: string) {
     }
 
     // Production defaults for pooler tuning. Allow overriding via env var
-    const defaultConnLimit = process.env.DB_CONNECTION_LIMIT || (process.env.NODE_ENV === 'production' ? '10' : '1')
+    const defaultConnLimit = process.env.DB_CONNECTION_LIMIT || String(getPoolMax())
     if (!parsed.searchParams.has('connection_limit')) {
       parsed.searchParams.set('connection_limit', defaultConnLimit)
     }
@@ -62,7 +75,13 @@ const prismaClientSingleton = () => {
 
   try {
     console.log('Initializing Prisma client with adapter...')
-    const adapter = new PrismaPg({ connectionString: getConnectionString(databaseUrl) })
+    const pool = new Pool({
+      connectionString: getConnectionString(databaseUrl),
+      max: getPoolMax(),
+      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 10_000),
+      connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10_000),
+    })
+    const adapter = new PrismaPg(pool, { disposeExternalPool: true })
     const client = new PrismaClient({ adapter })
     console.log('Prisma client initialized successfully')
     return client

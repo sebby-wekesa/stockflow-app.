@@ -56,6 +56,8 @@ const AVAILABLE_STAGES = [
   { name: 'Packaging', department: 'Packaging' }
 ];
 
+const NO_RAW_MATERIAL_VALUE = 'none';
+
 export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplateBuilderProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -281,14 +283,17 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
             <div>
               <Label htmlFor="rawMaterial">Raw Material</Label>
               <Select
-                value={formData.rawMaterialId}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, rawMaterialId: value }))}
+                value={formData.rawMaterialId || NO_RAW_MATERIAL_VALUE}
+                onValueChange={(value) => setFormData(prev => ({
+                  ...prev,
+                  rawMaterialId: value === NO_RAW_MATERIAL_VALUE ? '' : value
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select raw material" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No specific material</SelectItem>
+                  <SelectItem value={NO_RAW_MATERIAL_VALUE}>No specific material</SelectItem>
                   {rawMaterials.map((material) => (
                     <SelectItem key={material.id} value={material.id}>
                       {material.materialName} ({material.diameter}, {material.length || '—'} L / {material.width || '—'} W/D / {material.height || '—'} H)
