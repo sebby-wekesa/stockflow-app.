@@ -3,7 +3,7 @@ import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { withRetry } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
+import { CATEGORY_LABELS, CATEGORY_SHORT, CATEGORY_BADGE_CLASS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 
@@ -23,12 +23,15 @@ export default async function ProductsPage({
 
   const params = await searchParams
   const origin = params.origin as 'FACTORY_MADE' | 'LOCAL_PURCHASE' | 'IMPORTED' | undefined
+  const rawCategory = params.category
+  const category = rawCategory && rawCategory in CATEGORY_LABELS ? rawCategory as ProductCategory : undefined
   const q = params.q?.trim() ?? ''
   const page = Math.max(1, Number(params.page ?? 1))
 
   // Build the WHERE clause
   const where: any = {}
   if (origin) where.origin = origin
+  if (category) where.category = category
   if (q) {
     where.OR = [
       { sku: { contains: q, mode: 'insensitive' } },
@@ -69,12 +72,14 @@ export default async function ProductsPage({
     { key: 'IMPORTED', label: 'Imported', count: countByOrigin.IMPORTED ?? 0 },
   ]
 
-  function buildHref(overrides: { origin?: string; q?: string; page?: number }) {
+  function buildHref(overrides: { origin?: string; category?: string; q?: string; page?: number }) {
     const params = new URLSearchParams()
     const org = overrides.origin ?? origin
+    const cat = overrides.category ?? category
     const query = overrides.q ?? q
     const pg = overrides.page ?? page
     if (org) params.set('origin', org)
+    if (cat) params.set('category', cat)
     if (query) params.set('q', query)
     if (pg > 1) params.set('page', String(pg))
     const qs = params.toString()
@@ -134,9 +139,25 @@ export default async function ProductsPage({
             className="form-input"
           />
         </div>
+        <div className="form-group" style={{minWidth:'220px'}}>
+          <label className="form-label">Category</label>
+          <select name="category" defaultValue={category ?? ''} className="form-input">
+            <option value="">All categories</option>
+            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button type="submit" className="btn btn-primary h-[42px]">
           Search
         </button>
+        {(q || category) && (
+          <Link href={buildHref({ q: '', category: '', page: 1 })} className="btn btn-ghost h-[42px]">
+            Clear
+          </Link>
+        )}
       </form>
 
       <div className="section-header mb-8">
@@ -144,7 +165,9 @@ export default async function ProductsPage({
           {origin ? `${tabs.find(t => t.key === origin)?.label} Products` : 'All Products'}
         </div>
         <div className="section-sub">
-          {q ? `Search results for "${q}"` : `${total} products found`}
+          {q || category
+            ? `Filtered results${q ? ` for "${q}"` : ''}${category ? ` in ${CATEGORY_LABELS[category]}` : ''}`
+            : `${total} products found`}
         </div>
       </div>
 
@@ -167,7 +190,7 @@ export default async function ProductsPage({
               {products.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-muted text-sm">
-                    {q || origin ? (
+                    {q || origin || category ? (
                       <div>
                         No products match your search criteria.{' '}
                         <Link href="/products" className="text-accent-amber hover:underline">
