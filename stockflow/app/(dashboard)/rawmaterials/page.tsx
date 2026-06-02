@@ -7,15 +7,45 @@ import { updateRawMaterialReceipt } from '@/actions/raw-materials'
 
 export const dynamic = 'force-dynamic';
 
-export default async function RawmaterialsPage() {
+export default async function RawmaterialsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>
+}) {
+  const params = await searchParams
+  const query = (params.q || '').trim()
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
+  const materialSearch = query
+    ? {
+        OR: [
+          { sku: { contains: query, mode: 'insensitive' as const } },
+          { materialName: { contains: query, mode: 'insensitive' as const } },
+          { category: { contains: query, mode: 'insensitive' as const } },
+          { diameter: { contains: query, mode: 'insensitive' as const } },
+          { length: { contains: query, mode: 'insensitive' as const } },
+          { width: { contains: query, mode: 'insensitive' as const } },
+          { height: { contains: query, mode: 'insensitive' as const } },
+        ],
+      }
+    : undefined
+  const receiptSearch = query
+    ? {
+        OR: [
+          { reference: { contains: query, mode: 'insensitive' as const } },
+          { loggedBy: { contains: query, mode: 'insensitive' as const } },
+          { RawMaterial: materialSearch },
+        ],
+      }
+    : undefined
 
   const materials = await withRetry(() => db.rawMaterial.findMany({
+    where: materialSearch,
     orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
   }), undefined);
   
   const receipts = await withRetry(() => db.materialReceipt.findMany({
+    where: receiptSearch,
     include: { RawMaterial: true },
     orderBy: { createdAt: 'desc' },
     take: 20
@@ -30,6 +60,21 @@ export default async function RawmaterialsPage() {
         </div>
         <Link href="/import" className="btn btn-primary">+ Receive stock</Link>
       </div>
+      <form action="/rawmaterials" className="card mb-24" style={{display:'flex',gap:'12px',alignItems:'end'}}>
+        <div className="form-group" style={{flex:1,marginBottom:0}}>
+          <label className="form-label" htmlFor="raw-material-search">Search raw materials</label>
+          <input
+            id="raw-material-search"
+            name="q"
+            type="search"
+            className="form-input"
+            defaultValue={query}
+            placeholder="Search material, category, dimensions, reference, or user"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary">Search</button>
+        {query && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
+      </form>
       <div className="mb-24" style={{display:'grid',gap:'24px'}}>
         {RAW_MATERIAL_CATEGORIES.map((category) => {
           const categoryMaterials = materials.filter((m) => m.category === category)
@@ -55,14 +100,18 @@ export default async function RawmaterialsPage() {
                   )
                 })}
                 {categoryMaterials.length === 0 && (
-                  <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>No materials in this category.</div>
+                  <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>
+                    {query ? 'No matching materials in this category.' : 'No materials in this category.'}
+                  </div>
                 )}
               </div>
             </section>
           )
         })}
         {materials.length === 0 && (
-          <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>No raw materials defined.</div>
+          <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>
+            {query ? `No raw materials match "${query}".` : 'No raw materials defined.'}
+          </div>
         )}
       </div>
       <div className="card">
@@ -124,7 +173,9 @@ export default async function RawmaterialsPage() {
               )
             })}
             {receipts.length === 0 && (
-              <tr><td colSpan={9} style={{textAlign: 'center', color: 'var(--muted)'}}>No receipts found.</td></tr>
+              <tr><td colSpan={9} style={{textAlign: 'center', color: 'var(--muted)'}}>
+                {query ? `No receipts match "${query}".` : 'No receipts found.'}
+              </td></tr>
             )}
           </tbody>
         </table>
