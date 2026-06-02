@@ -558,6 +558,7 @@ model RawMaterial {
   organizationId         String
   sku                    String
   materialName           String
+  category               String                   @default("Flat Bars")
   diameter               String
   supplierId             String?
   barcode                String?

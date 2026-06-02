@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: [
+        { category: 'asc' },
         { materialName: 'asc' },
         { diameter: 'asc' },
       ],

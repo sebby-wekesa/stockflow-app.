@@ -26,6 +26,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     product_code: product.sku ?? '',
     canonical_name: product.name,
     category: product.category,
+    origin: product.origin,
     uom: product.uom,
     cost_price: product.unitCost ?? null,
     reorder_point: product.reorderLevel ?? null,

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
-import type { ProductCategory } from '@prisma/client'
+import type { ProductCategory, StockOrigin } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 
 /** Returns the auth user if role is ADMIN or MANAGER, else throws. */
@@ -28,6 +28,7 @@ const createSchema = z.object({
     'local_purchase',
     'service',
   ]),
+  origin: z.enum(['FACTORY_MADE', 'LOCAL_PURCHASE', 'IMPORTED']).default('FACTORY_MADE'),
   uom: z.string().min(1).max(20).default('PCS'),
   cost_price: z.coerce.number().nonnegative().optional().nullable(),
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
@@ -44,11 +45,17 @@ const createSchema = z.object({
   leg_length_inch: z.string().max(20).optional().nullable(),
 })
 
+const updateSchema = createSchema.extend({
+  current_stock: z.coerce.number().nonnegative().optional().nullable(),
+  adjustment_reason: z.string().max(500).optional().nullable(),
+})
+
 function extractForm(formData: FormData) {
   return {
     product_code: formData.get('product_code'),
     canonical_name: formData.get('canonical_name'),
     category: formData.get('category'),
+    origin: formData.get('origin') || 'FACTORY_MADE',
     uom: formData.get('uom') || 'PCS',
     cost_price: formData.get('cost_price') || null,
     selling_price: formData.get('selling_price') || null,
@@ -62,6 +69,8 @@ function extractForm(formData: FormData) {
     leaf_position: formData.get('leaf_position') || null,
     shaft_size_mm: formData.get('shaft_size_mm') || null,
     leg_length_inch: formData.get('leg_length_inch') || null,
+    current_stock: formData.get('current_stock') || null,
+    adjustment_reason: formData.get('adjustment_reason') || null,
   }
 }
 
@@ -87,6 +96,7 @@ export async function createProduct(formData: FormData) {
           sku: parsed.data.product_code,
           name: parsed.data.canonical_name,
           category: parsed.data.category as ProductCategory,
+          origin: parsed.data.origin as StockOrigin,
           uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
           unitCost: parsed.data.cost_price ?? null,
           vendor: parsed.data.vendor ?? null,
@@ -133,7 +143,7 @@ export async function updateProduct(productId: string, formData: FormData) {
   const user = await requireProductManager()
   const db = getTenantPrisma(user.organizationId)
 
-  const parsed = createSchema.safeParse(extractForm(formData))
+  const parsed = updateSchema.safeParse(extractForm(formData))
   if (!parsed.success) {
     const firstError = parsed.error.issues[0]
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
@@ -153,18 +163,38 @@ export async function updateProduct(productId: string, formData: FormData) {
     }
   }
 
-  await db.product.update({
-    where: { id: productId },
-    data: {
-      sku: parsed.data.product_code,
-      name: parsed.data.canonical_name,
-      category: parsed.data.category as ProductCategory,
-      uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
-      unitCost: parsed.data.cost_price ?? null,
-      vendor: parsed.data.vendor ?? null,
-      reorderLevel: parsed.data.reorder_point ?? null,
-    },
-  })
+  const nextStock = parsed.data.current_stock
+  const stockChanged = nextStock != null && nextStock !== existing.currentStock
+  const stockDelta = stockChanged ? nextStock - existing.currentStock : 0
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    await tx.product.update({
+      where: { id: productId },
+      data: {
+        sku: parsed.data.product_code,
+        name: parsed.data.canonical_name,
+        category: parsed.data.category as ProductCategory,
+        origin: parsed.data.origin as StockOrigin,
+        uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
+        unitCost: parsed.data.cost_price ?? null,
+        vendor: parsed.data.vendor ?? null,
+        reorderLevel: parsed.data.reorder_point ?? null,
+        ...(stockChanged ? { currentStock: nextStock } : {}),
+      },
+    })
+
+    if (stockChanged) {
+      await tx.stockMovement.create({
+        data: {
+          productId,
+          movementType: 'adjustment',
+          quantity: stockDelta,
+          reference: `PRODUCT-EDIT-${Date.now().toString(36).toUpperCase()}`,
+          notes: parsed.data.adjustment_reason?.trim() ?? 'Product edit stock adjustment',
+        },
+      })
+    }
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/products')
   revalidatePath(`/products/${productId}`)

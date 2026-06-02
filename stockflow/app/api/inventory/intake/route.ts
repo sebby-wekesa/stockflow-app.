@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
+import { normalizeRawMaterialCategory } from '@/lib/raw-materials'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function POST(request: NextRequest) {
     const db = getTenantPrisma(user.organizationId)
     const body = await request.json()
     const { materialName, diameter, kgReceived, supplierId } = body
+    const category = normalizeRawMaterialCategory(body.category)
 
     // Validate required fields
     if (!materialName || !diameter || !kgReceived) {
@@ -34,6 +36,7 @@ export async function POST(request: NextRequest) {
     const existingMaterial = await db.rawMaterial.findFirst({
       where: {
         materialName,
+        category,
         diameter,
       },
     })
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
           organizationId: user.organizationId,
           sku,
           materialName,
+          category,
           diameter,
           availableKg: kgReceived,
           supplierId,

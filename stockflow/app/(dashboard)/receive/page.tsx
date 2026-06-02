@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { RAW_MATERIAL_CATEGORIES, type RawMaterialCategory } from "@/lib/raw-materials";
 
 export default function ReceivePage() {
-  const [materialName, setMaterialName] = useState("Steel rod 16mm");
+  const [category, setCategory] = useState<RawMaterialCategory>("Flat Bars");
+  const [materialName, setMaterialName] = useState("Flat bar 16mm");
   const [diameter, setDiameter] = useState("16mm");
   const [kgReceived, setKgReceived] = useState("");
   const [supplier, setSupplier] = useState("Steel Masters Ltd");
@@ -23,6 +25,7 @@ export default function ReceivePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           materialName,
+          category,
           diameter,
           kgReceived: parseFloat(kgReceived),
           supplier,
@@ -56,6 +59,19 @@ export default function ReceivePage() {
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
+              <label className="form-label">Category</label>
+              <select
+                className="form-input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as RawMaterialCategory)}
+                required
+              >
+                {RAW_MATERIAL_CATEGORIES.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label className="form-label">Material type</label>
               <input
                 type="text"
@@ -69,14 +85,16 @@ export default function ReceivePage() {
                   else if (e.target.value.includes("20mm")) setDiameter("20mm");
                   else if (e.target.value.includes("25mm")) setDiameter("25mm");
                 }}
-                placeholder="e.g. Steel rod 16mm or custom type"
+                placeholder="e.g. Flat bar 16mm or custom type"
               />
               <datalist id="material-types">
-                <option value="Steel rod 16mm" />
-                <option value="Steel rod 20mm" />
-                <option value="Steel rod 25mm" />
+                <option value="Flat bar 16mm" />
+                <option value="Round bar 20mm" />
+                <option value="Spring bush 25mm" />
               </datalist>
             </div>
+          </div>
+          <div className="form-row">
             <div className="form-group">
               <label className="form-label">Quantity (kg)</label>
               <input

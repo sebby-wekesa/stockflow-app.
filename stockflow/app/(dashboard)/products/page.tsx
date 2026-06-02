@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { withRetry } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { CATEGORY_SHORT, CATEGORY_BADGE_CLASS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
@@ -36,12 +37,12 @@ export default async function ProductsPage({
   }
 
   // Fetch in parallel: category counts, the page of products, total
-  const [counts, products, total] = await Promise.all([
-    db.product.groupBy({
+  const [counts, products, total] = await withRetry(async () => {
+    const counts = await db.product.groupBy({
       by: ['origin'],
       _count: { _all: true },
-    }),
-    db.product.findMany({
+    })
+    const products = await db.product.findMany({
       where,
       orderBy: { sku: 'asc' },
       take: PAGE_SIZE,
@@ -49,9 +50,11 @@ export default async function ProductsPage({
       include: {
         _count: { select: { ProductAlias: true } },
       },
-    }),
-    db.product.count({ where }),
-  ])
+    })
+    const total = await db.product.count({ where })
+
+    return [counts, products, total] as const
+  })
 
   const totalAll = counts.reduce((sum, c) => sum + c._count._all, 0)
   const totalPages = Math.ceil(total / PAGE_SIZE)

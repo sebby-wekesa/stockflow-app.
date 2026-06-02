@@ -2,6 +2,7 @@
 
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
+import { type RawMaterialCategory, normalizeRawMaterialCategory } from "@/lib/raw-materials";
 
 export async function getRawMaterials() {
   const user = await requireActiveAuth();
@@ -48,6 +49,7 @@ export async function getRawMaterial(id: string) {
 
 export async function createRawMaterial(data: {
   materialName: string;
+  category?: RawMaterialCategory;
   diameter: string;
   supplierId?: string;
 }) {
@@ -67,6 +69,7 @@ export async function createRawMaterial(data: {
       organizationId: user.organizationId,
       sku,
       materialName: data.materialName,
+      category: normalizeRawMaterialCategory(data.category),
       diameter: data.diameter,
       supplierId: data.supplierId || null
     }

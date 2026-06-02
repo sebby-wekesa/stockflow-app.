@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getTenantPrisma } from "@/lib/tenant-prisma"
 import { requireActiveAuth } from "@/lib/auth"
 import { withRetry } from '@/lib/prisma'
+import { RAW_MATERIAL_CATEGORIES } from '@/lib/raw-materials'
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,9 @@ export default async function RawmaterialsPage() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
-  const materials = await withRetry(() => db.rawMaterial.findMany(), undefined);
+  const materials = await withRetry(() => db.rawMaterial.findMany({
+    orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
+  }), undefined);
   
   const receipts = await withRetry(() => db.materialReceipt.findMany({
     include: { RawMaterial: true },
@@ -26,18 +29,34 @@ export default async function RawmaterialsPage() {
         </div>
         <Link href="/import" className="btn btn-primary">+ Receive stock</Link>
       </div>
-      <div className="stats-grid mb-24" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
-        {materials.map(m => {
-          const availableNum = m.availableKg.toNumber();
-          const reservedNum = m.reservedKg.toNumber();
-          const free = availableNum - reservedNum;
-          const trend = free > 500 ? 'teal' : free > 0 ? 'amber' : 'red';
+      <div className="mb-24" style={{display:'grid',gap:'24px'}}>
+        {RAW_MATERIAL_CATEGORIES.map((category) => {
+          const categoryMaterials = materials.filter((m) => m.category === category)
           return (
-            <div key={m.id} className={`stat-card ${trend}`}>
-              <div className="stat-label">{m.materialName}</div>
-              <div className="stat-value">{availableNum.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-              <div className="stat-sub"><span>{Math.max(0, free).toLocaleString()} kg free</span> · {reservedNum.toLocaleString()} kg reserved</div>
-            </div>
+            <section key={category}>
+              <div className="section-header mb-16">
+                <div className="section-title">{category}</div>
+                <span className="badge badge-muted">{categoryMaterials.length} materials</span>
+              </div>
+              <div className="stats-grid" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+                {categoryMaterials.map(m => {
+                  const availableNum = m.availableKg.toNumber();
+                  const reservedNum = m.reservedKg.toNumber();
+                  const free = availableNum - reservedNum;
+                  const trend = free > 500 ? 'teal' : free > 0 ? 'amber' : 'red';
+                  return (
+                    <div key={m.id} className={`stat-card ${trend}`}>
+                      <div className="stat-label">{m.materialName}</div>
+                      <div className="stat-value">{availableNum.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
+                      <div className="stat-sub"><span>{Math.max(0, free).toLocaleString()} kg free</span> · {reservedNum.toLocaleString()} kg reserved</div>
+                    </div>
+                  )
+                })}
+                {categoryMaterials.length === 0 && (
+                  <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>No materials in this category.</div>
+                )}
+              </div>
+            </section>
           )
         })}
         {materials.length === 0 && (
@@ -47,11 +66,12 @@ export default async function RawmaterialsPage() {
       <div className="card">
         <div className="section-header mb-16"><div className="section-title">Receipt history</div></div>
         <table>
-          <thead><tr><th>Date</th><th>Material</th><th>Kg received</th><th>Reference</th><th>Logged by</th></tr></thead>
+          <thead><tr><th>Date</th><th>Category</th><th>Material</th><th>Kg received</th><th>Reference</th><th>Logged by</th></tr></thead>
           <tbody>
             {receipts.map(r => (
               <tr key={r.id}>
                 <td>{r.createdAt.toLocaleDateString()}</td>
+                <td>{r.RawMaterial.category}</td>
                 <td>{r.RawMaterial.materialName}</td>
                 <td><span className="job-kg">{r.kgReceived.toNumber().toFixed(2)} kg</span></td>
                 <td>{r.reference || '—'}</td>
@@ -59,7 +79,7 @@ export default async function RawmaterialsPage() {
               </tr>
             ))}
             {receipts.length === 0 && (
-              <tr><td colSpan={5} style={{textAlign: 'center', color: 'var(--muted)'}}>No receipts found.</td></tr>
+              <tr><td colSpan={6} style={{textAlign: 'center', color: 'var(--muted)'}}>No receipts found.</td></tr>
             )}
           </tbody>
         </table>

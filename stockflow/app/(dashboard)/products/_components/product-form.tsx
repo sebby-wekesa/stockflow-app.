@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CATEGORY_LABELS, PRODUCT_TYPES_BY_CATEGORY, PRODUCT_TYPE_LABELS } from '@/lib/products'
-import type { ProductCategory, UOM } from '@prisma/client'
+import { CATEGORY_LABELS, ORIGIN_LABELS, PRODUCT_TYPES_BY_CATEGORY, PRODUCT_TYPE_LABELS } from '@/lib/products'
+import type { ProductCategory, StockOrigin } from '@prisma/client'
 
 type Mode = 'create' | 'edit'
 
@@ -11,8 +11,9 @@ type Initial = {
   product_code?: string
   canonical_name?: string
   category?: ProductCategory
+  origin?: StockOrigin
   product_type?: string
-  uom?: UOM
+  uom?: string
   description?: string | null
   vehicle_make?: string | null
   vehicle_model?: string | null
@@ -123,6 +124,24 @@ export function ProductForm({
 
           <div>
             <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+              Origin <span className="text-red">*</span>
+            </label>
+            <select
+              name="origin"
+              required
+              defaultValue={initial?.origin ?? 'FACTORY_MADE'}
+              className="input"
+            >
+              {Object.entries(ORIGIN_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
               Product type <span className="text-red">*</span>
             </label>
             <select
@@ -147,15 +166,15 @@ export function ProductForm({
             <select
               name="uom"
               required
-              defaultValue={initial?.uom ?? (isService ? 'pcs' : 'pcs')}
+              defaultValue={(initial?.uom ?? 'PCS').toUpperCase()}
               className="input"
             >
-              <option value="pcs">Pieces</option>
-              <option value="set">Set</option>
-              <option value="kg">Kilograms</option>
-              <option value="litres">Litres</option>
-              <option value="metres">Metres</option>
-              <option value="box">Box</option>
+              <option value="PCS">Pieces</option>
+              <option value="SET">Set</option>
+              <option value="KGS">Kilograms</option>
+              <option value="LITRES">Litres</option>
+              <option value="METRES">Metres</option>
+              <option value="BOX">Box</option>
             </select>
           </div>
 
@@ -345,13 +364,12 @@ export function ProductForm({
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-                Reason for adjustment <span className="text-red-500">*</span>
+                Reason for adjustment
               </label>
               <input
                 name="adjustment_reason"
                 type="text"
-                required
-                placeholder="e.g. Physical count correction, damaged goods, etc."
+                placeholder="Required only when stock changes"
                 className="input"
               />
             </div>

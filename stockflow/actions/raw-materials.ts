@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { RAW_MATERIAL_CATEGORIES, normalizeRawMaterialCategory } from '@/lib/raw-materials'
 
 async function requireWarehouseAccess(): Promise<AuthUser> {
   const user = await requireActiveAuth()
@@ -24,6 +25,7 @@ async function requireWarehouseAccess(): Promise<AuthUser> {
 const createRMSchema = z.object({
   sku: z.string().min(1).max(60),
   materialName: z.string().min(1).max(200),
+  category: z.enum(RAW_MATERIAL_CATEGORIES).default('Flat Bars'),
   diameter: z.string().min(1).max(50),
   supplierId: z.string().optional().nullable(),
   costPerKg: z.coerce.number().nonnegative().optional().nullable(),
@@ -36,6 +38,7 @@ export async function createRawMaterial(formData: FormData) {
   const raw = {
     sku: formData.get('sku'),
     materialName: formData.get('materialName'),
+    category: formData.get('category') || 'Flat Bars',
     diameter: formData.get('diameter'),
     supplierId: formData.get('supplierId') || null,
     costPerKg: formData.get('costPerKg') || null,
@@ -53,6 +56,7 @@ export async function createRawMaterial(formData: FormData) {
     data: {
       sku: parsed.data.sku,
       materialName: parsed.data.materialName,
+      category: parsed.data.category,
       diameter: parsed.data.diameter,
       supplierId: parsed.data.supplierId ?? null,
       costPerKg: parsed.data.costPerKg ?? undefined,
@@ -166,12 +170,14 @@ export async function receiveRawMaterialsBatch(
     try {
       const skuVal = pick(row, 'sku', 'code', 'product_code')
       const nameVal = pick(row, 'material_name', 'materialName', 'name', 'description')
+      const categoryVal = pick(row, 'category', 'material_category', 'materialCategory')
       const diameterVal = pick(row, 'diameter', 'size', 'spec')
       const kgVal = pick(row, 'kg_received', 'kgReceived', 'quantity', 'qty', 'kg')
       const costVal = pick(row, 'cost_per_kg', 'costPerKg', 'unit_cost')
 
       const sku = String(skuVal ?? '').trim()
       const name = String(nameVal ?? '').trim()
+      const category = normalizeRawMaterialCategory(String(categoryVal ?? '').trim())
       const diameter = String(diameterVal ?? '').trim()
       const kg = Number(kgVal)
 
@@ -194,6 +200,7 @@ export async function receiveRawMaterialsBatch(
               data: {
                 sku,
                 materialName: name,
+                category,
                 diameter,
                 costPerKg: Number.isFinite(Number(costVal)) ? Number(costVal) : undefined,
                 availableKg: new Prisma.Decimal(kg),
@@ -254,6 +261,7 @@ export async function searchRawMaterials(query: string) {
       OR: [
         { sku: { contains: query, mode: 'insensitive' } },
         { materialName: { contains: query, mode: 'insensitive' } },
+        { category: { contains: query, mode: 'insensitive' } },
         { diameter: { contains: query, mode: 'insensitive' } },
       ],
     },
