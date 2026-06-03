@@ -38,13 +38,15 @@ export default async function NewSalesPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-head text-2xl font-bold">New sales order</h1>
-        <p className="text-muted text-sm mt-1">
-          Create a new sales order and optionally invoice immediately
-        </p>
+      {/* PAGE HEADER */}
+      <div className="section-header mb-8">
+        <div>
+          <div className="section-title">New sales order</div>
+          <div className="section-sub">Create a new sales order and optionally invoice immediately</div>
+        </div>
       </div>
 
+      {/* SALES FORM */}
       <SalesForm allowedBranches={allowedBranches} defaultBranch={defaultBranch} />
     </div>
   )

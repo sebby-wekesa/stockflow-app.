@@ -144,22 +144,22 @@ export function SalesForm({
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="mb-4 p-4 rounded-md bg-red/10 border border-red/30 text-red text-sm">
           {error}
         </div>
       )}
 
-      {/* HEADER: branch + customer + date */}
-      <div className="card p-5 mb-4">
+      {/* SECTION 1: BRANCH + CUSTOMER + DATE */}
+      <div className="card mb-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+            <label className="form-label">
               Selling from <span className="text-red">*</span>
             </label>
             <select
               value={branch}
               onChange={(e) => handleBranchChange(e.target.value as Branch)}
-              className="input"
+              className="form-input w-full"
               disabled={allowedBranches.length === 1}
             >
               {allowedBranches.map((b) => (
@@ -171,23 +171,23 @@ export function SalesForm({
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+            <label className="form-label">
               Invoice date <span className="text-red">*</span>
             </label>
             <input
               type="date"
               value={invoiceDate}
               onChange={(e) => setInvoiceDate(e.target.value)}
-              className="input font-mono"
+              className="form-input w-full font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+            <label className="form-label">
               Customer <span className="text-red">*</span>
             </label>
             {customer ? (
-              <div className="bg-surface2 rounded-md px-3 py-2 flex items-center justify-between text-sm">
+              <div className="bg-surface2 rounded-md px-3 py-2 flex items-center justify-between text-sm border border-border">
                 <span className="truncate">{customer.name}</span>
                 <button onClick={clearCustomer} className="text-xs text-muted hover:text-text ml-2">
                   ✕
@@ -200,7 +200,7 @@ export function SalesForm({
                 <input
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="input flex-1"
+                  className="form-input flex-1"
                   placeholder="Walk-in customer"
                 />
                 <button
@@ -216,10 +216,10 @@ export function SalesForm({
         </div>
       </div>
 
-      {/* LINE ITEMS */}
+      {/* SECTION 2: LINE ITEMS */}
       <div className="card mb-4">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <div className="font-head font-bold text-sm">Line items</div>
+        <div className="border-b border-border flex items-center justify-between pb-4 mb-4">
+          <div className="section-title">Line items</div>
           <span className="text-xs text-muted">
             {totals.lineCount} {totals.lineCount === 1 ? 'item' : 'items'}
           </span>
@@ -237,43 +237,42 @@ export function SalesForm({
           ))}
         </div>
 
-        <div className="p-4 border-t border-border">
+        <div className="border-t border-border pt-4 mt-4">
           <button type="button" onClick={addLine} className="btn btn-ghost btn-sm">
             + Add line
           </button>
         </div>
       </div>
 
-      {/* NOTES + TOTAL */}
+      {/* SECTION 3: NOTES + TOTAL */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="card p-5">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+        <div className="card">
+          <label className="form-label">
             Order notes (optional)
           </label>
           <textarea
             value={orderNotes}
             onChange={(e) => setOrderNotes(e.target.value)}
-            className="input"
+            className="form-input w-full mt-2"
             rows={3}
             placeholder="LPO numbers, vehicle reg, special instructions..."
           />
         </div>
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted">Total</span>
-            <span className="font-head text-2xl font-bold font-mono">
+        <div className="card">
+          <div className="mb-3">
+            <span className="form-label">Order Total</span>
+            <div className="text-2xl font-bold font-mono mt-3">
               {formatKES(totals.subtotal)}
-            </span>
+            </div>
           </div>
           <div className="text-xs text-muted">
             {totals.lineCount} line {totals.lineCount === 1 ? 'item' : 'items'}
-            {totals.lineCount === 0 && ' · add at least one to continue'}
+            {totals.lineCount === 0 && ' — add at least one to continue'}
           </div>
         </div>
       </div>
-
-      {/* ACTIONS */}
-      <div className="flex justify-end gap-2">
+      {/* SECTION 4: ACTIONS */}
+      <div className="flex justify-end gap-3 mb-3">
         <button
           type="button"
           onClick={() => handleSubmit('draft')}
@@ -292,7 +291,7 @@ export function SalesForm({
         </button>
       </div>
 
-      <p className="text-xs text-muted mt-2 text-right">
+      <p className="text-xs text-muted text-right">
         Confirming will generate an invoice number and decrement stock immediately.
       </p>
     </div>
@@ -357,7 +356,7 @@ function SalesLineRow({
           </div>
 
           <div className="col-span-4 md:col-span-2">
-            <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">
+            <label className="form-label">
               Qty
             </label>
             <input
@@ -366,12 +365,12 @@ function SalesLineRow({
               step="1"
               value={line.qty}
               onChange={(e) => onUpdate({ qty: e.target.value })}
-              className={`input font-mono ${exceedsStock ? 'border-red' : ''}`}
+              className={`form-input font-mono`}
             />
           </div>
 
           <div className="col-span-4 md:col-span-2">
-            <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">
+            <label className="form-label">
               Unit price
             </label>
             <input
@@ -380,12 +379,12 @@ function SalesLineRow({
               step="0.01"
               value={line.unit_price}
               onChange={(e) => onUpdate({ unit_price: e.target.value })}
-              className="input font-mono"
+              className="form-input font-mono"
             />
           </div>
 
           <div className="col-span-3 md:col-span-2 text-right">
-            <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">
+            <label className="form-label">
               Total
             </label>
             <div className="font-mono font-medium pt-2">{formatKES(lineTotal)}</div>
@@ -408,13 +407,13 @@ function SalesLineRow({
             <input
               value={line.notes}
               onChange={(e) => onUpdate({ notes: e.target.value })}
-              className="input text-xs"
+              className="form-input text-xs w-full"
               placeholder="Line notes — LPO, vehicle reg, etc. (optional)"
             />
           </div>
 
           {exceedsStock && (
-            <div className="col-span-12 text-xs text-red">
+            <div className="col-span-12 text-xs text-red bg-red/10 border border-red/30 rounded p-2 px-3">
               Quantity exceeds available stock at {BRANCH_LABELS[branch]}
             </div>
           )}
@@ -463,7 +462,7 @@ function ProductSearch({
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search product by code or name..."
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-1"
+          className="form-input flex-1"
         />
         {onCancel && (
           <button
@@ -476,7 +475,7 @@ function ProductSearch({
         )}
       </div>
 
-      <div className="border border-[var(--border2)] rounded-lg max-h-52 overflow-auto bg-[var(--surface2)] text-[var(--text)]">
+      <div className="border border-border rounded-md max-h-52 overflow-auto bg-surface2 text-text">
         {searching ? (
           <div className="text-sm text-muted px-3 py-3">Searching...</div>
         ) : query.length < 2 ? (
@@ -491,18 +490,18 @@ function ProductSearch({
               key={r.id}
               type="button"
               onClick={() => onPick(r)}
-              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-[var(--surface)] text-sm border-b border-[var(--border)] last:border-b-0 ${
-                index === 0 ? 'rounded-t-lg' : ''
+              className={`w-full text-left px-3 py-2.5 flex items-center justify-between hover:bg-surface transition-colors text-sm border-b border-border last:border-b-0 ${
+                index === 0 ? 'rounded-t-md' : ''
               }`}
             >
               <div className="min-w-0 flex-1 pr-3">
-                <div className="font-mono text-[13px] text-[var(--accent)]">{r.product_code}</div>
-                <div className="text-[var(--text)] truncate">{r.canonical_name}</div>
+                <div className="font-mono text-[13px] text-accent">{r.product_code}</div>
+                <div className="text-text truncate">{r.canonical_name}</div>
               </div>
 
               <div className="text-right flex-shrink-0 text-sm">
-                <div className="font-medium tabular-nums text-[var(--text)]">{formatKES(r.selling_price)}</div>
-                <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-[var(--teal)]' : 'text-[var(--red)]'}`}>
+                <div className="font-medium tabular-nums text-text">{formatKES(r.selling_price)}</div>
+                <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-teal' : 'text-red'}`}>
                   {r.stock_at_branch ?? 0} in stock
                 </div>
               </div>
@@ -551,7 +550,7 @@ function CustomerSearch({
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search by name or phone..."
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex-1"
+          className="form-input flex-1"
         />
         <button
           type="button"
@@ -562,7 +561,7 @@ function CustomerSearch({
         </button>
       </div>
 
-      <div className="border border-[var(--border2)] rounded-lg max-h-44 overflow-auto bg-[var(--surface2)] text-[var(--text)]">
+      <div className="border border-border rounded-md max-h-44 overflow-auto bg-surface2 text-text">
         {searching ? (
           <div className="text-sm text-muted px-3 py-2.5">Searching...</div>
         ) : query.length < 2 ? (
@@ -575,9 +574,9 @@ function CustomerSearch({
               key={c.id}
               type="button"
               onClick={() => onPick(c)}
-              className="w-full text-left px-3 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] text-sm"
+              className="w-full text-left px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-surface text-sm transition-colors"
             >
-              <div className="font-medium text-[var(--text)]">{c.name}</div>
+              <div className="font-medium text-text">{c.name}</div>
               {c.phone && (
                 <div className="text-xs text-muted font-mono">{c.phone}</div>
               )}
