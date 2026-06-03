@@ -13,13 +13,14 @@ export function normalizeProductUom(value: unknown): ProductUom | null {
   return null
 }
 
-// Display labels for the 5 categories
+// Display labels for the 6 categories
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   springs: 'Springs',
   ubolts: 'Ubolts',
   trailer_parts: 'Trailer parts',
   break_linings: 'Break linings',
   center_bolts: 'Center bolts',
+  nuts: 'Nuts',
 }
 
 // Short labels for badges and tabs
@@ -29,6 +30,7 @@ export const CATEGORY_SHORT: Record<ProductCategory, string> = {
   trailer_parts: 'Trailer parts',
   break_linings: 'Break linings',
   center_bolts: 'Center bolts',
+  nuts: 'Nuts',
 }
 
 // Color theme per category
@@ -38,6 +40,7 @@ export const CATEGORY_BADGE_CLASS: Record<ProductCategory, string> = {
   trailer_parts: 'bg-surface2 text-muted',
   break_linings: 'bg-teal/15 text-teal',
   center_bolts: 'bg-red/15 text-red',
+  nuts: 'bg-orange/15 text-orange',
 }
 
 // Display labels for stock origins
@@ -68,6 +71,7 @@ export const PRODUCT_TYPES_BY_CATEGORY: Record<ProductCategory, ProductType[]> =
   trailer_parts: ['bearing', 'seal', 'assembly', 'bush', 'hub', 'clamp', 'equalizer', 'hardware'],
   break_linings: ['brake_lining', 'brake_pad', 'brake_shoe'],
   center_bolts: ['centre_bolt'],
+  nuts: ['hardware'],
 }
 
 export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
@@ -126,6 +130,8 @@ export function suggestProductCode(
       return `BL-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
     case 'center_bolts':
       return `CB-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
+    case 'nuts':
+      return `NUT-${(inputs.name ?? '').toUpperCase().replace(/\s+/g, '-').slice(0, 20)}`
     default:
       return ''
   }

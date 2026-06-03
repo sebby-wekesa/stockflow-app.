@@ -814,6 +814,7 @@ enum ProductCategory {
   trailer_parts
   break_linings
   center_bolts
+  nuts
 }
 
 enum ProductType {
