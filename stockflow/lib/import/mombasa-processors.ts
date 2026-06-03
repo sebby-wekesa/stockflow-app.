@@ -53,7 +53,7 @@ export const trailerPartsProcessor: CategoryProcessor = {
       reorderLevel: reorderLevel > 0 ? reorderLevel : Math.max(1, Math.floor(balance * 0.2)), // 20% of balance as default
       unitCost: unitCost > 0 ? unitCost : undefined,
       vendor: vendor?.trim(),
-      uom: 'PCS',
+      uom: 'KG',
       rawData: row
     }
   },
@@ -96,7 +96,7 @@ export const brakeLiningsProcessor: CategoryProcessor = {
       reorderLevel: reorderLevel > 0 ? reorderLevel : Math.max(2, Math.floor(balance * 0.15)), // 15% for brake parts
       unitCost: unitCost > 0 ? unitCost : undefined,
       vendor: vendor?.trim(),
-      uom: 'PCS',
+      uom: 'KG',
       rawData: row
     }
   },
@@ -139,7 +139,7 @@ export const springComponentsProcessor: CategoryProcessor = {
       reorderLevel: reorderLevel > 0 ? reorderLevel : Math.max(1, Math.floor(balance * 0.25)), // 25% for springs
       unitCost: unitCost > 0 ? unitCost : undefined,
       vendor: vendor?.trim(),
-      uom: 'PCS',
+      uom: 'KG',
       rawData: row
     }
   },
@@ -173,7 +173,7 @@ export const genericProcessor: CategoryProcessor = {
       reorderLevel: reorderLevel > 0 ? reorderLevel : Math.max(1, Math.floor(balance * 0.2)),
       unitCost: unitCost > 0 ? unitCost : undefined,
       vendor: vendor?.trim(),
-      uom: 'PCS',
+      uom: 'KG',
       rawData: row
     }
   },
@@ -258,7 +258,7 @@ export async function processMombasaInventory(
             sku: processedProduct.sku,
             category: processedProduct.category as any,
             origin: 'LOCAL_PURCHASE',
-            uom: normalizeProductUom(processedProduct.uom) ?? 'PCS',
+            uom: normalizeProductUom(processedProduct.uom) ?? 'KG',
             currentStock: processedProduct.balance,
             unitCost: processedProduct.unitCost,
             vendor: processedProduct.vendor,

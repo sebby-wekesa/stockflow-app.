@@ -90,7 +90,7 @@ export async function processInventoryAndSalesUpload(fileBuffer: Buffer, filenam
         if (rawBalItem && String(rawBalItem).trim() !== "") {
           const product_name = cleanProductName(String(rawBalItem));
           const current_stock = Number(row[map.balCurr]) || 0;
-          const uom_string = normalizeProductUom(row[map.balUom]) ?? 'PCS';
+          const uom_string = normalizeProductUom(row[map.balUom]) ?? 'KG';
 
           if (!['CONSUMABLES', 'DOLL', 'SPRINGTECH', 'TOTAL', 'COLUMN1'].includes(product_name)) {
             // Upsert directly into the main application catalog table

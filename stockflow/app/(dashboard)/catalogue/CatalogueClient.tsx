@@ -325,7 +325,7 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
                         fontWeight: 500,
                         color: p.availableQty > 0 ? 'var(--green)' : 'var(--red)'
                       }}>
-                        {p.availableQty} unit{p.availableQty !== 1 ? 's' : ''}
+                        {p.availableQty} kg
                       </span>
                     </td>
                     <td style={{

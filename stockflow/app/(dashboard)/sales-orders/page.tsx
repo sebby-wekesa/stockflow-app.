@@ -109,7 +109,7 @@ export default async function SalesOrdersPage() {
     createdAt: d.createdAt,
     source: 'design' as const,
     origin: d.billOfMaterials.length > 0 && d.stages.length > 0 ? 'Made to order' : 'Setup incomplete',
-    uom: 'units',
+    uom: 'KG',
   }));
 
   const formattedProducts = [...manufactured, ...madeToOrder, ...otherProducts];

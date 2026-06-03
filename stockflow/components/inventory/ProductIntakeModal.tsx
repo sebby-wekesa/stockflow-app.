@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { X, ShoppingCart, Ship, Package, DollarSign, Hash, Truck, FileText, CheckCircle, AlertCircle } from "lucide-react";
 
 type Origin = "LOCAL_PURCHASE" | "IMPORTED";
-type UOM = "PCS" | "SETS";
+type UOM = "KG";
 
 interface ProductIntakeModalProps {
   open: boolean;
@@ -17,7 +17,7 @@ const MULTIPLIER = 1.25;
 export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeModalProps) {
   const [origin, setOrigin] = useState<Origin>("LOCAL_PURCHASE");
   const [name, setName] = useState("");
-  const [uom, setUom] = useState<UOM>("PCS");
+  const [uom, setUom] = useState<UOM>("KG");
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState("");
   const [landingCost, setLandingCost] = useState("");
@@ -33,7 +33,7 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
   }, [origin]);
 
   function resetForm() {
-    setName(""); setUom("PCS"); setQuantity("");
+    setName(""); setUom("KG"); setQuantity("");
     setUnitCost(""); setLandingCost(""); setVendor(""); setReference("");
   }
 
@@ -183,8 +183,7 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
                 value={uom}
                 onChange={(e) => setUom(e.target.value as UOM)}
               >
-                <option value="PCS">PCS</option>
-                <option value="SETS">SETS</option>
+                <option value="KG">KG</option>
               </select>
             </div>
           </div>

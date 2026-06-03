@@ -303,7 +303,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
         label: 'Finished goods ready',
         value: finishedGoods._sum.kgProduced || 0,
         suffix: 'kg',
-        sub: `${finishedGoods._sum.quantity || 0} units available`,
+        sub: `${finishedGoods._sum.quantity || 0} kg available`,
         color: 'purple'
       },
       {

@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
 
     if (!productUom) {
       return NextResponse.json(
-        { error: 'uom must be PCS or SETS' },
+        { error: 'uom must be KG' },
         { status: 400 }
       );
     }

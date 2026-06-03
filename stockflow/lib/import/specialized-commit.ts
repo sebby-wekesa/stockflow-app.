@@ -113,7 +113,7 @@ export async function commitProductMaster(
               data: {
                 name: row.canonical_name,
                 category: mapCategory(row.category),
-                uom: normalizeProductUom(row.uom) ?? 'PCS',
+                uom: normalizeProductUom(row.uom) ?? 'KG',
                 ...(row.cost_price !== null && { unitCost: row.cost_price }),
               },
             })
@@ -124,7 +124,7 @@ export async function commitProductMaster(
                 sku,
                 category: mapCategory(row.category),
                 origin: 'FACTORY_MADE',
-                uom: normalizeProductUom(row.uom) ?? 'PCS',
+                uom: normalizeProductUom(row.uom) ?? 'KG',
                 currentStock: 0,
                 unitCost: row.cost_price ?? null,
               },
@@ -211,7 +211,7 @@ export async function commitSalesImport(
           sku,
           category: 'break_linings',
           origin: 'LOCAL_PURCHASE',
-          uom: 'PCS',
+          uom: 'KG',
           currentStock: 0,
           organizationId,
         },

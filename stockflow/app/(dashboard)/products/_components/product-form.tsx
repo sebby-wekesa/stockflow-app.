@@ -165,7 +165,7 @@ export function ProductForm({
             <select
               name="uom"
               required
-              defaultValue={normalizeProductUom(initial?.uom) ?? 'PCS'}
+              defaultValue={normalizeProductUom(initial?.uom) ?? 'KG'}
               className="form-input w-full"
             >
               {PRODUCT_UOMS.map((uom) => (

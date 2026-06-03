@@ -146,7 +146,7 @@ export async function addProductStock(input: AddProductStockInput) {
   }
   const productUom = normalizeProductUom(uom);
   if (!productUom) {
-    throw new Error("UOM must be PCS or SETS");
+    throw new Error("UOM must be KG");
   }
 
   // Upsert Product

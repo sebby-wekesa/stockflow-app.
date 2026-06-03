@@ -7,7 +7,7 @@ import { CATEGORY_LABELS } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
-import { ProductOriginSelect, ProductUomSelect } from './_components/product-inline-selects'
+import { ProductOriginSelect } from './_components/product-inline-selects'
 
 export const dynamic = 'force-dynamic';
 
@@ -184,7 +184,6 @@ export default async function ProductsPage({
                 <th>Category</th>
                 <th>Origin</th>
                 <th>UOM</th>
-                <th>Pieces / Sets</th>
                 <th>Current Stock</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -193,7 +192,7 @@ export default async function ProductsPage({
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={8} className="py-12 text-center text-muted text-sm">
                     {q || origin || category ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -235,23 +234,10 @@ export default async function ProductsPage({
                        />
                      </td>
                     <td>
-                      <ProductUomSelect
-                        productId={p.id}
-                        uom={p.uom}
-                        canEdit={canEditProducts}
-                      />
-                    </td>
-                    <td>
-                      <ProductUomSelect
-                        productId={p.id}
-                        uom={p.uom}
-                        currentStock={p.currentStock}
-                        canEdit={canEditProducts}
-                        variant="stock-label"
-                      />
+                      <span className="badge badge-muted">KG</span>
                     </td>
                     <td className="font-mono text-sm">
-                      {p.currentStock.toLocaleString()}
+                      {p.currentStock.toLocaleString()} <span className="text-muted">kg</span>
                     </td>
                     <td>
                       <span className="badge badge-teal">

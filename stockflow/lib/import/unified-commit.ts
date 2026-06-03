@@ -42,7 +42,7 @@ export function bundleToParsedWorkbookResult(bundle: UnifiedDataBundle): ParsedW
 
   const products = bundle.products.map((p) => ({
     name: toUpperTrim(p.name),
-    uom: normalizeProductUom(p.uom) ?? 'PCS',
+    uom: normalizeProductUom(p.uom) ?? 'KG',
     opening_stock: Number(p.opening_stock) || 0,
     current_stock: Number(p.current_stock) || 0,
     location,

@@ -265,7 +265,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
                       <div className="text-xs text-gray-600">
                         {item.source === 'design'
                           ? 'Creates production order'
-                          : `${item.availableQty} ${item.uom || 'units'} available`}
+                          : `${item.availableQty} ${item.uom || 'KG'} available`}
                       </div>
                     </div>
                     <div className="text-right">

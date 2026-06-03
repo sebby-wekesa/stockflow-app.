@@ -32,9 +32,9 @@ const createSchema = z.object({
   origin: z.enum(['FACTORY_MADE', 'LOCAL_PURCHASE', 'IMPORTED']).default('FACTORY_MADE'),
   uom: z.preprocess(
     (value) => normalizeProductUom(value),
-    z.enum(['PCS', 'SETS'], {
-      invalid_type_error: 'UOM must be PCS or SETS',
-      required_error: 'UOM must be PCS or SETS',
+    z.enum(['KG'], {
+      invalid_type_error: 'UOM must be KG',
+      required_error: 'UOM must be KG',
     })
   ),
   cost_price: z.coerce.number().nonnegative().optional().nullable(),
@@ -74,9 +74,9 @@ const updateOriginSchema = z.object({
 const updateUomSchema = z.object({
   uom: z.preprocess(
     (value) => normalizeProductUom(value),
-    z.enum(['PCS', 'SETS'], {
-      invalid_type_error: 'UOM must be PCS or SETS',
-      required_error: 'UOM must be PCS or SETS',
+    z.enum(['KG'], {
+      invalid_type_error: 'UOM must be KG',
+      required_error: 'UOM must be KG',
     })
   ),
 })
@@ -87,7 +87,7 @@ function extractForm(formData: FormData) {
     canonical_name: formData.get('canonical_name'),
     category: formData.get('category'),
     origin: formData.get('origin') || 'FACTORY_MADE',
-    uom: formData.get('uom') || 'PCS',
+    uom: formData.get('uom') || 'KG',
     cost_price: formData.get('cost_price') || null,
     selling_price: formData.get('selling_price') || null,
     reorder_point: formData.get('reorder_point') || null,
@@ -285,7 +285,7 @@ export async function updateProductUom(productId: string, uom: string) {
 
   const parsed = updateUomSchema.safeParse({ uom })
   if (!parsed.success) {
-    throw new Error('UOM must be PCS or SETS')
+    throw new Error('UOM must be KG')
   }
 
   const product = await db.product.findFirst({

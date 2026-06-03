@@ -88,7 +88,7 @@ async function SalesView({ user, role }: { user: any; role: TeamRole }) {
                 <div className="product-name">{product.name}</div>
                 <div className="product-code">{product.code}</div>
                 <div className="product-stock">
-                  <span className="job-kg">{product.availableQty} units</span> available
+                  <span className="job-kg">{product.availableQty} kg</span> available
                 </div>
                 <div className="product-price">{formatKES(Number(product.price))}/unit</div>
                 <a href="/catalogue" className="btn btn-sm">Order Now</a>
@@ -241,4 +241,3 @@ async function PackagingView({ user, role }: { user: any; role: TeamRole }) {
     </div>
   )
 }
-

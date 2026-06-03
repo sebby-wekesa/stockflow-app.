@@ -437,7 +437,7 @@ model Product {
   sku            String?
   category       ProductCategory  @default(springs)
   origin         StockOrigin      @default(FACTORY_MADE)
-  uom            String           @default("PCS")
+  uom            String           @default("KG")
   currentStock   Float            @default(0)
   unitCost       Float?
   landingCost    Float?
