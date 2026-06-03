@@ -7,7 +7,7 @@ import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import type { ProductCategory, StockOrigin } from '@prisma/client'
 import { Prisma } from '@prisma/client'
-import { normalizeProductUom } from '@/lib/products'
+import { PRODUCT_CATEGORIES, normalizeProductUom } from '@/lib/products'
 
 /** Returns the auth user if role is ADMIN or MANAGER, else throws. */
 async function requireProductManager(): Promise<AuthUser> {
@@ -22,13 +22,7 @@ const createSchema = z.object({
   // form keeps snake_case keys for backwards compat with existing forms
   product_code: z.string().min(1).max(60),
   canonical_name: z.string().min(1).max(200),
-  category: z.enum([
-    'springs',
-    'ubolts',
-    'trailer_parts',
-    'break_linings',
-    'center_bolts',
-  ]),
+  category: z.enum(PRODUCT_CATEGORIES),
   origin: z.enum(['FACTORY_MADE', 'LOCAL_PURCHASE', 'IMPORTED']).default('FACTORY_MADE'),
   uom: z.preprocess(
     (value) => normalizeProductUom(value),
@@ -59,13 +53,7 @@ const updateSchema = createSchema.extend({
 })
 
 const updateCategorySchema = z.object({
-  category: z.enum([
-    'springs',
-    'ubolts',
-    'trailer_parts',
-    'break_linings',
-    'center_bolts',
-  ]),
+  category: z.enum(PRODUCT_CATEGORIES),
 })
 
 const updateOriginSchema = z.object({

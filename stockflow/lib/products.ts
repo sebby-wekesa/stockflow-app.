@@ -1,5 +1,18 @@
 import type { ProductCategory, ProductType, StockOrigin } from '@prisma/client'
 
+export const PRODUCT_CATEGORIES = [
+  'springs',
+  'ubolts',
+  'trailer_parts',
+  'break_linings',
+  'center_bolts',
+  'nuts',
+] as const
+
+export function isProductCategory(value: unknown): value is ProductCategory {
+  return typeof value === 'string' && (PRODUCT_CATEGORIES as readonly string[]).includes(value)
+}
+
 export const PRODUCT_UOMS = ['KG'] as const
 export type ProductUom = (typeof PRODUCT_UOMS)[number]
 

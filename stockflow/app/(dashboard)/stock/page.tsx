@@ -6,7 +6,7 @@ import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { redirect } from 'next/navigation'
 import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES } from '@/lib/branches'
 import ExportStockButton from './_components/ExportStockButton'
-import { CATEGORY_BADGE_CLASS, CATEGORY_SHORT } from '@/lib/products'
+import { CATEGORY_BADGE_CLASS, CATEGORY_LABELS, CATEGORY_SHORT, isProductCategory } from '@/lib/products'
 import type { BranchCode as Branch } from '@/lib/branches'
 
 // Status badge component
@@ -47,6 +47,7 @@ export default async function BranchStockPage({
   const params = await searchParams;
   const focusedBranch = params.branch as Branch | undefined
   const page = Math.max(1, Number(params.page ?? 1))
+  const category = isProductCategory(params.category) ? params.category : undefined
 
   // Build product filter
   const productWhere: any = {}
@@ -60,8 +61,8 @@ export default async function BranchStockPage({
   }
 
   // Add category filter if provided
-  if (params.category) {
-    productWhere.category = params.category
+  if (category) {
+    productWhere.category = category
   }
 
   // Add status filter if provided
@@ -227,13 +228,13 @@ export default async function BranchStockPage({
 
           <div className="form-group">
             <label className="form-label">Category</label>
-            <select name="category" defaultValue={params.category} className="form-input">
+            <select name="category" defaultValue={category ?? ''} className="form-input">
               <option value="">All Categories</option>
-              <option value="springs">Springs</option>
-              <option value="ubolts">Ubolts</option>
-              <option value="trailer_parts">Trailer parts</option>
-              <option value="break_linings">Break linings</option>
-              <option value="center_bolts">Center bolts</option>
+              {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
 
