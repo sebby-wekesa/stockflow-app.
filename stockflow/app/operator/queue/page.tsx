@@ -28,16 +28,13 @@ export default function OperatorQueuePage() {
       setLoading(true);
       try {
         const depts = await getActiveDepartments();
-        setDepartments(depts.length > 0 ? depts : ['Cutting', 'Bending', 'Welding', 'Assembly']);
+        setDepartments(depts);
 
-        const initialDept = depts[0] || 'Cutting';
+        const initialDept = depts[0] || '';
         setSelectedDept(initialDept);
-
-        // Try to get current user name (best effort)
-        // For now we just show a generic welcome
       } catch (err) {
-        setDepartments(['Cutting', 'Bending', 'Welding', 'Assembly']);
-        setSelectedDept('Cutting');
+        setDepartments([]);
+        setSelectedDept('');
       }
       setLoading(false);
     };
@@ -86,6 +83,9 @@ export default function OperatorQueuePage() {
               {dept}
             </button>
           ))}
+          {departments.length === 0 && (
+            <div className="text-sm text-muted">No active departments in the production queue.</div>
+          )}
         </div>
       </div>
 
@@ -138,6 +138,12 @@ export default function OperatorQueuePage() {
             <p className="text-muted text-sm">
               No active jobs currently in the <strong>{selectedDept}</strong> department.
             </p>
+          </div>
+        )}
+
+        {!loading && jobs.length === 0 && !selectedDept && (
+          <div className="p-8 text-center">
+            <p className="text-muted text-sm">No active jobs are currently available.</p>
           </div>
         )}
       </div>

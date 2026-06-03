@@ -177,9 +177,9 @@ export async function getActiveDepartments() {
       active.unshift(user.department);
     }
 
-    return active.length > 0 ? active : ["Cutting", "Bending", "Welding", "Assembly"];
+    return active;
   } catch (error) {
     console.warn("Failed to fetch active departments:", error);
-    return ["Cutting", "Bending", "Welding", "Assembly", "Packaging"];
+    return [];
   }
 }

@@ -40,14 +40,11 @@ export default function OperatorDashboard() {
     const load = async () => {
       try {
         const depts = await getActiveDepartments();
-        const deptList = depts.length > 0 ? depts : ["Cutting", "Bending", "Welding", "Assembly", "Packaging", "Finishing"];
-        setDepartments(deptList);
-        const initial = deptList[0] || "Cutting";
-        setSelectedDept(initial);
+        setDepartments(depts);
+        setSelectedDept(depts[0] || "");
       } catch {
-        const fallback = ["Cutting", "Bending", "Welding", "Assembly", "Packaging"];
-        setDepartments(fallback);
-        setSelectedDept("Cutting");
+        setDepartments([]);
+        setSelectedDept("");
       }
     };
     load();
@@ -108,6 +105,9 @@ export default function OperatorDashboard() {
               {dept}
             </button>
           ))}
+          {departments.length === 0 && (
+            <div className="text-sm text-muted">No active departments in the production queue.</div>
+          )}
         </div>
       </div>
 
@@ -158,6 +158,12 @@ export default function OperatorDashboard() {
             <p className="text-muted text-sm">
               No active jobs currently in the <strong>{selectedDept}</strong> department.
             </p>
+          </div>
+        )}
+
+        {!loading && !selectedDept && (
+          <div className="p-8 text-center">
+            <p className="text-muted text-sm">No active jobs are currently available.</p>
           </div>
         )}
       </div>

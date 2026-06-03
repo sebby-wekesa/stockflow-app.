@@ -16,7 +16,7 @@ export default function OperatorQueuePage() {
       const depts = await getActiveDepartments();
       setDepartments(depts);
       // Default to first one (usually user's dept or most active)
-      const initial = depts[0] || "Cutting";
+      const initial = depts[0] || "";
       setSelectedDept(initial);
     };
     loadDepts();
@@ -114,9 +114,15 @@ export default function OperatorQueuePage() {
           </div>
         )}
 
-        {!loading && orders.length === 0 && (
+        {!loading && orders.length === 0 && selectedDept && (
           <div style={{ padding: "20px", color: "var(--muted)", textAlign: "center" }}>
             No active jobs in the <strong>{selectedDept}</strong> department right now.
+          </div>
+        )}
+
+        {!loading && orders.length === 0 && !selectedDept && (
+          <div style={{ padding: "20px", color: "var(--muted)", textAlign: "center" }}>
+            No active jobs are currently available.
           </div>
         )}
       </div>
