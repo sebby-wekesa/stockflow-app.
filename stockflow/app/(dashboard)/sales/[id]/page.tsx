@@ -33,6 +33,12 @@ export default async function SalesOrderDetailPage({
     0
   )
 
+  function getBillablePiecesSets(item: { unitPrice: unknown; totalPrice: unknown }) {
+    const unitPrice = Number(item.unitPrice)
+    if (unitPrice <= 0) return 0
+    return Number(item.totalPrice) / unitPrice
+  }
+
   return (
     <div className="max-w-4xl">
       <div className="mb-6 flex items-start justify-between">
@@ -101,6 +107,7 @@ export default async function SalesOrderDetailPage({
               <th className="pb-2 font-medium">SKU</th>
               <th className="pb-2 font-medium">Description</th>
               <th className="pb-2 font-medium text-right">Qty</th>
+              <th className="pb-2 font-medium text-right">Sets/pcs</th>
               <th className="pb-2 font-medium text-right">Unit price</th>
               <th className="pb-2 font-medium text-right">Total</th>
             </tr>
@@ -118,6 +125,11 @@ export default async function SalesOrderDetailPage({
                   {item.quantity}
                 </td>
                 <td className="py-3 text-right font-mono text-sm align-top whitespace-nowrap">
+                  {getBillablePiecesSets(item).toLocaleString('en-KE', {
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td className="py-3 text-right font-mono text-sm align-top whitespace-nowrap">
                   {formatKES(Number(item.unitPrice))}
                 </td>
                 <td className="py-3 text-right font-mono text-sm align-top whitespace-nowrap">
@@ -128,7 +140,7 @@ export default async function SalesOrderDetailPage({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-border">
-              <td colSpan={4} className="pt-3 text-right font-medium">
+              <td colSpan={5} className="pt-3 text-right font-medium">
                 Total
               </td>
               <td className="pt-3 text-right font-mono font-bold text-lg">

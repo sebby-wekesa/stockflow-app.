@@ -92,9 +92,10 @@ export async function createSalesOrder(formData: FormData) {
     throw new Error(`Branch "${data.branch}" not found in your organization. Add it under Settings > Branches.`)
   }
 
-  // Pre-compute total from form input (no DB read needed).
+  // Pre-compute total from form input. Qty is stock movement quantity;
+  // pieces_sets is the billable pieces/sets count.
   const totalAmount = data.lines.reduce(
-    (sum, l) => sum + Number(l.unit_price) * Number(l.qty),
+    (sum, l) => sum + Number(l.unit_price) * Number(l.pieces_sets),
     0
   )
 
@@ -147,6 +148,7 @@ export async function createSalesOrder(formData: FormData) {
       const product = productMap.get(line.product_id)!
       const qty = Number(line.qty)
       const unitPrice = Number(line.unit_price)
+      const billablePiecesSets = Number(line.pieces_sets) || 0
 
       // Ensure FinishedGoods shadow exists for this org
       const fgSku = product.sku || product.id
@@ -169,7 +171,7 @@ export async function createSalesOrder(formData: FormData) {
           finishedGoodsId: fg.id,
           quantity: qty,
           unitPrice,
-          totalPrice: qty * unitPrice,
+          totalPrice: billablePiecesSets * unitPrice,
         },
       })
 

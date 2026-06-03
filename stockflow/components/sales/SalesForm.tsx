@@ -89,9 +89,9 @@ export function SalesForm({
   // Compute totals
   const totals = lines.reduce(
     (acc, line) => {
-      const qty = parseFloat(line.qty) || 0
+      const piecesSets = parseFloat(line.pieces_sets) || 0
       const price = parseFloat(line.unit_price) || 0
-      const lineTotal = qty * price
+      const lineTotal = piecesSets * price
       return {
         lineCount: acc.lineCount + (line.product ? 1 : 0),
         subtotal: acc.subtotal + lineTotal,
@@ -320,14 +320,15 @@ function SalesLineRow({
     onUpdate({
       product,
       unit_price: product.selling_price > 0 ? String(product.selling_price) : '0',
-      pieces_sets: String(product.piecesSets || 0),
+      pieces_sets: product.piecesSets > 0 ? '1' : '0',
     })
     setShowPicker(false)
   }
 
   const qty = parseFloat(line.qty) || 0
+  const piecesSets = parseFloat(line.pieces_sets) || 0
   const price = parseFloat(line.unit_price) || 0
-  const lineTotal = qty * price
+  const lineTotal = piecesSets * price
   const exceedsStock =
     line.product &&
     line.product.stock_at_branch !== null &&
