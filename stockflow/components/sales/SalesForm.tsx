@@ -137,7 +137,10 @@ export function SalesForm({
 
     startTransition(async () => {
       try {
-        await createSalesOrder(fd)
+        const result = await createSalesOrder(fd)
+        if (result?.error) {
+          setError(result.error)
+        }
       } catch (err) {
         setError((err as Error).message)
       }
@@ -167,7 +170,7 @@ export function SalesForm({
             >
               {allowedBranches.map((b) => (
                 <option key={b} value={b}>
-                  {BRANCH_LABELS[b]}
+                  {BRANCH_LABELS[b] ?? b}
                 </option>
               ))}
             </select>

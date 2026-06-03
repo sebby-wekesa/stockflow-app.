@@ -38,68 +38,98 @@ const orderSchema = z.object({
   lines: z.array(lineSchema).min(1, 'Add at least one line item'),
 })
 
+const SALES_BRANCH_ALIASES: Record<string, string[]> = {
+  mombasa: ['mombasa', 'msa', 'mombasa branch'],
+  msa: ['mombasa', 'msa', 'mombasa branch'],
+  nairobi: ['nairobi', 'nbo', 'nbi', 'nairobi branch'],
+  nbo: ['nairobi', 'nbo', 'nbi', 'nairobi branch'],
+  nbi: ['nairobi', 'nbo', 'nbi', 'nairobi branch'],
+  bonje: ['bonje', 'bunje', 'bnj', 'bonje branch', 'bunje branch'],
+  bunje: ['bonje', 'bunje', 'bnj', 'bonje branch', 'bunje branch'],
+  bnj: ['bonje', 'bunje', 'bnj', 'bonje branch', 'bunje branch'],
+}
+
+function normalizeSalesBranch(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (['mombasa', 'msa'].includes(normalized)) return 'mombasa'
+  if (['nairobi', 'nbo', 'nbi'].includes(normalized)) return 'nairobi'
+  if (['bonje', 'bunje', 'bnj'].includes(normalized)) return 'bonje'
+  return normalized
+}
+
+function getBranchLookupValues(value: string) {
+  const normalized = value.trim().toLowerCase()
+  return Array.from(new Set([value, normalized, ...(SALES_BRANCH_ALIASES[normalized] ?? [])]))
+}
+
 export async function createSalesOrder(formData: FormData) {
-  const lines: Array<{
-    product_id: string
-    qty: string
-    unit_price: string
-    pieces_sets: string
-    notes: string | null
-  }> = []
-  let i = 0
-  while (formData.has(`line_${i}_product_id`)) {
-    lines.push({
-      product_id: formData.get(`line_${i}_product_id`) as string,
-      qty: formData.get(`line_${i}_qty`) as string,
-      unit_price: formData.get(`line_${i}_unit_price`) as string,
-      pieces_sets: (formData.get(`line_${i}_pieces_sets`) as string) || '0',
-      notes: (formData.get(`line_${i}_notes`) as string) || null,
+  let redirectTo: string | null = null
+
+  try {
+    const lines: Array<{
+      product_id: string
+      qty: string
+      unit_price: string
+      pieces_sets: string
+      notes: string | null
+    }> = []
+    let i = 0
+    while (formData.has(`line_${i}_product_id`)) {
+      lines.push({
+        product_id: formData.get(`line_${i}_product_id`) as string,
+        qty: formData.get(`line_${i}_qty`) as string,
+        unit_price: formData.get(`line_${i}_unit_price`) as string,
+        pieces_sets: (formData.get(`line_${i}_pieces_sets`) as string) || '0',
+        notes: (formData.get(`line_${i}_notes`) as string) || null,
+      })
+      i++
+    }
+
+    const raw = {
+      branch: formData.get('branch'),
+      customer_id: formData.get('customer_id') || null,
+      customer_name: formData.get('customer_name'),
+      invoice_date: formData.get('invoice_date'),
+      notes: formData.get('notes') || null,
+      action: formData.get('action') ?? 'invoice',
+      lines,
+    }
+
+    const parsed = orderSchema.safeParse(raw)
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0].message }
+    }
+
+    const data = parsed.data
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+    const action = data.action
+    const salesBranch = normalizeSalesBranch(data.branch)
+    const branchLookupValues = getBranchLookupValues(data.branch)
+
+    // Resolve the branch outside the transaction. Safe to do here because
+    // branches are stable — they don't change between the lookup and the writes.
+    const branchRow = await db.branch.findFirst({
+      where: {
+        OR: branchLookupValues.flatMap((branch) => [
+          { code: { equals: branch, mode: 'insensitive' as const } },
+          { name: { equals: branch, mode: 'insensitive' as const } },
+          { name: { contains: branch, mode: 'insensitive' as const } },
+        ]),
+      },
     })
-    i++
-  }
+    if (!branchRow) {
+      return { error: `Branch "${data.branch}" not found in your organization. Add it under Settings > Branches.` }
+    }
 
-  const raw = {
-    branch: formData.get('branch'),
-    customer_id: formData.get('customer_id') || null,
-    customer_name: formData.get('customer_name'),
-    invoice_date: formData.get('invoice_date'),
-    notes: formData.get('notes') || null,
-    action: formData.get('action') ?? 'invoice',
-    lines,
-  }
+    // Pre-compute total from form input. Qty is stock movement quantity;
+    // pieces_sets is the billable pieces/sets count.
+    const totalAmount = data.lines.reduce(
+      (sum, l) => sum + Number(l.unit_price) * Number(l.pieces_sets),
+      0
+    )
 
-  const parsed = orderSchema.safeParse(raw)
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues[0].message)
-  }
-
-  const data = parsed.data
-  const user = await requireActiveAuth()
-  const db = getTenantPrisma(user.organizationId)
-  const action = data.action
-
-  // Resolve the branch outside the transaction. Safe to do here because
-  // branches are stable — they don't change between the lookup and the writes.
-  const branchRow = await db.branch.findFirst({
-    where: {
-      OR: [
-        { code: { equals: data.branch, mode: 'insensitive' } },
-        { name: { equals: data.branch, mode: 'insensitive' } },
-      ],
-    },
-  })
-  if (!branchRow) {
-    throw new Error(`Branch "${data.branch}" not found in your organization. Add it under Settings > Branches.`)
-  }
-
-  // Pre-compute total from form input. Qty is stock movement quantity;
-  // pieces_sets is the billable pieces/sets count.
-  const totalAmount = data.lines.reduce(
-    (sum, l) => sum + Number(l.unit_price) * Number(l.pieces_sets),
-    0
-  )
-
-  const result = await withTenantTransaction(user.organizationId, async (tx) => {
+    const result = await withTenantTransaction(user.organizationId, async (tx) => {
     // Fetch all products in this order (existence check)
     const productIds = data.lines.map((l) => l.product_id)
     type ProductLite = { id: string; sku: string | null; name: string; uom: string; currentStock: number; piecesSets: number }
@@ -130,7 +160,7 @@ export async function createSalesOrder(formData: FormData) {
     // if a collision occurs the txn aborts and the caller retries.
     const orderNumber =
       action === 'invoice'
-        ? await nextInvoiceNumber(user.organizationId, branchRow.code as any)
+        ? await nextInvoiceNumber(user.organizationId, salesBranch)
         : `DRAFT-${Date.now().toString(36).toUpperCase()}`
 
     const order = await tx.saleOrder.create({
@@ -217,11 +247,20 @@ export async function createSalesOrder(formData: FormData) {
     }
 
     return order
-  }, { maxWait: 10000, timeout: 30000 })
+    }, { maxWait: 10000, timeout: 30000 })
 
-  revalidatePath('/sales')
-  revalidatePath('/stock')
-  redirect(`/sales/${result.id}`)
+    revalidatePath('/sales')
+    revalidatePath('/stock')
+    redirectTo = `/sales/${result.id}`
+  } catch (error) {
+    console.error('createSalesOrder failed:', error)
+    return {
+      error: error instanceof Error ? error.message : 'Failed to create sales order',
+    }
+  }
+
+  if (redirectTo) redirect(redirectTo)
+  return { error: 'Failed to create sales order' }
 }
 
 export async function confirmDraft(orderId: string) {
