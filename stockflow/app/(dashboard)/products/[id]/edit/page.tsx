@@ -30,6 +30,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     uom: product.uom,
     cost_price: product.unitCost ?? null,
     reorder_point: product.reorderLevel ?? null,
+    pieces_sets: product.piecesSets ?? 0,
     vendor: product.vendor ?? null,
     // extra optional fields the form may render in edit (populated if present on object)
     product_type: (product as any).product_type ?? null,

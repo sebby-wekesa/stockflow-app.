@@ -40,6 +40,7 @@ const createSchema = z.object({
   cost_price: z.coerce.number().nonnegative().optional().nullable(),
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
   reorder_point: z.coerce.number().int().nonnegative().optional().nullable(),
+  pieces_sets: z.coerce.number().int().nonnegative().optional().default(0),
   vendor: z.string().max(200).optional().nullable(),
   // Fields below are not in the schema — accepted but ignored so existing forms don't crash:
   product_type: z.string().optional().nullable(),
@@ -81,6 +82,10 @@ const updateUomSchema = z.object({
   ),
 })
 
+const updatePiecesSetsSchema = z.object({
+  piecesSets: z.coerce.number().int().nonnegative(),
+})
+
 function extractForm(formData: FormData) {
   return {
     product_code: formData.get('product_code'),
@@ -91,6 +96,7 @@ function extractForm(formData: FormData) {
     cost_price: formData.get('cost_price') || null,
     selling_price: formData.get('selling_price') || null,
     reorder_point: formData.get('reorder_point') || null,
+    pieces_sets: formData.get('pieces_sets') || 0,
     vendor: formData.get('vendor') || null,
     product_type: formData.get('product_type') || null,
     description: formData.get('description') || null,
@@ -132,6 +138,7 @@ export async function createProduct(formData: FormData) {
           unitCost: parsed.data.cost_price ?? null,
           vendor: parsed.data.vendor ?? null,
           reorderLevel: parsed.data.reorder_point ?? null,
+          piecesSets: parsed.data.pieces_sets ?? 0,
           currentStock: 0,
           organizationId: user.organizationId,
         },
@@ -210,6 +217,7 @@ export async function updateProduct(productId: string, formData: FormData) {
         unitCost: parsed.data.cost_price ?? null,
         vendor: parsed.data.vendor ?? null,
         reorderLevel: parsed.data.reorder_point ?? null,
+        piecesSets: parsed.data.pieces_sets ?? 0,
         ...(stockChanged ? { currentStock: nextStock } : {}),
       },
     })
@@ -297,6 +305,30 @@ export async function updateProductUom(productId: string, uom: string) {
   await db.product.update({
     where: { id: productId },
     data: { uom: parsed.data.uom },
+  })
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+}
+
+export async function updateProductPiecesSets(productId: string, piecesSets: number) {
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
+  const parsed = updatePiecesSetsSchema.safeParse({ piecesSets })
+  if (!parsed.success) {
+    throw new Error('PCS/Sets must be a whole number')
+  }
+
+  const product = await db.product.findFirst({
+    where: { id: productId },
+    select: { id: true },
+  })
+  if (!product) throw new Error('Product not found')
+
+  await db.product.update({
+    where: { id: productId },
+    data: { piecesSets: parsed.data.piecesSets },
   })
 
   revalidatePath('/products')

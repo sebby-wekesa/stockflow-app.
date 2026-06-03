@@ -7,7 +7,7 @@ import { CATEGORY_LABELS } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
-import { ProductOriginSelect } from './_components/product-inline-selects'
+import { ProductOriginSelect, ProductPiecesSetsInput } from './_components/product-inline-selects'
 
 export const dynamic = 'force-dynamic';
 
@@ -185,6 +185,7 @@ export default async function ProductsPage({
                 <th>Origin</th>
                 <th>UOM</th>
                 <th>Current Stock</th>
+                <th>PCS/Sets</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -192,7 +193,7 @@ export default async function ProductsPage({
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={9} className="py-12 text-center text-muted text-sm">
                     {q || origin || category ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -238,6 +239,13 @@ export default async function ProductsPage({
                     </td>
                     <td className="font-mono text-sm">
                       {p.currentStock.toLocaleString()} <span className="text-muted">kg</span>
+                    </td>
+                    <td>
+                      <ProductPiecesSetsInput
+                        productId={p.id}
+                        piecesSets={p.piecesSets}
+                        canEdit={canEditProducts}
+                      />
                     </td>
                     <td>
                       <span className="badge badge-teal">

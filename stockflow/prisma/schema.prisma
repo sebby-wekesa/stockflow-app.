@@ -439,6 +439,7 @@ model Product {
   origin         StockOrigin      @default(FACTORY_MADE)
   uom            String           @default("KG")
   currentStock   Float            @default(0)
+  piecesSets     Int              @default(0)
   unitCost       Float?
   landingCost    Float?
   vendor         String?

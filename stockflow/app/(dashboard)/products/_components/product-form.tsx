@@ -24,6 +24,7 @@ type Initial = {
   cost_price?: number | null
   selling_price?: number | null
   reorder_point?: number | null
+  pieces_sets?: number | null
   currentStock?: number | null
 }
 
@@ -296,7 +297,7 @@ export function ProductForm({
       {/* PRICING */}
       <div className="card p-6">
         <div className="section-title mb-16">Pricing & reorder</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs uppercase tracking-wider text-muted mb-2">
               Cost price (KES)
@@ -334,6 +335,19 @@ export function ProductForm({
               defaultValue={initial?.reorder_point ?? ''}
               className="form-input w-full font-mono"
               placeholder="Alert when stock < this"
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+              PCS/Sets
+            </label>
+            <input
+              name="pieces_sets"
+              type="number"
+              min="0"
+              step="1"
+              defaultValue={initial?.pieces_sets ?? 0}
+              className="form-input w-full font-mono"
             />
           </div>
         </div>
