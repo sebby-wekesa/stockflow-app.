@@ -8,13 +8,14 @@ import { OrderActions } from '@/components/sales/OrderActions'
 export default async function SalesOrderDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   const user = await requireActiveAuth()
   const db = getTenantPrisma(user.organizationId)
 
   const order = await db.saleOrder.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       SaleItem: {
         include: {
