@@ -7,8 +7,12 @@ import type { UserRole } from "@/lib/types";
 import { ROLE_NAMES, ROLE_COLORS } from "@/lib/types";
 import { signOut } from "@/actions/auth";
 
+type SidebarCounts = {
+  operatorQueue?: number
+}
+
 // Generate role-specific navigation items
-function getRoleNavItems(role: UserRole): any[] {
+function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): any[] {
   // Common navigation for all roles
   const commonItems = [
     { section: "Account" },
@@ -65,7 +69,12 @@ function getRoleNavItems(role: UserRole): any[] {
     case 'OPERATOR':
       return [
         { section: "My Work" },
-        { label: "Job queue", href: "/operator_queue", badge: "3", badgeColor: "purple" },
+        {
+          label: "Job queue",
+          href: "/operator_queue",
+          badge: counts.operatorQueue && counts.operatorQueue > 0 ? String(counts.operatorQueue) : undefined,
+          badgeColor: "purple",
+        },
         { section: "History" },
         { label: "Completed jobs", href: "/operator_history" },
       ];
@@ -104,9 +113,9 @@ function getRoleNavItems(role: UserRole): any[] {
   }
 }
 
-export function Sidebar({ role }: { role: UserRole }) {
+export function Sidebar({ role, counts = {} }: { role: UserRole; counts?: SidebarCounts }) {
   const pathname = usePathname();
-  const navItems = getRoleNavItems(role);
+  const navItems = getRoleNavItems(role, counts);
   const roleColor = ROLE_COLORS[role];
   const roleNameDisplay = ROLE_NAMES[role];
 

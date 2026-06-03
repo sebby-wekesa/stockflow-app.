@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth';
+import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { Sidebar } from "@/components/Sidebar";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 
@@ -10,6 +11,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect('/login');
 
   const role = user.role;
+  const sidebarCounts: { operatorQueue?: number } = {};
+
+  if (role === 'OPERATOR') {
+    const db = getTenantPrisma(user.organizationId);
+    sidebarCounts.operatorQueue = await db.productionOrder.count({
+      where: {
+        status: 'IN_PRODUCTION',
+        ...(user.department ? { currentDept: user.department } : {}),
+      },
+    });
+  }
 
   if (role === 'PENDING') {
     return (
@@ -31,7 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex h-screen bg-zinc-950 text-white">
       <PresenceHeartbeat />
-      <Sidebar role={role} />
+      <Sidebar role={role} counts={sidebarCounts} />
       <div className="flex-1 overflow-auto">
         {children}
       </div>
