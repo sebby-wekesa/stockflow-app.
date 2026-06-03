@@ -67,6 +67,20 @@ const updateCategorySchema = z.object({
   ]),
 })
 
+const updateOriginSchema = z.object({
+  origin: z.enum(['FACTORY_MADE', 'LOCAL_PURCHASE', 'IMPORTED']),
+})
+
+const updateUomSchema = z.object({
+  uom: z.preprocess(
+    (value) => normalizeProductUom(value),
+    z.enum(['PCS', 'SETS'], {
+      invalid_type_error: 'UOM must be PCS or SETS',
+      required_error: 'UOM must be PCS or SETS',
+    })
+  ),
+})
+
 function extractForm(formData: FormData) {
   return {
     product_code: formData.get('product_code'),
@@ -235,6 +249,54 @@ export async function updateProductCategory(productId: string, category: Product
   await db.product.update({
     where: { id: productId },
     data: { category: parsed.data.category as ProductCategory },
+  })
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+}
+
+export async function updateProductOrigin(productId: string, origin: StockOrigin) {
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
+  const parsed = updateOriginSchema.safeParse({ origin })
+  if (!parsed.success) {
+    throw new Error('Invalid product origin')
+  }
+
+  const product = await db.product.findFirst({
+    where: { id: productId },
+    select: { id: true },
+  })
+  if (!product) throw new Error('Product not found')
+
+  await db.product.update({
+    where: { id: productId },
+    data: { origin: parsed.data.origin as StockOrigin },
+  })
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+}
+
+export async function updateProductUom(productId: string, uom: string) {
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
+  const parsed = updateUomSchema.safeParse({ uom })
+  if (!parsed.success) {
+    throw new Error('UOM must be PCS or SETS')
+  }
+
+  const product = await db.product.findFirst({
+    where: { id: productId },
+    select: { id: true },
+  })
+  if (!product) throw new Error('Product not found')
+
+  await db.product.update({
+    where: { id: productId },
+    data: { uom: parsed.data.uom },
   })
 
   revalidatePath('/products')

@@ -3,10 +3,11 @@ import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { withRetry } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import { CATEGORY_LABELS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
+import { CATEGORY_LABELS } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
+import { ProductOriginSelect, ProductUomSelect } from './_components/product-inline-selects'
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,7 @@ export default async function ProductsPage({
 
   const totalAll = counts.reduce((sum, c) => sum + c._count._all, 0)
   const totalPages = Math.ceil(total / PAGE_SIZE)
+  const canEditProducts = user.role === 'ADMIN' || user.role === 'MANAGER'
 
   const countByOrigin: Record<string, number> = {}
   for (const c of counts) countByOrigin[c.origin] = c._count._all
@@ -222,20 +224,31 @@ export default async function ProductsPage({
                        <ProductCategorySelect
                          productId={p.id}
                          category={p.category}
-                         canEdit={user.role === 'ADMIN' || user.role === 'MANAGER'}
+                         canEdit={canEditProducts}
                        />
                      </td>
                      <td>
-                       <span className={`badge ${ORIGIN_BADGE_CLASS[p.origin] || 'badge-muted'}`}>
-                         {ORIGIN_SHORT[p.origin] || p.origin}
-                       </span>
+                       <ProductOriginSelect
+                         productId={p.id}
+                         origin={p.origin}
+                         canEdit={canEditProducts}
+                       />
                      </td>
-                    <td className="text-sm uppercase">{p.uom}</td>
-                    <td className="font-mono text-sm">
-                      {p.currentStock.toLocaleString()}{' '}
-                      <span className="text-muted">
-                        {p.uom === 'SETS' ? (p.currentStock === 1 ? 'set' : 'sets') : (p.currentStock === 1 ? 'piece' : 'pieces')}
-                      </span>
+                    <td>
+                      <ProductUomSelect
+                        productId={p.id}
+                        uom={p.uom}
+                        canEdit={canEditProducts}
+                      />
+                    </td>
+                    <td>
+                      <ProductUomSelect
+                        productId={p.id}
+                        uom={p.uom}
+                        currentStock={p.currentStock}
+                        canEdit={canEditProducts}
+                        variant="stock-label"
+                      />
                     </td>
                     <td className="font-mono text-sm">
                       {p.currentStock.toLocaleString()}
