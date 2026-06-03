@@ -24,6 +24,7 @@ const lineSchema = z.object({
   product_id: z.string().min(1),
   qty: z.coerce.number().int().positive(),
   unit_price: z.coerce.number().nonnegative(),
+  pieces_sets: z.coerce.number().int().nonnegative().optional().default(0),
   notes: z.string().max(500).optional().nullable(),
 })
 
@@ -42,6 +43,7 @@ export async function createSalesOrder(formData: FormData) {
     product_id: string
     qty: string
     unit_price: string
+    pieces_sets: string
     notes: string | null
   }> = []
   let i = 0
@@ -50,6 +52,7 @@ export async function createSalesOrder(formData: FormData) {
       product_id: formData.get(`line_${i}_product_id`) as string,
       qty: formData.get(`line_${i}_qty`) as string,
       unit_price: formData.get(`line_${i}_unit_price`) as string,
+      pieces_sets: (formData.get(`line_${i}_pieces_sets`) as string) || '0',
       notes: (formData.get(`line_${i}_notes`) as string) || null,
     })
     i++
@@ -98,10 +101,10 @@ export async function createSalesOrder(formData: FormData) {
   const result = await withTenantTransaction(user.organizationId, async (tx) => {
     // Fetch all products in this order (existence check)
     const productIds = data.lines.map((l) => l.product_id)
-    type ProductLite = { id: string; sku: string | null; name: string; uom: string; currentStock: number }
+    type ProductLite = { id: string; sku: string | null; name: string; uom: string; currentStock: number; piecesSets: number }
     const products = await tx.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, sku: true, name: true, uom: true, currentStock: true },
+      select: { id: true, sku: true, name: true, uom: true, currentStock: true, piecesSets: true },
     }) as ProductLite[]
     if (products.length !== data.lines.length) {
       throw new Error('One or more products not found in your organization')
@@ -182,6 +185,20 @@ export async function createSalesOrder(formData: FormData) {
           throw new Error(
             `Insufficient stock for ${product.sku ?? product.name}: have ${product.currentStock}, need ${qty}. Another sale may have completed first.`
           )
+        }
+
+        // Deduct pieces/sets if specified
+        const piecesSets = Number(line.pieces_sets) || 0
+        if (piecesSets > 0) {
+          const decrementedSets = await tx.product.updateMany({
+            where: { id: line.product_id, piecesSets: { gte: piecesSets } },
+            data: { piecesSets: { decrement: piecesSets } },
+          })
+          if (decrementedSets.count === 0) {
+            throw new Error(
+              `Insufficient pieces/sets for ${product.sku ?? product.name}: have ${product.piecesSets}, need ${piecesSets}. Another sale may have completed first.`
+            )
+          }
         }
 
         await tx.stockMovement.create({
@@ -361,10 +378,12 @@ export async function searchProductsForSale(query: string, branch: string) {
 
   return products.map((p) => ({
     id: p.id,
-    sku: p.sku,
-    name: p.name,
+    product_code: p.sku,
+    canonical_name: p.name,
     uom: p.uom,
-    currentStock: p.currentStock,
-    unitCost: p.unitCost,
+    category: p.category,
+    selling_price: p.unitCost ?? 0,
+    stock_at_branch: p.currentStock,
+    piecesSets: p.piecesSets ?? 0,
   }))
 }

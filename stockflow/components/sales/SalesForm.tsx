@@ -16,12 +16,14 @@ type LineProduct = {
   category: string
   selling_price: number
   stock_at_branch: number | null
+  piecesSets: number
 }
 
 type Line = {
   product?: LineProduct
   qty: string
   unit_price: string
+  pieces_sets: string
   notes: string
 }
 
@@ -31,7 +33,7 @@ type CustomerHit = {
   phone: string | null
 }
 
-const emptyLine = (): Line => ({ qty: '1', unit_price: '0', notes: '' })
+const emptyLine = (): Line => ({ qty: '1', unit_price: '0', pieces_sets: '0', notes: '' })
 
 export function SalesForm({
   allowedBranches,
@@ -129,6 +131,7 @@ export function SalesForm({
       fd.set(`line_${i}_product_id`, line.product!.id)
       fd.set(`line_${i}_qty`, line.qty)
       fd.set(`line_${i}_unit_price`, line.unit_price)
+      fd.set(`line_${i}_pieces_sets`, line.pieces_sets)
       fd.set(`line_${i}_notes`, line.notes)
     })
 
@@ -317,6 +320,7 @@ function SalesLineRow({
     onUpdate({
       product,
       unit_price: product.selling_price > 0 ? String(product.selling_price) : '0',
+      pieces_sets: String(product.piecesSets || 0),
     })
     setShowPicker(false)
   }
@@ -369,7 +373,21 @@ function SalesLineRow({
             />
           </div>
 
-          <div className="col-span-4 md:col-span-2">
+          <div className="col-span-4 md:col-span-1.5">
+            <label className="form-label">
+              Sets
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={line.pieces_sets}
+              onChange={(e) => onUpdate({ pieces_sets: e.target.value })}
+              className="form-input font-mono"
+            />
+          </div>
+
+          <div className="col-span-4 md:col-span-1.5">
             <label className="form-label">
               Unit price
             </label>
@@ -502,7 +520,8 @@ function ProductSearch({
               <div className="text-right flex-shrink-0 text-sm">
                 <div className="font-medium tabular-nums text-text">{formatKES(r.selling_price)}</div>
                 <div className={`text-[11px] ${r.stock_at_branch && r.stock_at_branch > 0 ? 'text-teal' : 'text-red'}`}>
-                  {r.stock_at_branch ?? 0} in stock
+                  {r.stock_at_branch ?? 0} {r.uom}
+                  {r.piecesSets > 0 && ` · ${r.piecesSets} sets`}
                 </div>
               </div>
             </button>
