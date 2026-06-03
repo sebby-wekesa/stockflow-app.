@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { SalesOrderForm } from "@/components/SalesOrderForm";
+import { formatKES } from "@/lib/sales-utils";
 
 type SortOption = 'name' | 'code' | 'price' | 'quantity' | 'date';
 
@@ -332,7 +333,7 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
                       fontWeight: 500,
                       color: 'var(--accent)'
                     }}>
-                      ${p.price?.toFixed(2) || 'TBD'}
+                      {p.price > 0 ? formatKES(p.price) : 'TBD'}
                     </td>
                   </tr>
                 ))}
