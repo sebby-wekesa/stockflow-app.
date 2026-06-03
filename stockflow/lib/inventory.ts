@@ -4,7 +4,7 @@
  */
 
 export type OriginType = 'IMPORTED' | 'LOCAL_PURCHASE' | 'FACTORY_MADE';
-export type UOM = 'PCS' | 'KGS';
+export type UOM = 'PCS' | 'SETS';
 
 export interface ProcessedItem {
   itemName: string;
@@ -51,8 +51,8 @@ export function processStockArrivals(items: string[]): ProcessedItem[] {
     }
 
     // 3. UOM Logic
-    if (item.toLowerCase().includes('kg') || item.toLowerCase().includes('steel rod') || item.toLowerCase().includes('wire rod')) {
-      uom = 'KGS';
+    if (item.toLowerCase().includes('set')) {
+      uom = 'SETS';
     }
 
     // 4. Landing Cost Calculation

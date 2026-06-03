@@ -3,6 +3,7 @@
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { normalizeProductUom, type ProductUom } from "@/lib/products";
 
 // ─── Raw Materials ──────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export async function addRawMaterial(formData: FormData) {
 export type AddProductStockInput = {
   name: string;
   origin: "LOCAL_PURCHASE" | "IMPORTED";
-  uom: "PCS" | "KGS";
+  uom: ProductUom;
   quantity: number;
   unitCost?: number;
   landingCost?: number;
@@ -142,6 +143,10 @@ export async function addProductStock(input: AddProductStockInput) {
 
   if (!name || !origin || !uom || quantity <= 0) {
     throw new Error("Missing required fields: name, origin, uom, quantity > 0");
+  }
+  const productUom = normalizeProductUom(uom);
+  if (!productUom) {
+    throw new Error("UOM must be PCS or SETS");
   }
 
   // Upsert Product
@@ -173,7 +178,7 @@ export async function addProductStock(input: AddProductStockInput) {
         name,
         sku,
         origin,
-        uom,
+        uom: productUom,
         currentStock: quantity,
         unitCost: unitCost ?? null,
         landingCost: landingCost ?? null,

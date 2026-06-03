@@ -7,6 +7,7 @@
 
 
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
+import { normalizeProductUom } from '@/lib/products'
 import { matchProductName, clearAliasCache } from './alias-matcher'
 import type {
   ParsedSalesRow,
@@ -112,7 +113,7 @@ export async function commitProductMaster(
               data: {
                 name: row.canonical_name,
                 category: mapCategory(row.category),
-                uom: row.uom?.toUpperCase() ?? 'PCS',
+                uom: normalizeProductUom(row.uom) ?? 'PCS',
                 ...(row.cost_price !== null && { unitCost: row.cost_price }),
               },
             })
@@ -123,7 +124,7 @@ export async function commitProductMaster(
                 sku,
                 category: mapCategory(row.category),
                 origin: 'FACTORY_MADE',
-                uom: row.uom?.toUpperCase() ?? 'PCS',
+                uom: normalizeProductUom(row.uom) ?? 'PCS',
                 currentStock: 0,
                 unitCost: row.cost_price ?? null,
               },
@@ -210,7 +211,7 @@ export async function commitSalesImport(
           sku,
           category: 'break_linings',
           origin: 'LOCAL_PURCHASE',
-          uom: 'pcs',
+          uom: 'PCS',
           currentStock: 0,
           organizationId,
         },

@@ -2,6 +2,7 @@
 import { StockOrigin, ProductCategory, StockStatus, SaleStatus, Design, FinishedGoods } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { prisma } from '@/lib/prisma';
+import { normalizeProductUom } from '@/lib/products';
 
 /**
  * Normalizes item names to ensure case-sensitive inner joins match 
@@ -89,7 +90,7 @@ export async function processInventoryAndSalesUpload(fileBuffer: Buffer, filenam
         if (rawBalItem && String(rawBalItem).trim() !== "") {
           const product_name = cleanProductName(String(rawBalItem));
           const current_stock = Number(row[map.balCurr]) || 0;
-          const uom_string = row[map.balUom] ? String(row[map.balUom]).trim().toUpperCase() : 'PCS';
+          const uom_string = normalizeProductUom(row[map.balUom]) ?? 'PCS';
 
           if (!['CONSUMABLES', 'DOLL', 'SPRINGTECH', 'TOTAL', 'COLUMN1'].includes(product_name)) {
             // Upsert directly into the main application catalog table

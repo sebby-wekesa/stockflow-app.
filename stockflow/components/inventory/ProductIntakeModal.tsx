@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { X, ShoppingCart, Ship, Package, DollarSign, Hash, Truck, FileText, CheckCircle, AlertCircle } from "lucide-react";
 
 type Origin = "LOCAL_PURCHASE" | "IMPORTED";
-type UOM = "PCS" | "KGS";
+type UOM = "PCS" | "SETS";
 
 interface ProductIntakeModalProps {
   open: boolean;
@@ -184,7 +184,7 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
                 onChange={(e) => setUom(e.target.value as UOM)}
               >
                 <option value="PCS">PCS</option>
-                <option value="KGS">KGS</option>
+                <option value="SETS">SETS</option>
               </select>
             </div>
           </div>

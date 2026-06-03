@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { requireActiveAuth } from '@/lib/auth';
+import { normalizeProductUom } from '@/lib/products';
 
 // GET /api/inventory/products?origin=LOCAL_PURCHASE|IMPORTED|FACTORY_MADE
 //                              &page=1&limit=200
@@ -107,9 +108,18 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
+    const productUom = normalizeProductUom(uom);
+
     if (!name || !origin || !uom || !quantity || quantity <= 0) {
       return NextResponse.json(
         { error: 'Missing required fields: name, origin, uom, quantity' },
+        { status: 400 }
+      );
+    }
+
+    if (!productUom) {
+      return NextResponse.json(
+        { error: 'uom must be PCS or SETS' },
         { status: 400 }
       );
     }
@@ -167,7 +177,7 @@ export async function POST(request: NextRequest) {
               name,
               sku,
               origin,
-              uom,
+              uom: productUom,
               currentStock: Number(quantity),
               unitCost: unitCost ? Number(unitCost) : null,
               landingCost: landingCost ? Number(landingCost) : null,

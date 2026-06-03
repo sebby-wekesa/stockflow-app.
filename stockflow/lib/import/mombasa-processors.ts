@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Category-specific processors for Mombasa stock imports
 import { prisma } from '@/lib/prisma'
+import { normalizeProductUom } from '@/lib/products'
 
 export interface ProcessedProduct {
   name: string
@@ -257,7 +258,7 @@ export async function processMombasaInventory(
             sku: processedProduct.sku,
             category: processedProduct.category as any,
             origin: 'LOCAL_PURCHASE',
-            uom: processedProduct.uom || 'PCS',
+            uom: normalizeProductUom(processedProduct.uom) ?? 'PCS',
             currentStock: processedProduct.balance,
             unitCost: processedProduct.unitCost,
             vendor: processedProduct.vendor,

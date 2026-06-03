@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CATEGORY_LABELS, ORIGIN_LABELS, PRODUCT_TYPES_BY_CATEGORY, PRODUCT_TYPE_LABELS } from '@/lib/products'
+import { CATEGORY_LABELS, ORIGIN_LABELS, PRODUCT_TYPES_BY_CATEGORY, PRODUCT_TYPE_LABELS, PRODUCT_UOM_LABELS, PRODUCT_UOMS, normalizeProductUom } from '@/lib/products'
 import type { ProductCategory, StockOrigin } from '@prisma/client'
 
 type Mode = 'create' | 'edit'
@@ -63,14 +63,14 @@ export function ProductForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="p-3 rounded-md bg-red/10 border border-red/30 text-red text-sm">
           {error}
         </div>
       )}
 
       {/* CORE FIELDS */}
       <div className="card p-6">
-        <div className="font-head font-bold mb-4">Core details</div>
+        <div className="section-title mb-16">Core details</div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -81,7 +81,7 @@ export function ProductForm({
               name="product_code"
               required
               defaultValue={initial?.product_code ?? ''}
-              className="input font-mono"
+              className="form-input w-full font-mono"
               placeholder="e.g. FH215/FSML"
             />
             <p className="text-xs text-muted mt-1">
@@ -97,7 +97,7 @@ export function ProductForm({
               name="canonical_name"
               required
               defaultValue={initial?.canonical_name ?? ''}
-              className="input"
+              className="form-input w-full"
               placeholder="e.g. Mitsubishi FH215 Front Spring Main Leaf"
             />
           </div>
@@ -111,7 +111,7 @@ export function ProductForm({
               required
               value={category}
               onChange={(e) => setCategory(e.target.value as ProductCategory)}
-              className="input"
+              className="form-input w-full"
             >
               {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
@@ -129,7 +129,7 @@ export function ProductForm({
               name="origin"
               required
               defaultValue={initial?.origin ?? 'FACTORY_MADE'}
-              className="input"
+              className="form-input w-full"
             >
               {Object.entries(ORIGIN_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
@@ -148,7 +148,7 @@ export function ProductForm({
               required
               defaultValue={initial?.product_type ?? productTypes[0]}
               key={category}
-              className="input"
+              className="form-input w-full"
             >
               {productTypes.map((t) => (
                 <option key={t} value={t}>
@@ -165,15 +165,14 @@ export function ProductForm({
             <select
               name="uom"
               required
-              defaultValue={(initial?.uom ?? 'PCS').toUpperCase()}
-              className="input"
+              defaultValue={normalizeProductUom(initial?.uom) ?? 'PCS'}
+              className="form-input w-full"
             >
-              <option value="PCS">Pieces</option>
-              <option value="SET">Set</option>
-              <option value="KGS">Kilograms</option>
-              <option value="LITRES">Litres</option>
-              <option value="METRES">Metres</option>
-              <option value="BOX">Box</option>
+              {PRODUCT_UOMS.map((uom) => (
+                <option key={uom} value={uom}>
+                  {PRODUCT_UOM_LABELS[uom]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -184,7 +183,7 @@ export function ProductForm({
             <input
               name="description"
               defaultValue={initial?.description ?? ''}
-              className="input"
+              className="form-input w-full"
               placeholder="Optional notes about this product"
             />
           </div>
@@ -194,7 +193,7 @@ export function ProductForm({
       {/* CATEGORY-SPECIFIC FIELDS */}
       {(isSpring || isUbolt) && (
         <div className="card p-6">
-          <div className="font-head font-bold mb-4">
+          <div className="section-title mb-16">
             {isSpring ? 'Vehicle & spring details' : 'U-bolt specifications'}
           </div>
 
@@ -206,7 +205,7 @@ export function ProductForm({
               <input
                 name="vehicle_make"
                 defaultValue={initial?.vehicle_make ?? ''}
-                className="input"
+                className="form-input w-full"
                 placeholder="e.g. Mitsubishi FH 215"
               />
             </div>
@@ -218,7 +217,7 @@ export function ProductForm({
               <input
                 name="vehicle_model"
                 defaultValue={initial?.vehicle_model ?? ''}
-                className="input"
+                className="form-input w-full"
                 placeholder="e.g. FH215"
               />
             </div>
@@ -232,7 +231,7 @@ export function ProductForm({
                   <select
                     name="spring_position"
                     defaultValue={initial?.spring_position ?? ''}
-                    className="input"
+                    className="form-input w-full"
                   >
                     <option value="">— select —</option>
                     <option value="Front">Front</option>
@@ -248,7 +247,7 @@ export function ProductForm({
                   <select
                     name="leaf_position"
                     defaultValue={initial?.leaf_position ?? ''}
-                    className="input"
+                    className="form-input w-full"
                   >
                     <option value="">— select —</option>
                     <option value="Main Leaf">Main leaf</option>
@@ -272,7 +271,7 @@ export function ProductForm({
                     type="number"
                     min="0"
                     defaultValue={initial?.shaft_size_mm ?? ''}
-                    className="input"
+                    className="form-input w-full"
                     placeholder="e.g. 24"
                   />
                 </div>
@@ -284,7 +283,7 @@ export function ProductForm({
                   <input
                     name="leg_length_inch"
                     defaultValue={initial?.leg_length_inch ?? ''}
-                    className="input"
+                    className="form-input w-full"
                     placeholder='e.g. 8"'
                   />
                 </div>
@@ -296,7 +295,7 @@ export function ProductForm({
 
       {/* PRICING */}
       <div className="card p-6">
-        <div className="font-head font-bold mb-4">Pricing & reorder</div>
+        <div className="section-title mb-16">Pricing & reorder</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs uppercase tracking-wider text-muted mb-2">
@@ -308,7 +307,7 @@ export function ProductForm({
               step="0.01"
               min="0"
               defaultValue={initial?.cost_price ?? ''}
-              className="input font-mono"
+              className="form-input w-full font-mono"
             />
           </div>
           <div>
@@ -321,7 +320,7 @@ export function ProductForm({
               step="0.01"
               min="0"
               defaultValue={initial?.selling_price ?? ''}
-              className="input font-mono"
+              className="form-input w-full font-mono"
             />
           </div>
           <div>
@@ -333,7 +332,7 @@ export function ProductForm({
               type="number"
               min="0"
               defaultValue={initial?.reorder_point ?? ''}
-              className="input font-mono"
+              className="form-input w-full font-mono"
               placeholder="Alert when stock < this"
             />
           </div>
@@ -341,22 +340,22 @@ export function ProductForm({
       </div>
 
       {mode === 'edit' && (
-        <div className="card p-6 border-amber-500/50">
-          <div className="font-head font-bold mb-2 text-amber-600">⚠ Stock Adjustment</div>
+        <div className="card p-6" style={{ borderColor: 'rgba(240,192,64,0.45)' }}>
+          <div className="section-title mb-6" style={{ color: 'var(--accent)' }}>Stock Adjustment</div>
           <div className="text-sm text-muted mb-4">
             Changing stock here creates an adjustment record. Prefer using receipts or production for normal changes.
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-                Current Stock (PCS or units)
+                Current Stock
               </label>
               <input
                 name="current_stock"
                 type="number"
                 step="0.01"
                 defaultValue={initial?.currentStock ?? 0}
-                className="input font-mono"
+                className="form-input w-full font-mono"
               />
             </div>
             <div>
@@ -367,7 +366,7 @@ export function ProductForm({
                 name="adjustment_reason"
                 type="text"
                 placeholder="Required only when stock changes"
-                className="input"
+                className="form-input w-full"
               />
             </div>
           </div>

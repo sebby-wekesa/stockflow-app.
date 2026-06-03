@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ProductForm } from '@/app/(dashboard)/products/_components/product-form'
 import { updateProduct } from '@/actions/products'
@@ -39,30 +40,33 @@ export default function EditProductClient({ product, initialForForm }: Props) {
       <div className="section-header mb-16">
         <div>
           <div className="section-title">Edit Product</div>
-          <div className="section-sub">Update product details and settings</div>
+          <div className="section-sub">
+            {product.sku || product.id.slice(0, 8)} · {product.name}
+          </div>
         </div>
+        <Link href="/products" className="btn btn-ghost">
+          Back to products
+        </Link>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="mb-16 p-3 rounded-md bg-red/10 border border-red/30 text-red text-sm">
           {error}
         </div>
       )}
 
       {success ? (
-        <div className="bg-teal-50 border-l-4 border-teal-400 p-4 mb-6">
-          <p className="text-sm text-teal-800">
+        <div className="mb-16 p-3 rounded-md bg-teal/10 border border-teal/30 text-teal text-sm">
+          <p>
             Product updated successfully! Redirecting to product list...
           </p>
         </div>
       ) : (
-        <div className="card">
-          <ProductForm 
-            mode="edit" 
-            initial={initialForForm ?? product} 
-            action={handleUpdate} 
-          />
-        </div>
+        <ProductForm
+          mode="edit"
+          initial={initialForForm ?? product}
+          action={handleUpdate}
+        />
       )}
     </div>
   )

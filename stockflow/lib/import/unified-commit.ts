@@ -2,6 +2,7 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
+import { normalizeProductUom } from '@/lib/products'
 import type { ParsedWorkbookResult } from './specialized-parsers'
 import type { UnifiedDataBundle } from './unified-parser'
 
@@ -41,7 +42,7 @@ export function bundleToParsedWorkbookResult(bundle: UnifiedDataBundle): ParsedW
 
   const products = bundle.products.map((p) => ({
     name: toUpperTrim(p.name),
-    uom: (p.uom ?? 'PCS').trim() || 'PCS',
+    uom: normalizeProductUom(p.uom) ?? 'PCS',
     opening_stock: Number(p.opening_stock) || 0,
     current_stock: Number(p.current_stock) || 0,
     location,

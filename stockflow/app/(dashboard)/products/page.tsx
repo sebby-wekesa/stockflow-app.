@@ -182,6 +182,7 @@ export default async function ProductsPage({
                 <th>Category</th>
                 <th>Origin</th>
                 <th>UOM</th>
+                <th>Pieces / Sets</th>
                 <th>Current Stock</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -190,7 +191,7 @@ export default async function ProductsPage({
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={9} className="py-12 text-center text-muted text-sm">
                     {q || origin || category ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -230,6 +231,12 @@ export default async function ProductsPage({
                        </span>
                      </td>
                     <td className="text-sm uppercase">{p.uom}</td>
+                    <td className="font-mono text-sm">
+                      {p.currentStock.toLocaleString()}{' '}
+                      <span className="text-muted">
+                        {p.uom === 'SETS' ? (p.currentStock === 1 ? 'set' : 'sets') : (p.currentStock === 1 ? 'piece' : 'pieces')}
+                      </span>
+                    </td>
                     <td className="font-mono text-sm">
                       {p.currentStock.toLocaleString()}
                     </td>

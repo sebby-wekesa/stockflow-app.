@@ -1,5 +1,20 @@
 import type { ProductCategory, ProductType, StockOrigin } from '@prisma/client'
 
+export const PRODUCT_UOMS = ['PCS', 'SETS'] as const
+export type ProductUom = (typeof PRODUCT_UOMS)[number]
+
+export const PRODUCT_UOM_LABELS: Record<ProductUom, string> = {
+  PCS: 'Pieces (PCS)',
+  SETS: 'Sets',
+}
+
+export function normalizeProductUom(value: unknown): ProductUom | null {
+  const normalized = String(value ?? 'PCS').trim().toUpperCase()
+  if (['PCS', 'PC', 'PIECE', 'PIECES'].includes(normalized)) return 'PCS'
+  if (['SET', 'SETS'].includes(normalized)) return 'SETS'
+  return null
+}
+
 // Display labels for the 5 categories
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   springs: 'Springs',

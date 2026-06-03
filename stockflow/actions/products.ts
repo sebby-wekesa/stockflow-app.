@@ -7,6 +7,7 @@ import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import type { ProductCategory, StockOrigin } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { normalizeProductUom } from '@/lib/products'
 
 /** Returns the auth user if role is ADMIN or MANAGER, else throws. */
 async function requireProductManager(): Promise<AuthUser> {
@@ -29,7 +30,13 @@ const createSchema = z.object({
     'center_bolts',
   ]),
   origin: z.enum(['FACTORY_MADE', 'LOCAL_PURCHASE', 'IMPORTED']).default('FACTORY_MADE'),
-  uom: z.string().min(1).max(20).default('PCS'),
+  uom: z.preprocess(
+    (value) => normalizeProductUom(value),
+    z.enum(['PCS', 'SETS'], {
+      invalid_type_error: 'UOM must be PCS or SETS',
+      required_error: 'UOM must be PCS or SETS',
+    })
+  ),
   cost_price: z.coerce.number().nonnegative().optional().nullable(),
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
   reorder_point: z.coerce.number().int().nonnegative().optional().nullable(),
@@ -107,7 +114,7 @@ export async function createProduct(formData: FormData) {
           name: parsed.data.canonical_name,
           category: parsed.data.category as ProductCategory,
           origin: parsed.data.origin as StockOrigin,
-          uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
+          uom: parsed.data.uom,
           unitCost: parsed.data.cost_price ?? null,
           vendor: parsed.data.vendor ?? null,
           reorderLevel: parsed.data.reorder_point ?? null,
@@ -185,7 +192,7 @@ export async function updateProduct(productId: string, formData: FormData) {
         name: parsed.data.canonical_name,
         category: parsed.data.category as ProductCategory,
         origin: parsed.data.origin as StockOrigin,
-        uom: parsed.data.uom?.toUpperCase() ?? 'PCS',
+        uom: parsed.data.uom,
         unitCost: parsed.data.cost_price ?? null,
         vendor: parsed.data.vendor ?? null,
         reorderLevel: parsed.data.reorder_point ?? null,
