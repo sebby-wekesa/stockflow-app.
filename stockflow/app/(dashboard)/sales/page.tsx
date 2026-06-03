@@ -33,7 +33,7 @@ export default async function SalesPage({
     ]
   }
 
-   const [orders, total] = await Promise.all([
+   const [orders, total, finishedGoodsStock, finishedGoodsDesigns] = await Promise.all([
      db.saleOrder.findMany({
        where,
        orderBy: { createdAt: 'desc' },
@@ -45,7 +45,21 @@ export default async function SalesPage({
        },
      }),
      db.saleOrder.count({ where }),
+     db.finishedGoods.aggregate({
+       _sum: {
+         kgProduced: true,
+         quantity: true,
+       },
+     }),
+     db.finishedGoods.findMany({
+       distinct: ['designId'],
+       select: { designId: true },
+     }),
    ])
+
+   const finishedGoodsKg = Number(finishedGoodsStock._sum.kgProduced ?? 0)
+   const finishedGoodsUnits = Number(finishedGoodsStock._sum.quantity ?? 0)
+   const finishedGoodsDesignCount = finishedGoodsDesigns.length
    
     // Calculate summary by branch
     const branchCountMap: Record<string, number> = {}
@@ -93,12 +107,12 @@ export default async function SalesPage({
             <div className="section-header mb-16"><div className="section-title">Available stock</div><Link href="/catalogue" className="btn btn-ghost btn-sm">View catalogue</Link></div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px'}}>
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius)',padding:'14px',textAlign:'center'}}>
-                <div style={{fontFamily:'var(--font-mono)',fontSize:'20px',color:'var(--teal)',marginBottom:'4px'}}>1,340 kg</div>
+                <div style={{fontFamily:'var(--font-mono)',fontSize:'20px',color:'var(--teal)',marginBottom:'4px'}}>{finishedGoodsKg.toLocaleString()} kg</div>
                 <div style={{fontSize:'11px',color:'var(--muted)'}}>Finished goods ready</div>
               </div>
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius)',padding:'14px',textAlign:'center'}}>
-                <div style={{fontFamily:'var(--font-mono)',fontSize:'20px',color:'var(--teal)',marginBottom:'4px'}}>247 units</div>
-                <div style={{fontSize:'11px',color:'var(--muted)'}}>Across 6 designs</div>
+                <div style={{fontFamily:'var(--font-mono)',fontSize:'20px',color:'var(--teal)',marginBottom:'4px'}}>{finishedGoodsUnits.toLocaleString()} units</div>
+                <div style={{fontSize:'11px',color:'var(--muted)'}}>Across {finishedGoodsDesignCount.toLocaleString()} designs</div>
               </div>
             </div>
           </div>

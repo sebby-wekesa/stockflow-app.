@@ -8,7 +8,7 @@ export default async function CataloguePage() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
-  const [finishedGoods, generalProducts, designs] = await Promise.all([
+  const [finishedGoods, generalProducts] = await Promise.all([
     db.finishedGoods.findMany({
       where: { quantity: { gt: 0 } },
       include: { design: true },
@@ -17,17 +17,6 @@ export default async function CataloguePage() {
     db.product.findMany({
       where: { currentStock: { gt: 0 } },
       select: { id: true, name: true, sku: true, currentStock: true, uom: true, origin: true, unitCost: true, createdAt: true },
-    }),
-    db.design.findMany({
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true,
-        targetWeight: true,
-        createdAt: true,
-      },
-      orderBy: { name: 'asc' },
     }),
   ]);
 
@@ -61,22 +50,7 @@ export default async function CataloguePage() {
      source: 'product' as const,
    }));
 
-  const madeToOrder = designs.map(d => ({
-    id: d.id,
-    designId: d.id,
-    design: {
-      name: d.name,
-      code: d.code,
-      description: d.description ?? undefined,
-    },
-    quantity: 999999,
-    kgProduced: d.targetWeight ? Number(d.targetWeight) : 0,
-    price: null,
-    createdAt: d.createdAt.toISOString(),
-    source: 'design' as const,
-  }));
-
-  const catalogueProducts = [...manufactured, ...madeToOrder, ...others];
+  const catalogueProducts = [...manufactured, ...others];
 
   return <CatalogueClient products={catalogueProducts} />;
 }
