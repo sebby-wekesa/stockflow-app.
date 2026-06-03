@@ -3,9 +3,10 @@ import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { withRetry } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import { CATEGORY_LABELS, CATEGORY_SHORT, CATEGORY_BADGE_CLASS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
+import { CATEGORY_LABELS, ORIGIN_BADGE_CLASS, ORIGIN_SHORT } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
+import { ProductCategorySelect } from './_components/product-category-select'
 
 export const dynamic = 'force-dynamic';
 
@@ -217,9 +218,11 @@ export default async function ProductsPage({
                     </td>
                      <td className="truncate max-w-xs">{p.name}</td>
                      <td>
-                       <span className={`badge ${CATEGORY_BADGE_CLASS[p.category] || 'badge-muted'}`}>
-                         {CATEGORY_SHORT[p.category] || p.category}
-                       </span>
+                       <ProductCategorySelect
+                         productId={p.id}
+                         category={p.category}
+                         canEdit={user.role === 'ADMIN' || user.role === 'MANAGER'}
+                       />
                      </td>
                      <td>
                        <span className={`badge ${ORIGIN_BADGE_CLASS[p.origin] || 'badge-muted'}`}>

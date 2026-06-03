@@ -50,6 +50,16 @@ const updateSchema = createSchema.extend({
   adjustment_reason: z.string().max(500).optional().nullable(),
 })
 
+const updateCategorySchema = z.object({
+  category: z.enum([
+    'springs',
+    'ubolts',
+    'trailer_parts',
+    'break_linings',
+    'center_bolts',
+  ]),
+})
+
 function extractForm(formData: FormData) {
   return {
     product_code: formData.get('product_code'),
@@ -195,6 +205,30 @@ export async function updateProduct(productId: string, formData: FormData) {
       })
     }
   }, { maxWait: 10000, timeout: 30000 })
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+}
+
+export async function updateProductCategory(productId: string, category: ProductCategory) {
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
+  const parsed = updateCategorySchema.safeParse({ category })
+  if (!parsed.success) {
+    throw new Error('Invalid product category')
+  }
+
+  const product = await db.product.findFirst({
+    where: { id: productId },
+    select: { id: true },
+  })
+  if (!product) throw new Error('Product not found')
+
+  await db.product.update({
+    where: { id: productId },
+    data: { category: parsed.data.category as ProductCategory },
+  })
 
   revalidatePath('/products')
   revalidatePath(`/products/${productId}`)
