@@ -14,6 +14,7 @@ const PUBLIC_ROUTES = [
   '/signup',
   '/auth/callback',
   '/auth/auth-code-error',
+  '/accept-invite',
   '/forgot-password',
   '/reset-password',
   '/set-password',
@@ -28,6 +29,7 @@ const STATUS_ROUTES = [
   '/account-suspended',
   '/account-closed',
   '/signup',
+  '/accept-invite',
   '/set-password',
 ]
 
