@@ -3,8 +3,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { StockOrigin } from '@prisma/client'
-import { updateProductOrigin, updateProductPiecesSets } from '@/actions/products'
+import { updateProductBranch, updateProductOrigin, updateProductPiecesSets } from '@/actions/products'
 import { ORIGIN_LABELS } from '@/lib/products'
+import { ALL_BRANCHES, BRANCH_LABELS, type BranchCode } from '@/lib/branches'
 
 type ProductOriginSelectProps = {
   productId: string
@@ -50,6 +51,65 @@ export function ProductOriginSelect({ productId, origin, canEdit }: ProductOrigi
         {Object.entries(ORIGIN_LABELS).map(([key, label]) => (
           <option key={key} value={key}>
             {label}
+          </option>
+        ))}
+      </select>
+      {error && <div className="mt-1 text-xs text-red">{error}</div>}
+    </div>
+  )
+}
+
+type ProductBranchSelectProps = {
+  productId: string
+  branch: BranchCode | null
+  branchLabel: string
+  canEdit: boolean
+}
+
+export function ProductBranchSelect({
+  productId,
+  branch,
+  branchLabel,
+  canEdit,
+}: ProductBranchSelectProps) {
+  const router = useRouter()
+  const [selectedBranch, setSelectedBranch] = useState<BranchCode | ''>(branch ?? '')
+  const [error, setError] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  if (!canEdit) {
+    return <span>{branchLabel}</span>
+  }
+
+  function handleChange(nextBranch: BranchCode) {
+    const previousBranch = selectedBranch
+    setSelectedBranch(nextBranch)
+    setError('')
+
+    startTransition(async () => {
+      try {
+        await updateProductBranch(productId, nextBranch)
+        router.refresh()
+      } catch (err) {
+        setSelectedBranch(previousBranch)
+        setError(err instanceof Error ? err.message : 'Could not update branch')
+      }
+    })
+  }
+
+  return (
+    <div className="min-w-[140px]">
+      <select
+        aria-label="Product branch"
+        value={selectedBranch}
+        disabled={isPending}
+        onChange={(event) => handleChange(event.target.value as BranchCode)}
+        className="form-input w-full py-1.5 text-xs"
+      >
+        <option value="" disabled>Assign branch</option>
+        {ALL_BRANCHES.map((option) => (
+          <option key={option} value={option}>
+            {BRANCH_LABELS[option]}
           </option>
         ))}
       </select>

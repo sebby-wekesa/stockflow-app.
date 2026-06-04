@@ -7,7 +7,7 @@ import { CATEGORY_LABELS } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
-import { ProductOriginSelect, ProductPiecesSetsInput } from './_components/product-inline-selects'
+import { ProductBranchSelect, ProductOriginSelect, ProductPiecesSetsInput } from './_components/product-inline-selects'
 import { ALL_BRANCHES, BRANCH_LABELS, normalizeBranchCode, type BranchCode } from '@/lib/branches'
 
 export const dynamic = 'force-dynamic';
@@ -217,7 +217,6 @@ export default async function ProductsPage({
 
       <form className="mb-16 flex gap-2 items-end">
         {origin && <input type="hidden" name="origin" value={origin} />}
-        {selectedBranch && <input type="hidden" name="branch" value={selectedBranch} />}
         <div className="form-group max-w-md flex-1">
           <label className="form-label">Search</label>
           <input
@@ -239,11 +238,22 @@ export default async function ProductsPage({
             ))}
           </select>
         </div>
+        <div className="form-group" style={{minWidth:'180px'}}>
+          <label className="form-label">Branch</label>
+          <select name="branch" defaultValue={selectedBranch ?? ''} className="form-input">
+            <option value="">All branches</option>
+            {ALL_BRANCHES.map((branch) => (
+              <option key={branch} value={branch}>
+                {BRANCH_LABELS[branch]}
+              </option>
+            ))}
+          </select>
+        </div>
         <button type="submit" className="btn btn-primary h-[42px]">
           Search
         </button>
-        {(q || category) && (
-          <Link href={buildHref({ q: '', category: '', page: 1 })} className="btn btn-ghost h-[42px]">
+        {(q || category || selectedBranch) && (
+          <Link href={buildHref({ q: '', category: '', branch: '', page: 1 })} className="btn btn-ghost h-[42px]">
             Clear
           </Link>
         )}
@@ -325,14 +335,19 @@ export default async function ProductsPage({
                       <span className="badge badge-muted">KG</span>
                     </td>
                     <td>
-                      <span className="badge badge-blue">
-                        {(() => {
-                          const code = p.Branch
-                            ? normalizeBranchCode(p.Branch.code, p.Branch.name, p.Branch.location)
-                            : null
-                          return code ? BRANCH_LABELS[code] : p.Branch?.name ?? 'Unassigned'
-                        })()}
-                      </span>
+                      {(() => {
+                        const code = p.Branch
+                          ? normalizeBranchCode(p.Branch.code, p.Branch.name, p.Branch.location)
+                          : null
+                        return (
+                          <ProductBranchSelect
+                            productId={p.id}
+                            branch={code}
+                            branchLabel={code ? BRANCH_LABELS[code] : p.Branch?.name ?? 'Unassigned'}
+                            canEdit={canEditProducts}
+                          />
+                        )
+                      })()}
                     </td>
                     <td className="font-mono text-sm">
                       {p.currentStock.toLocaleString()} <span className="text-muted">kg</span>

@@ -301,6 +301,32 @@ export async function updateProductOrigin(productId: string, origin: StockOrigin
   revalidatePath(`/products/${productId}`)
 }
 
+export async function updateProductBranch(productId: string, branchCode: BranchCode) {
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
+  if (!ALL_BRANCHES.includes(branchCode)) {
+    throw new Error('Invalid branch')
+  }
+
+  const [product, branch] = await Promise.all([
+    db.product.findFirst({
+      where: { id: productId },
+      select: { id: true },
+    }),
+    resolveProductBranch(db, branchCode),
+  ])
+  if (!product) throw new Error('Product not found')
+
+  await db.product.update({
+    where: { id: productId },
+    data: { branchId: branch.id },
+  })
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+}
+
 export async function updateProductUom(productId: string, uom: string) {
   const user = await requireProductManager()
   const db = getTenantPrisma(user.organizationId)
