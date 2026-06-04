@@ -22,6 +22,12 @@ export async function GET(request: Request) {
      orderBy: { createdAt: 'desc' },
      include: {
        SaleItem: { include: { FinishedGoods: { include: { design: true } } } },
+       createdByUser: {
+         select: {
+           name: true,
+           Branch: { select: { name: true } },
+         },
+       },
      },
    })
 
@@ -30,14 +36,16 @@ export async function GET(request: Request) {
     order.SaleItem.map((line) => ({
       invoice_date: new Date(order.createdAt).toISOString().slice(0, 10),
       invoice_number: order.id,
-      branch: 'mombasa', // assume
+      branch: order.createdByUser?.Branch?.name ?? 'Unassigned',
       customer: order.customerName,
       product_code: line.FinishedGoods.sku,
-      product_name: line.FinishedGoods.design.name, // assume
+      product_name: line.FinishedGoods.design.name,
       qty: line.quantity,
+      uom: 'pcs',
       unit_price: Number(line.unitPrice),
       total: Number(line.totalPrice),
       notes: '',
+      recorded_by: order.createdByUser?.name ?? 'System',
     }))
   )
 
