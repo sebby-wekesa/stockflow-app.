@@ -192,6 +192,47 @@ export async function verifyUser(userId: string) {
   }
 }
 
+export async function resendInvitation(userId: string) {
+  try {
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
+    const adminClient = getSupabaseAdmin();
+
+    if (!adminClient) {
+      return { success: false, error: "Supabase admin client is not configured." };
+    }
+
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: currentUser.organizationId },
+      select: { email: true, name: true, role: true },
+    });
+    if (!user) {
+      return { success: false, error: "User not found in this organization." };
+    }
+
+    const { error } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
+      redirectTo: getAuthCallbackUrl(),
+      data: {
+        name: user.name,
+        role: user.role,
+        organizationId: currentUser.organizationId,
+      },
+    });
+
+    if (error) {
+      return { success: false, error: `Could not resend invitation: ${error.message}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Resend invitation error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Could not resend invitation.",
+    };
+  }
+}
+
 export async function linkAndVerifyAuthUser(authUserId: string) {
   try {
     const currentUser = await assertAdminAccess();

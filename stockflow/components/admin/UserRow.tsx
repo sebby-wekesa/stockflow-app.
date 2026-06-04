@@ -6,6 +6,7 @@ import {
   deleteUser,
   updateUser,
   verifyUser,
+  resendInvitation,
   linkAndVerifyAuthUser,
   verifyAuthUserEmail,
 } from "@/app/actions/users";
@@ -87,6 +88,22 @@ export function UserRow({ user }: UserRowProps) {
     });
   };
 
+  const handleResendInvitation = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await resendInvitation(user.id);
+        if (!result.success) {
+          setError(result.error || "Failed to resend invitation.");
+          return;
+        }
+        setError("A new invitation email was sent.");
+      } catch (err) {
+        setError((err as Error).message || "Failed to resend invitation.");
+      }
+    });
+  };
+
   const handleEdit = () => {
     const newName = prompt("Enter new name:", user.name || "");
     if (newName === null) return;
@@ -161,6 +178,20 @@ export function UserRow({ user }: UserRowProps) {
         >
           {user.isVerified ? 'Verified' : isPending ? 'Verifying...' : 'Verify'}
         </button>
+        {!user.isVerified && (
+          <button
+            disabled={isPending}
+            onClick={handleResendInvitation}
+            className="btn btn-ghost"
+            style={{
+              padding: '4px 8px',
+              fontSize: '11px',
+              fontWeight: 600
+            }}
+          >
+            {isPending ? 'Sending...' : 'Resend invite'}
+          </button>
+        )}
         <button
           disabled={isPending}
           onClick={handleDelete}
