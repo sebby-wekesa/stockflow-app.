@@ -29,30 +29,34 @@ export default async function ImportCentrePage() {
         <div>
           <div className="section-title">Import Centre</div>
           <div className="section-sub">
-            Upload Excel files. Aliases auto-resolve product names against the master.
+            Upload and review sales, product master, and branch stock files.
           </div>
         </div>
         <Link href="/import/history" className="btn btn-ghost">
-          History
+          Import history
         </Link>
       </div>
 
       {/* PENDING SPECIALIZED PREVIEWS */}
       {specializedPreviews.length > 0 && (
         <div className="card mb-16">
-          <div className="section-header mb-6">
-            <div className="section-title">Awaiting Commit</div>
+          <div className="section-header mb-16">
+            <div>
+              <div className="section-title">Awaiting Commit</div>
+              <div className="section-sub">Review parsed files before adding them to StockFlow</div>
+            </div>
+            <span className="badge badge-amber">{specializedPreviews.length} pending</span>
           </div>
-          <div className="space-y-3">
+          <div className="import-batch-list">
             {specializedPreviews.map((b) => (
               <Link
                 key={b.id}
                 href={`/import/specialized/${b.id}`}
-                className="flex items-center justify-between p-4 bg-surface2 rounded-lg hover:bg-surface transition-colors border border-border"
+                className="card-sm import-batch-row"
               >
-                <div>
-                  <div className="font-medium">{b.file_name}</div>
-                  <div className="text-sm text-muted mt-1">
+                <div className="import-batch-copy">
+                  <div className="import-batch-name">{b.file_name}</div>
+                  <div className="section-sub">
                     {b.row_count} rows · {b.sheet_type} · {b.User.name} ·{' '}
                     {new Date(b.created_at).toLocaleString()}
                   </div>
@@ -67,19 +71,23 @@ export default async function ImportCentrePage() {
       {/* IN-PROGRESS GENERIC IMPORTS */}
       {inProgress.length > 0 && (
         <div className="card mb-16">
-          <div className="section-header mb-6">
-            <div className="section-title">In Progress</div>
+          <div className="section-header mb-16">
+            <div>
+              <div className="section-title">In Progress</div>
+              <div className="section-sub">Continue imports that still need attention</div>
+            </div>
+            <span className="badge badge-purple">{inProgress.length} active</span>
           </div>
-          <div className="space-y-3">
+          <div className="import-batch-list">
             {inProgress.map((b) => (
               <Link
                 key={b.id}
                 href={`/import/${b.id}`}
-                className="flex items-center justify-between p-4 bg-surface2 rounded-lg hover:bg-surface transition-colors border border-border"
+                className="card-sm import-batch-row"
               >
-                <div>
-                  <div className="font-medium">{b.file_name}</div>
-                  <div className="text-sm text-muted mt-1">
+                <div className="import-batch-copy">
+                  <div className="import-batch-name">{b.file_name}</div>
+                  <div className="section-sub">
                     {b.row_count} rows · {b.sheet_type} · {b.User.name} ·{' '}
                     {new Date(b.created_at).toLocaleString()}
                   </div>
@@ -93,19 +101,16 @@ export default async function ImportCentrePage() {
 
       {/* IMPORT FORMS */}
       <div className="card">
-        <div className="section-header mb-8">
-          <div className="section-title">Import Files</div>
-          <div className="section-sub">
-            Handles QuickBooks sales, Springs/U-bolt master sheets, and branch consumables stock.
-          </div>
-        </div>
-
-        <div className="space-y-12">
+        <div className="section-header mb-16">
           <div>
-            <div className="font-medium mb-4 text-sm text-muted">QUICK IMPORT</div>
-            <QuickImportForm assignedBranchName={user.branches[0]?.name ?? null} />
+            <div className="section-title">New Import</div>
+            <div className="section-sub">
+              Select the file type, confirm your branch, then upload an Excel or CSV file.
+            </div>
           </div>
+          <span className="badge badge-muted">Excel · CSV</span>
         </div>
+        <QuickImportForm assignedBranchName={user.branches[0]?.name ?? null} />
       </div>
     </div>
   )

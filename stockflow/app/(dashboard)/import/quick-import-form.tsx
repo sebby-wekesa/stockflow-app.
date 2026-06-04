@@ -89,10 +89,10 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
         const data = new Uint8Array(ev.target?.result as ArrayBuffer)
         const wb = XLSX.read(data, { type: 'array' })
         const firstSheet = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as any[][]
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }) as unknown[][]
         if (rows.length === 0) return
 
-        const header = rows[0].map((c: any) => String(c || '').trim().toLowerCase())
+        const header = rows[0].map((cell) => String(cell || '').trim().toLowerCase())
 
         const has = (name: string) => header.some((h: string) => h.includes(name))
 
@@ -154,22 +154,22 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card p-6">
+    <form onSubmit={handleSubmit} className="import-form">
       {error && (
-        <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="import-alert import-alert-error">
           {error}
         </div>
       )}
 
-      <div className="mb-4">
-        <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+      <div className="form-group">
+        <div className="form-label">
           What kind of file is this?
-        </label>
-        <div className="space-y-2">
+        </div>
+        <div className="import-type-grid">
           {SHEET_TYPES.map((opt) => (
             <label
               key={opt.value}
-              className="flex items-start gap-3 p-3 rounded-md border border-border hover:border-border2 cursor-pointer has-[:checked]:border-accent has-[:checked]:bg-accent/5"
+              className={`card-sm import-type-option ${sheetType === opt.value ? 'selected' : ''}`}
             >
               <input
                 type="radio"
@@ -177,50 +177,52 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
                 value={opt.value}
                 checked={sheetType === opt.value}
                 onChange={() => setSheetType(opt.value)}
-                className="mt-1"
               />
-              <div>
-                <div className="font-medium text-sm">{opt.label}</div>
-                <div className="text-xs text-muted mt-0.5">{opt.description}</div>
+              <div className="import-type-copy">
+                <div className="import-type-name">{opt.label}</div>
+                <div className="section-sub">{opt.description}</div>
               </div>
             </label>
           ))}
         </div>
       </div>
 
-      <div className="mb-4 p-3 rounded-md bg-surface2 border border-border">
-        <div className="text-xs uppercase tracking-wider text-muted">Import branch</div>
-        <div className="font-medium mt-1">
-          {assignedBranchName ?? 'No branch assigned'}
+      <div className="card-sm import-branch">
+        <div>
+          <div className="form-label">Import branch</div>
+          <div className="import-branch-name">
+            {assignedBranchName ?? 'No branch assigned'}
+          </div>
+          <div className="section-sub">
+            Imported data is automatically assigned to your user branch.
+          </div>
         </div>
-        <div className="text-xs text-muted mt-1">
-          Imported data is automatically assigned to your user branch.
-        </div>
+        <span className={`badge ${assignedBranchName ? 'badge-teal' : 'badge-red'}`}>
+          {assignedBranchName ? 'Assigned' : 'Required'}
+        </span>
       </div>
 
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          file ? 'border-teal bg-teal/5' : 'border-border2 bg-surface2 hover:border-accent'
-        }`}
+        className={`import-dropzone ${file ? 'ready' : ''}`}
       >
         {file ? (
           <div>
-            <div className="font-mono font-medium text-teal">{file.name}</div>
-            <div className="text-xs text-muted mt-1">
+            <div className="import-file-name">{file.name}</div>
+            <div className="section-sub">
               {(file.size / 1024 / 1024).toFixed(2)} MB · ready
             </div>
             <button
               type="button"
               onClick={() => setFile(null)}
-              className="text-xs text-muted hover:text-text underline mt-3"
+              className="btn btn-ghost btn-sm import-change-file"
             >
-              choose a different file
+              Choose a different file
             </button>
           </div>
         ) : (
-          <label className="cursor-pointer block">
-            <div className="text-sm font-medium mb-1">Click to choose Excel file</div>
-            <div className="text-xs text-muted">.xlsx, .xls, or .csv</div>
+          <label className="import-file-picker">
+            <span className="btn btn-ghost">Choose file</span>
+            <span className="section-sub">Accepted formats: .xlsx, .xls, or .csv</span>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -231,9 +233,12 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
         )}
       </div>
 
-      <div className="flex justify-end mt-6">
+      <div className="import-form-actions">
+        <div className="section-sub">
+          You will review parsed rows before anything is committed.
+        </div>
         <button type="submit" disabled={isPending || !file || !assignedBranchName} className="btn btn-primary">
-          {isPending ? 'Parsing file...' : 'Parse & preview →'}
+          {isPending ? 'Parsing file...' : 'Parse & preview'}
         </button>
       </div>
     </form>

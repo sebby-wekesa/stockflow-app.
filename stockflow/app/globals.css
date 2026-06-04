@@ -148,6 +148,37 @@ tr:hover td { background: var(--surface2); }
 .form-input:focus { outline: none; border-color: var(--accent); }
 select.form-input option { background: var(--surface2); }
 
+/* IMPORT CENTRE */
+.import-batch-list { display: flex; flex-direction: column; gap: 8px; }
+.import-batch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; transition: border-color 0.15s, background 0.15s; }
+.import-batch-row:hover { background: var(--surface2); border-color: var(--border2); }
+.import-batch-copy { min-width: 0; }
+.import-batch-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-form { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.import-type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.import-type-option { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.import-type-option:hover { border-color: var(--border2); background: var(--surface2); }
+.import-type-option.selected { border-color: var(--accent); background: rgba(240,192,64,0.06); }
+.import-type-option input { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; }
+.import-type-copy { min-width: 0; }
+.import-type-name { font-size: 13px; font-weight: 600; }
+.import-branch { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--surface2); }
+.import-branch-name { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.import-alert { border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; }
+.import-alert-error { background: rgba(224,85,85,0.12); border: 1px solid rgba(224,85,85,0.35); color: var(--red); }
+.import-dropzone { min-height: 140px; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; background: var(--surface2); border: 1px dashed var(--border2); border-radius: var(--radius); transition: border-color 0.15s, background 0.15s; }
+.import-dropzone:hover { border-color: var(--accent); }
+.import-dropzone.ready { border-color: rgba(46,196,160,0.55); background: rgba(46,196,160,0.05); }
+.import-file-picker { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+.import-file-name { color: var(--teal); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+.import-change-file { margin-top: 12px; }
+.import-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+@media (max-width: 760px) {
+  .import-type-grid { grid-template-columns: 1fr; }
+  .import-batch-row, .import-branch, .import-form-actions { align-items: flex-start; flex-direction: column; }
+}
+
 /* PROCESS STAGE BUILDER */
 .stage-builder { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); }
 .stage-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }

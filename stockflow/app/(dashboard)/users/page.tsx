@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { requireActiveAuth } from "@/lib/auth";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import type { UserRole } from "@/lib/types";
@@ -34,7 +35,7 @@ type AuthOnlyUser = {
   organizationName: string | null;
 };
 
-async function getUsers() {
+async function getUsers(query: string) {
   try {
     const user = await requireActiveAuth();
     const db = getTenantPrisma(user.organizationId);
@@ -75,7 +76,7 @@ async function getUsers() {
       : [];
     const authUsersById = new Map(authUsers);
 
-    return users.map(user => ({
+    const enrichedUsers = users.map(user => ({
       id: user.id,
       email: user.email,
       name: user.name,
@@ -87,6 +88,29 @@ async function getUsers() {
       branchId: user.branchId,
       Branch: user.Branch,
     })) as AdminUserRow[];
+
+    if (!query) return enrichedUsers;
+
+    const normalizedQuery = query.toLowerCase();
+
+    return enrichedUsers.filter((user) => {
+      const status = [
+        user.authMissing ? "missing auth" : user.isVerified ? "verified" : "unverified",
+        isUserOnline(user.lastSeenAt) ? "online" : "offline",
+      ];
+      const branch = user.Branch
+        ? BRANCH_LABELS[user.Branch.code as keyof typeof BRANCH_LABELS] || user.Branch.code
+        : "no branch";
+
+      return [
+        user.name || "unnamed user",
+        user.email,
+        user.role,
+        user.department || "",
+        branch,
+        ...status,
+      ].some((value) => value.toLowerCase().includes(normalizedQuery));
+    });
   } catch (error) {
     console.error('Failed to fetch users:', error);
     return [] as AdminUserRow[];
@@ -164,7 +188,13 @@ async function getAuthOnlyUsers(): Promise<AuthOnlyUser[]> {
   }
 }
 
-export default async function UsersPage() {
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const params = await searchParams;
+  const query = (params.q || "").trim();
   const user = await requireActiveAuth();
 
   if (!user) {
@@ -175,7 +205,7 @@ export default async function UsersPage() {
     redirect("/unauthorized");
   }
 
-  const users = await getUsers();
+  const users = await getUsers(query);
   const authOnlyUsers = await getAuthOnlyUsers();
 
   return (
@@ -187,6 +217,22 @@ export default async function UsersPage() {
         </div>
         <InviteUserModal />
       </div>
+
+      <form action="/users" className="card mb-16" style={{ display: "flex", gap: "12px", alignItems: "end" }}>
+        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+          <label className="form-label" htmlFor="user-search">Search users</label>
+          <input
+            id="user-search"
+            name="q"
+            type="search"
+            className="form-input"
+            defaultValue={query}
+            placeholder="Search by name, email, role, branch, department, or status"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary">Search</button>
+        {query && <Link href="/users" className="btn btn-ghost">Clear</Link>}
+      </form>
 
       <div className="card">
         <div className="table-wrap">
@@ -272,14 +318,14 @@ export default async function UsersPage() {
                     color: 'var(--muted)',
                     margin: '0'
                   }}>
-                    No users found
+                    {query ? `No users match "${query}"` : "No users found"}
                   </p>
                   <p style={{
                     fontSize: '12px',
                     color: 'var(--muted)',
                     marginTop: '4px'
                   }}>
-                    Invite your first team member to get started
+                    {query ? "Try a different search term" : "Invite your first team member to get started"}
                   </p>
                 </td>
               </tr>
