@@ -263,7 +263,7 @@ export async function getSalesOrders(role?: string, limit?: number) {
 
   // Sales staff see their own orders, admins/managers see all
   const whereClause = effectiveRole === 'SALES'
-    ? { /* Would need user relation - for now show all */ }
+    ? { createdBy: user.id }
     : {};
 
   const orders = await db.saleOrder.findMany({

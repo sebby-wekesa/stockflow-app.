@@ -286,8 +286,42 @@ select.form-input option { background: var(--surface2); }
 .operator-open { margin-left: auto; color: var(--accent); font-weight: 600; }
 .operator-empty { padding: 42px 20px; text-align: center; background: var(--surface2); border: 1px dashed var(--border2); border-radius: var(--radius-sm); }
 
+/* SALES WORKSPACE */
+.sales-page { max-width: 1280px; margin: 0 auto; }
+.sales-money { font-size: 21px; line-height: 1.3; overflow-wrap: anywhere; }
+.sales-dashboard-grid { margin-bottom: 16px; }
+.sales-pipeline, .sales-actions { display: flex; flex-direction: column; gap: 8px; }
+.sales-pipeline-row, .sales-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sales-pipeline-row:hover, .sales-action-card:hover { background: #222428; border-color: var(--border2); }
+.sales-action-card { align-items: flex-start; flex-direction: column; gap: 3px; }
+.sales-action-card strong { font-size: 13px; color: var(--text); }
+.sales-action-card span { font-size: 11px; color: var(--muted); }
+.sales-order-link { color: var(--accent); font-family: var(--font-mono); font-size: 11px; }
+.sales-order-link:hover { text-decoration: underline; }
+.sales-filter-group { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.sales-search-form { display: flex; align-items: flex-end; gap: 8px; }
+.sales-search-form .form-group { flex: 1; max-width: 520px; }
+.sales-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--border); }
+.sales-empty { padding: 42px 20px; text-align: center; color: var(--muted); }
+.sales-form { max-width: 1120px; }
+.sales-line-list { display: flex; flex-direction: column; gap: 10px; }
+.sales-line-list > div { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.sales-order-total { margin-top: 12px; color: var(--accent); font-family: var(--font-mono); font-size: 28px; font-weight: 600; }
+.sales-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 8px; padding-top: 4px; }
+
 @media (max-width: 900px) {
   .operator-stats { grid-template-columns: 1fr; }
+  .sales-dashboard-grid, .sales-summary-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -295,6 +329,10 @@ select.form-input option { background: var(--surface2); }
   .operator-job-body { align-items: flex-start; }
   .operator-job-meta { align-items: flex-start; flex-direction: column; gap: 6px; }
   .operator-open { margin-left: 0; }
+  .sales-search-form, .sales-pagination { align-items: stretch; flex-direction: column; }
+  .sales-search-form .form-group { max-width: none; }
+  .sales-form-actions { flex-direction: column-reverse; }
+  .sales-form-actions .btn { width: 100%; }
 }
 
 /* APPROVAL CARD */

@@ -92,6 +92,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
     case 'SALES':
       return [
         { section: "Sales" },
+        { label: "Dashboard", href: "/dashboard" },
         { label: "New order", href: "/sales/new" },
         { label: "Order history", href: "/sales" },
         { section: "Catalogue" },

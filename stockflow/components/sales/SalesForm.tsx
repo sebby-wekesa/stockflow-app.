@@ -148,15 +148,17 @@ export function SalesForm({
   }
 
   return (
-    <div>
+    <div className="sales-form">
       {error && (
-        <div className="mb-4 p-4 rounded-md bg-red/10 border border-red/30 text-red text-sm">
+        <div className="design-error mb-16">
           {error}
         </div>
       )}
 
-      {/* SECTION 1: BRANCH + CUSTOMER + DATE */}
-      <div className="card mb-4">
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div><div className="section-title">Order Details</div><div className="section-sub">Choose the selling branch, invoice date, and customer</div></div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="form-label">
@@ -222,16 +224,15 @@ export function SalesForm({
         </div>
       </div>
 
-      {/* SECTION 2: LINE ITEMS */}
-      <div className="card mb-4">
-        <div className="border-b border-border flex items-center justify-between pb-4 mb-4">
-          <div className="section-title">Line items</div>
-          <span className="text-xs text-muted">
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div><div className="section-title">Line Items</div><div className="section-sub">Search live product stock and enter quantities</div></div>
+          <span className="badge badge-muted">
             {totals.lineCount} {totals.lineCount === 1 ? 'item' : 'items'}
           </span>
         </div>
 
-        <div className="divide-y divide-border">
+        <div className="sales-line-list">
           {lines.map((line, i) => (
             <SalesLineRow
               key={i}
@@ -250,8 +251,7 @@ export function SalesForm({
         </div>
       </div>
 
-      {/* SECTION 3: NOTES + TOTAL */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="grid-2 sales-summary-grid mb-16">
         <div className="card">
           <label className="form-label">
             Order notes (optional)
@@ -267,7 +267,7 @@ export function SalesForm({
         <div className="card">
           <div className="mb-3">
             <span className="form-label">Order Total</span>
-            <div className="text-2xl font-bold font-mono mt-3">
+            <div className="sales-order-total">
               {formatKES(totals.subtotal)}
             </div>
           </div>
@@ -277,8 +277,7 @@ export function SalesForm({
           </div>
         </div>
       </div>
-      {/* SECTION 4: ACTIONS */}
-      <div className="flex justify-end gap-3 mb-3">
+      <div className="sales-form-actions">
         <button
           type="button"
           onClick={() => handleSubmit('draft')}
@@ -297,7 +296,7 @@ export function SalesForm({
         </button>
       </div>
 
-      <p className="text-xs text-muted text-right">
+      <p className="section-sub text-right">
         Confirming will generate an invoice number and decrement stock immediately.
       </p>
     </div>

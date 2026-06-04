@@ -5,9 +5,9 @@ import { TeamRole } from '@/lib/proxy'
 import Link from 'next/link'
 import OperatorDashboard from '../operator/OperatorDashboard'
 import WarehousePage from '../warehouse/page'
-import { formatKES } from '@/lib/sales-utils'
 import AdminDashboard from '@/components/AdminDashboard'
 import ManagerDashboard from '@/components/ManagerDashboard'
+import SalesDashboard from '@/components/SalesDashboard'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,117 +54,13 @@ function PendingView({ user }: { user: any }) {
 }
 
 
-// Sales Dashboard - Shows "Catalogue" and "My Orders"
-async function SalesView({ user, role }: { user: any; role: TeamRole }) {
-  // Import sales-specific data
-  const { getCatalogue } = await import('@/app/actions/sales')
-  const { getSalesOrders } = await import('@/app/actions/sales-orders')
-
-  const products = await getCatalogue()
-  const orders = await getSalesOrders(role.toUpperCase(), 15)
-
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div>
-          <div className="section-title">Sales Dashboard</div>
-          <div className="section-sub">Manage orders and browse catalogue</div>
-        </div>
-        <a href="/catalogue" className="btn btn-primary">Place New Order</a>
-      </div>
-
-      {/* Catalogue Section */}
-      <div className="card mb-16">
-        <div className="section-header mb-16">
-          <div>
-            <div className="section-title">Available Catalogue</div>
-            <div className="section-sub">Products ready for ordering</div>
-          </div>
-        </div>
-        {products.length > 0 ? (
-          <div className="grid-3">
-            {products.map((product: any) => (
-              <div key={product.id} className="product-card">
-                <div className="product-name">{product.name}</div>
-                <div className="product-code">{product.code}</div>
-                <div className="product-stock">
-                  <span className="job-kg">{product.availableQty} kg</span> available
-                </div>
-                <div className="product-price">{formatKES(Number(product.price))}/unit</div>
-                <a href="/catalogue" className="btn btn-sm">Order Now</a>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
-            No products available in catalogue.
-          </div>
-        )}
-      </div>
-
-      {/* My Orders Section - limited to latest 15 for better organization */}
-      <div className="card">
-        <div className="section-header mb-16">
-          <div>
-            <div className="section-title">My Orders</div>
-            <div className="section-sub">Track your order history (latest 15)</div>
-          </div>
-          <Link href="/sales" className="btn btn-ghost btn-sm">View all →</Link>
-        </div>
-        {orders.length > 0 ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Order #</th>
-                  <th>Date</th>
-                  <th>Items</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order: any) => (
-                  <tr key={order.id}>
-                    <td>
-                      <span style={{fontFamily:'var(--font-mono)',color:'var(--muted)'}}>{order.orderNumber}</span>
-                    </td>
-                    <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                    <td>{order.itemCount} items</td>
-                    <td>{formatKES(order.amount)}</td>
-                    <td>
-                      <span className={`badge ${
-                        order.status === 'PENDING' ? 'badge-amber' :
-                        order.status === 'CONFIRMED' ? 'badge-purple' :
-                        order.status === 'SHIPPED' ? 'badge-blue' : 'badge-green'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ padding: '20px', color: 'var(--muted)', textAlign: 'center' }}>
-            No orders placed yet.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-
-
 // TeamDashboard component - switches views based on role
 async function TeamDashboard({ role, user }: { role: TeamRole; user: any }) {
   switch (role) {
     case 'pending':
       return <PendingView user={user} />;
     case 'sales':
-      return <SalesView user={user} role={role} />;
+      return <SalesDashboard user={user} />;
     case 'packaging':
       return <PackagingView user={user} role={role} />;
     case 'warehouse':
