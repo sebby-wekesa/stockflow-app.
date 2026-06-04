@@ -1,117 +1,23 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { getTenantPrisma } from "@/lib/tenant-prisma";
-import { stageCompletionSchema, StageCompletionInput } from "@/lib/validations";
-import { requireActiveAuth } from "@/lib/auth";
+import { completeStage as completeLifecycleStage } from "@/app/actions/stage-completion";
+import { stageCompletionSchema, type StageCompletionInput } from "@/lib/validations";
 
+// Backward-compatible entry point for older forms. All stage writes now pass
+// through the shared lifecycle action, which enforces role, department,
+// sequence, weight balance, material consumption, and linked sales handling.
 export async function completeStage(input: StageCompletionInput) {
-  const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
-
   const validated = stageCompletionSchema.parse(input);
-
-  // Use tenant-scoped transaction for atomicity
-  return await db.$transaction(async (tx) => {
-    const order = await tx.productionOrder.findUnique({
-      where: { id: validated.orderId },
-      include: {
-        design: { include: { stages: true } },
-        StageLog: { orderBy: { sequence: "desc" }, take: 1 },
-      },
-    });
-
-    if (!order) {
-      throw new Error("Production order not found");
-    }
-
-    if (order.status !== "APPROVED" && order.status !== "IN_PRODUCTION") {
-      throw new Error("Order must be approved or in production");
-    }
-
-    const currentStageIndex = order.design.stages.findIndex(
-      (s: { sequence: number }) => s.sequence === validated.sequence
-    );
-
-    if (currentStageIndex === -1) {
-      throw new Error("Invalid stage sequence");
-    }
-
-    const expectedSequence = order.StageLog.length > 0 ? order.StageLog[0].sequence + 1 : 1;
-    if (validated.sequence !== expectedSequence) {
-      throw new Error(`Must complete stages in order. Expected sequence ${expectedSequence}, got ${validated.sequence}`);
-    }
-
-    const stage = order.design.stages[currentStageIndex];
-
-    if (!stage) {
-      throw new Error("Stage not found for the given sequence");
-    }
-
-    // Create the stage log
-    const stageLog = await tx.stageLog.create({
-      data: {
-        orderId: validated.orderId,
-        stageId: stage.id,
-        stageName: validated.stageName,
-        department: stage.department,
-        sequence: validated.sequence,
-        kgIn: validated.kgIn,
-        kgOut: validated.kgOut,
-        kgScrap: validated.kgScrap,
-        operatorId: validated.operatorId,
-        notes: validated.notes,
-        organizationId: user.organizationId,
-      },
-    });
-
-    const isLastStage = currentStageIndex === order.design.stages.length - 1;
-    const newStatus = isLastStage ? "COMPLETED" : "IN_PRODUCTION";
-    const nextStage = isLastStage ? null : order.design.stages[currentStageIndex + 1].sequence;
-
-    // Update production order status and stage
-    await tx.productionOrder.update({
-      where: { id: validated.orderId },
-      data: {
-        status: newStatus,
-        ...(nextStage !== null && { currentStage: nextStage }),
-        ...(isLastStage && { completedAt: new Date() }),
-      },
-    });
-
-    // If this is the last stage, create finished goods
-    if (isLastStage) {
-      // Generate SKU (FG-YYYY-NNNN)
-      const currentYear = new Date().getFullYear();
-      const lastFinishedGoods = await tx.finishedGoods.findFirst({
-        orderBy: { createdAt: 'desc' },
-        select: { sku: true },
-      });
-
-      let nextNumber = 1;
-      if (lastFinishedGoods?.sku) {
-        const match = lastFinishedGoods.sku.match(/FG-\d{4}-(\d{4})/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
-      }
-
-      const sku = `FG-${currentYear}-${nextNumber.toString().padStart(4, '0')}`;
-
-      await tx.finishedGoods.create({
-        data: {
-          sku,
-          designId: order.designId,
-          quantity: order.quantity,
-          kgProduced: validated.kgOut,
-          organizationId: user.organizationId,
-        },
-      });
-    }
-
-    revalidatePath("/dashboard");
-    revalidatePath("/jobs");
-
-    return { success: true, stageLog, newStatus, orderCompleted: isLastStage };
+  return completeLifecycleStage({
+    orderId: validated.orderId,
+    stageId: validated.stageId,
+    stageName: validated.stageName,
+    sequence: validated.sequence,
+    kgIn: validated.kgIn,
+    kgOut: validated.kgOut,
+    kgScrap: validated.kgScrap,
+    scrapReason: validated.scrapReason,
+    department: validated.department,
+    notes: validated.notes,
   });
 }

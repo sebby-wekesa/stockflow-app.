@@ -42,6 +42,22 @@ type UserContextRow = {
   } | null
 }
 
+const ROUTE_ROLE_RULES: Array<{ paths: string[]; roles: string[] }> = [
+  { paths: ['/users'], roles: ['ADMIN'] },
+  { paths: ['/reports', '/analytics', '/scrap'], roles: ['ADMIN', 'MANAGER'] },
+  { paths: ['/approvals', '/manager', '/manager_dash'], roles: ['ADMIN', 'MANAGER'] },
+  { paths: ['/operator', '/operator_queue', '/operator_log', '/operator_history', '/stage-logger'], roles: ['OPERATOR', 'ADMIN', 'MANAGER'] },
+  { paths: ['/packaging', '/pack_queue', '/pack_done'], roles: ['PACKAGING', 'ADMIN', 'MANAGER'] },
+  { paths: ['/sales', '/sales-orders', '/catalogue', '/customers'], roles: ['SALES', 'ADMIN', 'MANAGER'] },
+  { paths: ['/rawmaterials', '/receive', '/inventory', '/stock', '/warehouse', '/products', '/finishedgoods'], roles: ['WAREHOUSE', 'ADMIN', 'MANAGER'] },
+  { paths: ['/designs', '/jobs', '/orders', '/production', '/place_order', '/departments', '/settings/branches'], roles: ['ADMIN', 'MANAGER'] },
+  { paths: ['/import'], roles: ['ADMIN', 'WAREHOUSE'] },
+]
+
+function pathMatches(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`)
+}
+
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development'
 
@@ -243,6 +259,17 @@ export async function proxy(request: NextRequest) {
     const homePage = getRoleHomePage(ctx.role)
     return applySecurityHeaders(
       NextResponse.redirect(new URL(homePage, request.url)),
+      nonce,
+      csp
+    )
+  }
+
+  const routeRule = ROUTE_ROLE_RULES.find(rule =>
+    rule.paths.some(path => pathMatches(pathname, path))
+  )
+  if (routeRule && !routeRule.roles.includes(ctx.role)) {
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL(getRoleHomePage(ctx.role), request.url)),
       nonce,
       csp
     )

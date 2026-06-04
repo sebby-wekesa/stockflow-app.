@@ -4,7 +4,11 @@ import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function updateOrderStatus(orderId: string, status: "APPROVED" | "REJECTED") {
+export async function updateOrderStatus(
+  orderId: string,
+  status: "APPROVED" | "REJECTED",
+  rejectionReason?: string
+) {
   try {
     const user = await requireActiveAuth();
     if (!["ADMIN", "MANAGER"].includes(user.role)) {
@@ -14,10 +18,14 @@ export async function updateOrderStatus(orderId: string, status: "APPROVED" | "R
     const db = getTenantPrisma(user.organizationId);
 
     if (status === "REJECTED") {
-      await db.productionOrder.update({
-        where: { id: orderId, organizationId: user.organizationId },
-        data: { status: "REJECTED" },
+      if (!rejectionReason || rejectionReason.trim().length < 3) {
+        throw new Error("A rejection reason of at least 3 characters is required");
+      }
+      const rejected = await db.productionOrder.updateMany({
+        where: { id: orderId, status: 'PENDING' },
+        data: { status: "REJECTED", rejectionReason: rejectionReason.trim() },
       });
+      if (rejected.count === 0) throw new Error('Only pending orders can be rejected');
     } else {
       await db.$transaction(async (tx) => {
         const order = await tx.productionOrder.findUnique({
@@ -63,6 +71,7 @@ export async function updateOrderStatus(orderId: string, status: "APPROVED" | "R
             status: "IN_PRODUCTION",
             approvedBy: user.id,
             approvedAt: new Date(),
+            rejectionReason: null,
             currentStage: firstStage.sequence,
             currentDept: firstStage.department,
           },

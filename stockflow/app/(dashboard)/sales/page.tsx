@@ -193,7 +193,7 @@ export default async function SalesPage({
         >
           All Statuses
         </Link>
-        {(['PENDING', 'CONFIRMED', 'SHIPPED', 'CANCELLED'] as const).map((s) => (
+        {(['PENDING', 'CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED', 'CANCELLED'] as const).map((s) => (
           <Link
             key={s}
             href={buildHref({ status: s, page: 1 })}

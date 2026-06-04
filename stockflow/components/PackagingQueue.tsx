@@ -97,7 +97,7 @@ export function PackagingQueue({ orders: initialOrders, initialStats }: Packagin
         <div className="stat-card teal">
           <div className="stat-label">Fulfilled today</div>
           <div className="stat-value">{stats.shippedToday}</div>
-          <div className="stat-sub">Orders shipped</div>
+          <div className="stat-sub">Awaiting dispatch</div>
         </div>
         <div className="stat-card amber">
           <div className="stat-label">Packaged this week</div>
@@ -174,7 +174,7 @@ export function PackagingQueue({ orders: initialOrders, initialStats }: Packagin
                           Fulfilling...
                         </>
                       ) : (
-                        'Mark fulfilled'
+                        'Mark packaged'
                       )}
                     </button>
                   </div>

@@ -7,6 +7,9 @@ import { requireActiveAuth } from '@/lib/auth'
 export async function POST(request: NextRequest) {
   try {
     const user = await requireActiveAuth()
+    if (!['ADMIN', 'MANAGER'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     const db = getTenantPrisma(user.organizationId)
 
     const body = await request.json()
@@ -49,7 +52,8 @@ export async function POST(request: NextRequest) {
 
       const firstStage = design.stages[0]
 
-      // Check if material exists and has sufficient stock (scoped)
+      // Validate the selected material exists. Stock is reserved only after
+      // manager approval, through the shared production approval lifecycle.
       const material = await tx.rawMaterial.findUnique({
         where: { id: materialId },
       })
@@ -64,10 +68,6 @@ export async function POST(request: NextRequest) {
       }
 
       const requiredKg = design.targetWeight.toNumber() * quantity
-      if (material.availableKg.toNumber() < requiredKg) {
-        throw new Error(`Insufficient material stock. Required: ${requiredKg}kg, Available: ${material.availableKg.toNumber()}kg`)
-      }
-
       // Generate order number
       const orderNumber = `PO-${Date.now().toString().slice(-6)}`
 
@@ -78,19 +78,10 @@ export async function POST(request: NextRequest) {
           designId,
           quantity,
           targetKg: requiredKg,
-          status: 'IN_PRODUCTION',
+          status: 'PENDING',
           priority: 'MEDIUM',
           currentStage: firstStage.sequence,
           currentDept: firstStage.department,
-        },
-      })
-
-      // Reserve material (scoped)
-      await tx.rawMaterial.update({
-        where: { id: materialId },
-        data: {
-          availableKg: material.availableKg.toNumber() - requiredKg,
-          reservedKg: material.reservedKg.toNumber() + requiredKg,
         },
       })
 
@@ -99,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: 'Production order created and material reserved successfully',
+        message: 'Production order created and sent for approval',
         order: result,
       },
       { status: 201 }

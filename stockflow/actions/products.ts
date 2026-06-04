@@ -8,6 +8,7 @@ import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import type { ProductCategory, StockOrigin } from '@prisma/client'
 import { PRODUCT_CATEGORIES, normalizeProductUom } from '@/lib/products'
 import { ALL_BRANCHES, normalizeBranchCode, type BranchCode } from '@/lib/branches'
+import { syncProductShadowStock } from '@/lib/order-lifecycle'
 
 /** Returns the auth user if role is ADMIN or MANAGER, else throws. */
 async function requireProductManager(): Promise<AuthUser> {
@@ -237,6 +238,12 @@ export async function updateProduct(productId: string, formData: FormData) {
     })
 
     if (stockChanged) {
+      await syncProductShadowStock(
+        tx,
+        existing.sku,
+        parsed.data.product_code,
+        nextStock
+      )
       await tx.stockMovement.create({
         data: {
           productId,

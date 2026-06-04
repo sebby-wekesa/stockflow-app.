@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { incrementProductShadowStock } from '@/lib/order-lifecycle';
 import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { requireActiveAuth } from '@/lib/auth';
 import { normalizeProductUom } from '@/lib/products';
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest) {
               ...(vendor ? { vendor } : {}),
             },
           });
+          await incrementProductShadowStock(tx, existing.sku, Number(quantity));
           wasUpdate = true;
         } else {
           // Generate a simple SKU. Concurrent creates with the same name are

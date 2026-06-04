@@ -6,6 +6,7 @@ import type { AuthUser, Role } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
 import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { Prisma, type Design, type ProductionOrder, type RawMaterial, type StageLog } from '@prisma/client';
+import { updateOrderStatus } from '@/app/actions/orders';
 
 interface Stat {
   label: string;
@@ -365,27 +366,11 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
 }
 
 export async function approveOrder(orderId: string) {
-  const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
-
-  // Only managers and admins can approve
-  if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
-    throw new Error('Forbidden: insufficient permissions')
-  }
-
-  // Ensure order exists and is pending
-  const order = await db.productionOrder.findUnique({ where: { id: orderId } });
-  if (!order) throw new Error('Order not found');
-  if (order.status !== 'PENDING') throw new Error('Only pending orders can be approved');
-
-  await db.productionOrder.update({
-    where: { id: orderId },
-    data: { status: 'APPROVED', approvedBy: user.id, approvedAt: new Date() },
-  });
-
+  const result = await updateOrderStatus(orderId, 'APPROVED');
+  if (!result.success) throw new Error(result.error);
   revalidatePath('/manager');
   revalidatePath('/admin/approvals');
-  return { success: true };
+  return result;
 }
 
 // Server Action wrapper for <form action=> usage

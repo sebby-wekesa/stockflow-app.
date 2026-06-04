@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
+import { assertOperatorDepartment } from '@/lib/operator-access'
 
 export async function PATCH(
   request: NextRequest,
@@ -48,10 +49,14 @@ export async function PATCH(
         { status: 404 }
       )
     }
+    assertOperatorDepartment(user, order.currentDept)
+    if (order.status !== 'PENDING') {
+      return NextResponse.json({ error: 'Only pending orders can be approved or rejected' }, { status: 400 })
+    }
 
     // Update the order status
     const statusMap: any = {
-      RELEASED: 'APPROVED',
+      RELEASED: 'IN_PRODUCTION',
       REJECTED: 'REJECTED',
     }
 
@@ -87,36 +92,36 @@ export async function PATCH(
           throw new Error('Design has no production stages configured');
         }
 
-        // For now, assume single raw material per design (take first BOM item)
-        const primaryBomItem = design.billOfMaterials[0];
-
-        // 2. Calculate the required quantity for this BOM item
         const plannedUnits =
           design.targetWeight && design.targetWeight.gt(0)
             ? order.targetKg.toNumber() / design.targetWeight.toNumber()
             : order.quantity;
-        const requiredQuantity = plannedUnits * primaryBomItem.quantity.toNumber();
 
-        if (primaryBomItem.RawMaterial?.availableKg.toNumber() < requiredQuantity) {
-          throw new Error('Insufficient stock to release this order');
+        // Reserve every BOM material before releasing the job.
+        for (const bomItem of design.billOfMaterials) {
+          const requiredQuantity = plannedUnits * bomItem.quantity.toNumber();
+          if (!bomItem.RawMaterial || bomItem.RawMaterial.availableKg.toNumber() < requiredQuantity) {
+            throw new Error(
+              `Insufficient stock for ${bomItem.RawMaterial?.materialName ?? 'required material'}`
+            );
+          }
+
+          await tx.rawMaterial.update({
+            where: { id: bomItem.rawMaterialId },
+            data: {
+              availableKg: { decrement: requiredQuantity },
+              reservedKg: { increment: requiredQuantity }
+            }
+          });
         }
 
-        // 3. Deduct from Available and add to Reserved
-        await tx.rawMaterial.update({
-          where: { id: primaryBomItem.rawMaterialId },
-          data: {
-            availableKg: { decrement: requiredQuantity },
-            reservedKg: { increment: requiredQuantity }
-          }
-        });
-
-        // 4. Update the Order Status
         return await tx.productionOrder.update({
           where: { id: params.id },
           data: {
             status: newStatus,
             approvedBy: user.id,
             approvedAt: new Date(),
+            rejectionReason: null,
             currentStage: firstStage.sequence,
             currentDept: firstStage.department,
           },
@@ -134,11 +139,7 @@ export async function PATCH(
           status: newStatus,
           approvedBy: user.id,
           approvedAt: new Date(),
-          // Store rejection reason in notes if rejecting
-          ...(status === 'REJECTED' && {
-            // Note: Adjust this if your schema has a rejectionReason field
-            // For now, we'll use notes
-          }),
+          rejectionReason: rejectionReason.trim(),
         },
         include: {
           design: {
@@ -162,6 +163,7 @@ export async function PATCH(
       // Log audit error but don't fail the request
       console.error('Audit log error:', auditError)
     }
+    assertOperatorDepartment(user, order.currentDept)
 
     return NextResponse.json(
       {
@@ -218,6 +220,7 @@ export async function GET(
         { status: 404 }
       )
     }
+    assertOperatorDepartment(user, order.currentDept)
 
     return NextResponse.json(
       {

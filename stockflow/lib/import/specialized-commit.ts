@@ -345,7 +345,8 @@ export async function commitSalesImport(
             id: group.order_number,
             customerName: group.customer_name,
             totalAmount,
-            status: 'CONFIRMED',
+            // Imported invoices are historical sales that already left stock.
+            status: 'SHIPPED',
             createdBy: userId,
           },
         })

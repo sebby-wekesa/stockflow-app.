@@ -220,6 +220,7 @@ model FinishedGoods {
   sku                    String
   designId               String
   quantity               Int
+  reservedQuantity       Int                      @default(0)
   kgProduced             Decimal                  @db.Decimal(10, 4)
   barcode                String?
   batchNumber            String?
@@ -509,6 +510,7 @@ model ProductionOrder {
   assignedTo             String?
   approvedBy             String?
   approvedAt             DateTime?
+  rejectionReason        String?
   completedAt            DateTime?
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
@@ -720,6 +722,7 @@ model User {
   name                 String?
   role                 Role                  @default(PENDING)
   department           String?
+  departments          String[]              @default([])
   organizationId       String?
   branchId             String?
   createdAt            DateTime              @default(now())
@@ -798,6 +801,7 @@ enum OrgStatus {
 enum SaleStatus {
   PENDING
   CONFIRMED
+  READY_FOR_DISPATCH
   SHIPPED
   CANCELLED
 }

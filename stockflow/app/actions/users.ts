@@ -54,6 +54,10 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
     const name = (getPayloadValue(payload, 'name') as string)?.trim();
     const role = getPayloadValue(payload, 'role') as string;
     const branchId = getPayloadValue(payload, 'branchId') as string | null;
+    const departmentsValue = String(getPayloadValue(payload, 'departments') || '');
+    const departments = Array.from(new Set(
+      departmentsValue.split(',').map(value => value.trim()).filter(Boolean)
+    ));
 
     if (!email || !name || !role) {
       return { success: false, error: "Email, name and role are required" };
@@ -107,6 +111,8 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
           email,
           name,
           role: role as typeof USER_ROLES[number],
+          departments: role === 'OPERATOR' ? departments : [],
+          department: role === 'OPERATOR' ? departments[0] ?? null : null,
           organizationId: currentUser.organizationId,
           ...(branchId ? { branchId } : {}),
         },
@@ -141,9 +147,22 @@ export async function updateUserRole(userId: string, newRole: string) {
 
   const normalizedRole = normalizeUserRole(newRole);
 
+  const existing = await db.user.findUnique({
+    where: { id: userId },
+    select: { departments: true, department: true },
+  });
+  const existingDepartments = existing?.departments?.length
+    ? existing.departments
+    : existing?.department
+      ? [existing.department]
+      : [];
   await db.user.update({
     where: { id: userId, organizationId: currentUser.organizationId },
-    data: { role: normalizedRole },
+    data: {
+      role: normalizedRole,
+      departments: normalizedRole === 'OPERATOR' ? existingDepartments : [],
+      department: normalizedRole === 'OPERATOR' ? existingDepartments[0] ?? null : null,
+    },
   });
 
   revalidatePath('/admin/users');
@@ -443,6 +462,10 @@ export async function updateUser(_prevState: unknown, maybeFormData?: FormData) 
     const name = getPayloadValue(payload, 'name') as string;
     const role = getPayloadValue(payload, 'role') as string;
     const branchId = getPayloadValue(payload, 'branchId') as string | null;
+    const departmentsValue = String(getPayloadValue(payload, 'departments') || '');
+    const departments = Array.from(new Set(
+      departmentsValue.split(',').map(value => value.trim()).filter(Boolean)
+    ));
 
     if (!userId || !name || !role) {
       throw new Error("userId, name and role are required");
@@ -456,6 +479,8 @@ export async function updateUser(_prevState: unknown, maybeFormData?: FormData) 
     const updateData: any = {
       name,
       role: role as typeof USER_ROLES[number],
+      departments: role === 'OPERATOR' ? departments : [],
+      department: role === 'OPERATOR' ? departments[0] ?? null : null,
     };
 
     const isValidUuid = branchId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId);

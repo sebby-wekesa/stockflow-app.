@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
    const orders = await db.saleOrder.findMany({
      where: {
-       status: { in: ['CONFIRMED', 'SHIPPED'] },
+       status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED'] },
        ...(start ? { createdAt: { gte: start, lte: end } } : {}),
      },
      orderBy: { createdAt: 'desc' },

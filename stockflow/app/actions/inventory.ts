@@ -4,6 +4,7 @@ import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { normalizeProductUom, type ProductUom } from "@/lib/products";
+import { incrementProductShadowStock } from "@/lib/order-lifecycle";
 
 // ─── Raw Materials ──────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export async function addProductStock(input: AddProductStockInput) {
         updatedAt: new Date(),
       },
     });
+    await incrementProductShadowStock(db, existing.sku, quantity);
   } else {
     const sku = `${origin.slice(0, 3)}-${name
       .replace(/\s+/g, "-")

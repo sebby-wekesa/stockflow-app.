@@ -3,6 +3,7 @@
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
+import { releaseSaleOrderReservation, reserveSaleOrder } from '@/lib/order-lifecycle';
 
 export async function createSalesOrder(data: {
   customerId?: string;
@@ -85,7 +86,7 @@ export async function createSalesOrder(data: {
           // General Product → create/lookup shadow FinishedGoods
           const product = await tx.product.findUnique({
             where: { id: item.productId },
-            select: { id: true, sku: true, name: true, unitCost: true },
+            select: { id: true, sku: true, name: true, unitCost: true, currentStock: true },
           })
           if (!product) throw new Error('Referenced product not found')
 
@@ -105,7 +106,7 @@ export async function createSalesOrder(data: {
                 organizationId: user.organizationId,
                 sku: fgSku,
                 designId: placeholderDesignId,
-                quantity: 0,
+                quantity: Math.floor(product.currentStock),
                 kgProduced: 0,
                 unitCost: item.unitPrice ?? product.unitCost ?? 0,
               },
@@ -312,17 +313,23 @@ export async function confirmSalesOrder(orderId: string) {
     throw new Error('Unauthorized: Only managers can confirm orders');
   }
 
-  const order = await db.saleOrder.findUnique({
-    where: { id: orderId }
-  });
+  await db.$transaction(async (tx) => {
+    const order = await tx.saleOrder.findUnique({
+      where: { id: orderId },
+      include: { SaleItem: { include: { FinishedGoods: true } } },
+    });
 
-  if (!order || order.status !== 'PENDING') {
-    throw new Error('Order not found or not in pending status');
-  }
+    if (!order || order.status !== 'PENDING') {
+      throw new Error('Order not found or not in pending status');
+    }
+    const openProductionOrders = await tx.productionOrder.count({
+      where: { saleOrderId: orderId, status: { not: 'COMPLETED' } },
+    });
+    if (openProductionOrders > 0) {
+      throw new Error('Complete linked production orders before confirming this sale');
+    }
 
-  await db.saleOrder.update({
-    where: { id: orderId },
-    data: { status: 'CONFIRMED' }
+    await reserveSaleOrder(tx, order);
   });
 
   revalidatePath('/sales');
@@ -339,17 +346,34 @@ export async function cancelSalesOrder(orderId: string) {
     throw new Error('Unauthorized: Only managers can cancel orders');
   }
 
-  const order = await db.saleOrder.findUnique({
-    where: { id: orderId }
-  });
+  await db.$transaction(async (tx) => {
+    const order = await tx.saleOrder.findUnique({
+      where: { id: orderId },
+      include: { SaleItem: { include: { FinishedGoods: true } } },
+    });
 
-  if (!order || order.status === 'SHIPPED') {
-    throw new Error('Order not found or cannot be cancelled');
-  }
+    if (!order || order.status === 'SHIPPED' || order.status === 'READY_FOR_DISPATCH') {
+      throw new Error('Order not found or cannot be cancelled');
+    }
+    const activeProductionOrders = await tx.productionOrder.count({
+      where: {
+        saleOrderId: orderId,
+        status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] },
+      },
+    });
+    if (activeProductionOrders > 0) {
+      throw new Error('Cancel or complete linked production orders before cancelling this sale');
+    }
 
-  await db.saleOrder.update({
-    where: { id: orderId },
-    data: { status: 'CANCELLED' }
+    await releaseSaleOrderReservation(tx, order);
+    await tx.productionOrder.updateMany({
+      where: { saleOrderId: orderId, status: { in: ['PENDING', 'APPROVED'] } },
+      data: { status: 'CANCELLED' },
+    });
+    await tx.saleOrder.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
+    });
   });
 
   revalidatePath('/sales');

@@ -106,7 +106,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
           badge: counts.packagingQueue && counts.packagingQueue > 0 ? String(counts.packagingQueue) : undefined,
           badgeColor: "purple",
         },
-        { label: "Fulfilled today", href: "/pack_done" },
+        { label: "Ready for dispatch", href: "/pack_done" },
       ];
 
     case 'WAREHOUSE':

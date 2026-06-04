@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole, getUser } from "@/lib/auth";
 import { productionOrderSchema, ProductionOrderInput } from "@/lib/validations";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { updateOrderStatus } from "@/app/actions/orders";
 
 export async function createProductionOrder(formData: FormData) {
   const user = await requireRole("ADMIN");
@@ -69,92 +70,9 @@ export async function createProductionOrder(formData: FormData) {
 }
 
 export async function approveProductionOrder(orderId: string) {
-  const user = await requireRole("ADMIN");
-  const db = getTenantPrisma(user.organizationId);
-
-  const order = await db.productionOrder.findUnique({
-    where: { id: orderId },
-    include: {
-      design: {
-        include: {
-          billOfMaterials: {
-            include: {
-              RawMaterial: true
-            }
-          }
-        }
-      },
-    },
-  });
-
-  if (!order) {
-    throw new Error("Order not found");
-  }
-
-  if (order.status !== "PENDING") {
-    throw new Error("Order is not pending approval");
-  }
-
-  if (order.design.billOfMaterials.length === 0) {
-    throw new Error("Design does not have BOM items configured");
-  }
-
-  // Perform the transaction to approve order and consume materials
-  await db.$transaction(async (tx) => {
-    // 1. Consume materials from BOM
-    const consumptionLogs = [];
-
-    for (const bomItem of order.design.billOfMaterials) {
-      const requiredQuantity = Number(bomItem.quantity) * order.quantity;
-
-      // Check if sufficient stock is available
-      const material = await tx.rawMaterial.findUnique({
-        where: { id: bomItem.rawMaterialId }
-      });
-
-      if (!material) {
-        throw new Error(`Material ${bomItem.rawMaterialId} not found`);
-      }
-
-      if (Number(material.availableKg) < requiredQuantity) {
-        throw new Error(
-          `Insufficient stock for ${material.materialName}. Available: ${material.availableKg}${bomItem.unitOfMeasure}, Required: ${requiredQuantity}${bomItem.unitOfMeasure}`
-        );
-      }
-
-      // Deduct from available stock
-      await tx.rawMaterial.update({
-        where: { id: bomItem.rawMaterialId },
-        data: {
-          availableKg: { decrement: requiredQuantity }
-        }
-      });
-
-      // Create consumption log
-      const log = await tx.materialConsumptionLog.create({
-        data: {
-          id: crypto.randomUUID(),
-          productionOrderId: orderId,
-          rawMaterialId: bomItem.rawMaterialId,
-          quantityConsumed: requiredQuantity,
-          notes: "Auto-consumed on order approval",
-          organizationId: user.organizationId,
-        }
-      });
-
-      consumptionLogs.push(log);
-    }
-
-    // 2. Update the Order Status to APPROVED
-    await tx.productionOrder.update({
-      where: { id: orderId },
-      data: {
-        status: "APPROVED",
-        approvedBy: user.id,
-        approvedAt: new Date(),
-      },
-    });
-  });
+  await requireRole("ADMIN", "MANAGER");
+  const result = await updateOrderStatus(orderId, "APPROVED");
+  if (!result.success) throw new Error(result.error);
 
   redirect("/approvals");
 }

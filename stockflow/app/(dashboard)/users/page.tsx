@@ -18,6 +18,7 @@ type AdminUserRow = {
   name: string | null;
   role: UserRole;
   department: string | null;
+  departments: string[];
   lastSeenAt: Date | null;
   isVerified: boolean;
   authMissing: boolean;
@@ -48,6 +49,7 @@ async function getUsers(query: string) {
         name: true,
         role: true,
         department: true,
+        departments: true,
         lastSeenAt: true,
         branchId: true,
         Branch: {
@@ -82,6 +84,7 @@ async function getUsers(query: string) {
       name: user.name,
       role: user.role,
       department: user.department,
+      departments: user.departments,
       lastSeenAt: user.lastSeenAt,
       isVerified: Boolean(authUsersById.get(user.id)?.email_confirmed_at),
       authMissing: Boolean(supabaseAdmin && !authUsersById.get(user.id)),
@@ -106,7 +109,7 @@ async function getUsers(query: string) {
         user.name || "unnamed user",
         user.email,
         user.role,
-        user.department || "",
+        user.departments.join(" "),
         branch,
         ...status,
       ].some((value) => value.toLowerCase().includes(normalizedQuery));
@@ -272,7 +275,7 @@ export default async function UsersPage({
                     <span className="badge badge-ghost badge-sm">No branch</span>
                   )}
                 </td>
-                <td>{user.role === 'OPERATOR' ? (user.department || '—') : '—'}</td>
+                <td>{user.role === 'OPERATOR' ? (user.departments.join(', ') || user.department || '—') : '—'}</td>
                 <td>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <span className={`badge ${user.isVerified ? 'badge-green' : 'badge-amber'}`}>

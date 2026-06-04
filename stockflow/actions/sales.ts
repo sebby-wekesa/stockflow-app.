@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { nextInvoiceNumber } from '@/lib/sales'
+import { releaseSaleOrderReservation, reserveSaleOrder } from '@/lib/order-lifecycle'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SALES SCHEMA NOTES
@@ -13,8 +14,9 @@ import { nextInvoiceNumber } from '@/lib/sales'
 // SaleOrder (id, customerId, customerName, totalAmount, status, createdBy)
 //   -> SaleItem (saleOrderId, finishedGoodsId, quantity, unitPrice, totalPrice)
 // SaleItem links to FinishedGoods, not Product directly. For each picked
-// product we ensure a FinishedGoods shadow record exists.
-// Stock decrement happens on Product.currentStock.
+// product we ensure a FinishedGoods shadow record exists. FinishedGoods is
+// the fulfilment source of truth: confirmation reserves it and packaging
+// consumes the reservation.
 //
 // In multitenant mode, branch codes are per-org. The form sends a string
 // code (e.g. 'mombasa') and we resolve it against THIS org's Branch table.
@@ -188,7 +190,7 @@ export async function createSalesOrder(formData: FormData) {
           data: {
             sku: fgSku,
             designId: placeholderDesign.id,
-            quantity: 0,
+            quantity: Math.floor(product.currentStock),
             kgProduced: 0,
             unitCost: unitPrice,
           },
@@ -205,45 +207,15 @@ export async function createSalesOrder(formData: FormData) {
         },
       })
 
-      if (action === 'invoice') {
-        // Atomic compare-and-swap decrement. If currentStock < qty the
-        // updateMany matches zero rows; we abort the transaction so no
-        // partial write leaks out.
-        const decremented = await tx.product.updateMany({
-          where: { id: line.product_id, currentStock: { gte: qty } },
-          data: { currentStock: { decrement: qty } },
-        })
-        if (decremented.count === 0) {
-          throw new Error(
-            `Insufficient stock for ${product.sku ?? product.name}: have ${product.currentStock}, need ${qty}. Another sale may have completed first.`
-          )
-        }
+    }
 
-        // Deduct pieces/sets if specified
-        const piecesSets = Number(line.pieces_sets) || 0
-        if (piecesSets > 0) {
-          const decrementedSets = await tx.product.updateMany({
-            where: { id: line.product_id, piecesSets: { gte: piecesSets } },
-            data: { piecesSets: { decrement: piecesSets } },
-          })
-          if (decrementedSets.count === 0) {
-            throw new Error(
-              `Insufficient pieces/sets for ${product.sku ?? product.name}: have ${product.piecesSets}, need ${piecesSets}. Another sale may have completed first.`
-            )
-          }
-        }
-
-        await tx.stockMovement.create({
-          data: {
-            productId: line.product_id,
-            branchId: branchRow.id,
-            movementType: 'sale',
-            quantity: -qty,
-            reference: orderNumber,
-            notes: line.notes ?? `Sale to ${data.customer_name}`,
-          },
-        })
-      }
+    if (action === 'invoice') {
+      const reservableOrder = await tx.saleOrder.findUnique({
+        where: { id: order.id },
+        include: { SaleItem: { include: { FinishedGoods: true } } },
+      })
+      if (!reservableOrder) throw new Error('Sales order not found after creation')
+      await reserveSaleOrder(tx, { ...reservableOrder, status: 'PENDING' })
     }
 
     return order
@@ -288,41 +260,7 @@ export async function confirmDraft(orderId: string) {
       throw new Error('Order is no longer pending (may have been confirmed or cancelled by another action)')
     }
 
-    await tx.saleOrder.update({
-      where: { id: orderId },
-      data: { status: 'CONFIRMED' },
-    })
-
-    for (const line of order.SaleItem) {
-      // Look up the Product via the FG sku
-      const product = await tx.product.findFirst({
-        where: { sku: line.FinishedGoods.sku },
-      })
-      if (!product) {
-        throw new Error(`Product not found for SKU ${line.FinishedGoods.sku}`)
-      }
-
-      // Atomic compare-and-swap: decrement only if stock is sufficient
-      const decremented = await tx.product.updateMany({
-        where: { id: product.id, currentStock: { gte: line.quantity } },
-        data: { currentStock: { decrement: line.quantity } },
-      })
-      if (decremented.count === 0) {
-        throw new Error(
-          `Insufficient stock for ${line.FinishedGoods.sku}: have ${product.currentStock}, need ${line.quantity}`
-        )
-      }
-
-      await tx.stockMovement.create({
-        data: {
-          productId: product.id,
-          movementType: 'sale',
-          quantity: -line.quantity,
-          reference: order.id,
-          notes: `Sale confirmed for ${order.customerName}`,
-        },
-      })
-    }
+    await reserveSaleOrder(tx, order)
   }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/sales')
@@ -344,8 +282,8 @@ export async function cancelOrder(orderId: string, reason: string) {
   })
   if (!order) throw new Error('Order not found')
   if (order.status === 'CANCELLED') throw new Error('Already cancelled')
-  if (order.status === 'SHIPPED') {
-    throw new Error('Cannot cancel a shipped order')
+  if (order.status === 'SHIPPED' || order.status === 'READY_FOR_DISPATCH') {
+    throw new Error('Cannot cancel an order after packaging')
   }
 
   await withTenantTransaction(user.organizationId, async (tx) => {
@@ -357,34 +295,20 @@ export async function cancelOrder(orderId: string, reason: string) {
     })
     if (!current) throw new Error('Order not found')
     if (current.status === 'CANCELLED') throw new Error('Already cancelled')
-    if (current.status === 'SHIPPED') throw new Error('Cannot cancel a shipped order')
-
-    const wasConfirmed = current.status === 'CONFIRMED'
-
-    if (wasConfirmed) {
-      // Return stock for confirmed orders
-      for (const line of order.SaleItem) {
-        const product = await tx.product.findFirst({
-          where: { sku: line.FinishedGoods.sku },
-        })
-        if (!product) continue
-
-        await tx.stockMovement.create({
-          data: {
-            productId: product.id,
-            movementType: 'return',
-            quantity: line.quantity,
-            reference: order.id,
-            notes: `Sale cancelled: ${reason}`,
-          },
-        })
-
-        await tx.product.update({
-          where: { id: product.id },
-          data: { currentStock: { increment: line.quantity } },
-        })
-      }
+    if (current.status === 'SHIPPED' || current.status === 'READY_FOR_DISPATCH') {
+      throw new Error('Cannot cancel an order after packaging')
     }
+    const activeProductionOrders = await tx.productionOrder.count({
+      where: {
+        saleOrderId: orderId,
+        status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] },
+      },
+    })
+    if (activeProductionOrders > 0) {
+      throw new Error('Cancel or complete linked production orders before cancelling this sale')
+    }
+
+    await releaseSaleOrderReservation(tx, { ...order, status: current.status })
 
     await tx.saleOrder.update({
       where: { id: orderId },
@@ -417,6 +341,12 @@ export async function searchProductsForSale(query: string, branch: string) {
     orderBy: { sku: 'asc' },
   })
 
+  const finishedGoods = await db.finishedGoods.findMany({
+    where: { sku: { in: products.map((product) => product.sku).filter(Boolean) as string[] } },
+    select: { sku: true, quantity: true },
+  })
+  const availableBySku = new Map(finishedGoods.map((item) => [item.sku, item.quantity]))
+
   return products.map((p) => ({
     id: p.id,
     product_code: p.sku,
@@ -424,7 +354,9 @@ export async function searchProductsForSale(query: string, branch: string) {
     uom: p.uom,
     category: p.category,
     selling_price: p.unitCost ?? 0,
-    stock_at_branch: p.currentStock,
+    stock_at_branch: p.sku && availableBySku.has(p.sku)
+      ? availableBySku.get(p.sku)!
+      : p.currentStock,
     piecesSets: p.piecesSets ?? 0,
   }))
 }

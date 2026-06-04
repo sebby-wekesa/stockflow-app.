@@ -19,6 +19,7 @@ export default async function CataloguePage() {
       select: { id: true, name: true, sku: true, currentStock: true, uom: true, origin: true, unitCost: true, createdAt: true },
     }),
   ]);
+  const availableBySku = new Map(finishedGoods.map(item => [item.sku, item.quantity]));
 
    // Manufactured items
    const manufactured = finishedGoods.map(p => ({
@@ -43,7 +44,9 @@ export default async function CataloguePage() {
        code: p.sku || p.id.slice(0, 8),
        description: undefined,
      },
-     quantity: Math.floor(p.currentStock),
+     quantity: p.sku && availableBySku.has(p.sku)
+       ? availableBySku.get(p.sku)!
+       : Math.floor(p.currentStock),
      kgProduced: 0,
      price: p.unitCost ?? null,
      createdAt: p.createdAt.toISOString(),

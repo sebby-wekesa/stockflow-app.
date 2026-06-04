@@ -34,7 +34,7 @@ export default async function CustomersPage({
       skip: (page - 1) * PAGE_SIZE,
       include: {
         SaleOrder: {
-          where: { status: { in: ['CONFIRMED', 'SHIPPED'] } },
+          where: { status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED'] } },
           select: {
             createdAt: true,
             SaleItem: { select: { totalPrice: true } }

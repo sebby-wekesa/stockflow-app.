@@ -4,6 +4,8 @@ import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { stageLogSchema } from "@/lib/schemas";
 import { revalidatePath } from 'next/cache';
+import { reserveSaleOrder } from '@/lib/order-lifecycle';
+import { assertOperatorDepartment } from '@/lib/operator-access';
 
 export async function completeStage(data: {
   orderId: string;
@@ -61,6 +63,7 @@ export async function completeStage(data: {
     if (order.status !== 'IN_PRODUCTION') {
       throw new Error('Order is not in production status');
     }
+    assertOperatorDepartment(user, order.currentDept);
 
     // Verify this is the correct stage sequence
     if (validatedData.sequence !== order.currentStage) {
@@ -161,10 +164,12 @@ export async function completeStage(data: {
           });
 
           if (openLinkedOrders === 0) {
-            await tx.saleOrder.update({
+            const saleOrder = await tx.saleOrder.findUnique({
               where: { id: order.saleOrderId },
-              data: { status: 'CONFIRMED' },
+              include: { SaleItem: { include: { FinishedGoods: true } } },
             });
+            if (!saleOrder) throw new Error('Linked sales order not found');
+            await reserveSaleOrder(tx, saleOrder);
           }
         }
       } else {
@@ -229,9 +234,7 @@ export async function getOrderForCompletion(orderId: string) {
   }
 
   // Check permissions - operators can only see orders in their department
-  if (user.role === 'OPERATOR' && order.currentDept !== user.department) {
-    throw new Error('Unauthorized: Order not in your department');
-  }
+  assertOperatorDepartment(user, order.currentDept);
 
   const currentStage = order.design.stages.find(s => s.sequence === order.currentStage);
   const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;

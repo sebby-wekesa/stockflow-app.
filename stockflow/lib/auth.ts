@@ -34,6 +34,7 @@ export type AuthUser = {
   name: string | null;
   role: UserRole;
   department: string | null;
+  departments: string[];
   branches: { id: string; name: string }[];
   // New in Stage 2 — multitenancy
   organizationId: string;
@@ -99,6 +100,11 @@ export async function getUser(): Promise<AuthUser | null> {
       name: user.name ?? "",
       role: user.role,
       department: user.department ?? null,
+      departments: user.departments?.length
+        ? user.departments
+        : user.department
+          ? [user.department]
+          : [],
       branches: user.Branch ? [{ id: user.Branch.id, name: user.Branch.name }] : [],
       organizationId: user.Organization.id,
       organization: {

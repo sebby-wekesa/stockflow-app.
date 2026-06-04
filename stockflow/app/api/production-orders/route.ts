@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const user = await requireActiveAuth();
+    if (!['ADMIN', 'MANAGER'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const db = getTenantPrisma(user.organizationId);
 
     const body = await request.json()
@@ -66,6 +69,7 @@ export async function POST(request: NextRequest) {
     // Check if design exists (tenant scoped)
     const design = await db.design.findUnique({
       where: { id: designId },
+      include: { stages: { orderBy: { sequence: 'asc' }, take: 1 } },
     })
 
     if (!design) {
@@ -73,6 +77,9 @@ export async function POST(request: NextRequest) {
         { error: 'Design not found' },
         { status: 404 }
       )
+    }
+    if (design.stages.length === 0) {
+      return NextResponse.json({ error: 'Design has no production stages' }, { status: 400 });
     }
 
     // Generate a unique order number (e.g., PO-123456)
@@ -87,8 +94,8 @@ export async function POST(request: NextRequest) {
         targetKg: initialWeight,
         priority: priority || 'MEDIUM',
         status: 'PENDING',
-        currentDept: "Cutting",
-        currentStage: 1
+        currentStage: design.stages[0].sequence,
+        currentDept: design.stages[0].department,
       } as any,
       include: {
         design: true,
@@ -146,6 +153,9 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const user = await requireActiveAuth();
+    if (!['ADMIN', 'MANAGER'].includes(user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const db = getTenantPrisma(user.organizationId);
 
     const searchParams = request.nextUrl.searchParams

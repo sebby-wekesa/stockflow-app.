@@ -3,6 +3,7 @@
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
+import { consumeSaleOrderReservation } from '@/lib/order-lifecycle';
 
 export async function getPackagingQueue() {
   const user = await requireActiveAuth();
@@ -35,11 +36,11 @@ export async function getPackagingQueue() {
     }
   });
 
-  // Filter to only include orders where all items have available finished goods
+  // Confirmed orders have stock reserved specifically for packaging.
   const packableOrders = salesOrders.filter(order => {
     return order.SaleItem.every(item => {
       const finishedGoods = item.FinishedGoods;
-      return finishedGoods && finishedGoods.quantity >= item.quantity;
+      return finishedGoods && finishedGoods.reservedQuantity >= item.quantity;
     });
   });
 
@@ -64,7 +65,7 @@ export async function getPackagingQueue() {
       quantity: item.quantity,
       unitPrice: Number(item.unitPrice),
       totalPrice: Number(item.totalPrice),
-      availableStock: item.FinishedGoods?.quantity || 0
+      availableStock: item.FinishedGoods?.reservedQuantity || 0
     }))
   }));
 }
@@ -103,30 +104,48 @@ export async function fulfillOrder(orderId: string) {
       throw new Error('Order is not in a fulfillable state');
     }
 
-    // Verify all items are still available
+    // Verify all items are still reserved for this order.
     for (const item of order.SaleItem) {
-      if (!item.FinishedGoods || item.FinishedGoods.quantity < item.quantity) {
-        throw new Error(`Insufficient stock for ${item.FinishedGoods?.design?.name || 'item'}`);
+      if (!item.FinishedGoods || item.FinishedGoods.reservedQuantity < item.quantity) {
+        throw new Error(`Insufficient reserved stock for ${item.FinishedGoods?.design?.name || 'item'}`);
       }
     }
 
-    // Update finished goods inventory (reduce quantities)
+    await consumeSaleOrderReservation(tx, order);
+
+    // Product is a catalogue mirror for imported/local items. Physical stock
+    // leaves both records only when packaging fulfils the confirmed order.
     for (const item of order.SaleItem) {
-      await tx.finishedGoods.update({
-        where: { id: item.finishedGoodsId },
+      const product = await tx.product.findFirst({
+        where: { sku: item.FinishedGoods.sku },
+      });
+      if (!product) continue;
+
+      const decremented = await tx.product.updateMany({
+        where: { id: product.id, currentStock: { gte: item.quantity } },
+        data: { currentStock: { decrement: item.quantity } },
+      });
+      if (decremented.count === 0) {
+        throw new Error(`Product stock is inconsistent for ${item.FinishedGoods.sku}`);
+      }
+
+      await tx.stockMovement.create({
         data: {
-          quantity: {
-            decrement: item.quantity
-          }
-        }
+          organizationId: user.organizationId,
+          productId: product.id,
+          movementType: 'sale',
+          quantity: -item.quantity,
+          reference: order.id,
+          notes: `Fulfilled sale to ${order.customerName}`,
+        },
       });
     }
 
-    // Mark order as shipped
+    // Packaging is complete. Dispatch is a separate controlled handoff.
     await tx.saleOrder.update({
       where: { id: orderId },
       data: {
-        status: 'SHIPPED'
+        status: 'READY_FOR_DISPATCH'
       }
     });
 
@@ -143,13 +162,30 @@ export async function fulfillOrder(orderId: string) {
   });
 }
 
+export async function markOrderShipped(orderId: string) {
+  const user = await requireActiveAuth();
+  if (!['PACKAGING', 'ADMIN', 'MANAGER'].includes(user.role)) {
+    throw new Error('Unauthorized: Only packaging staff can dispatch orders');
+  }
+  const db = getTenantPrisma(user.organizationId);
+  const updated = await db.saleOrder.updateMany({
+    where: { id: orderId, status: 'READY_FOR_DISPATCH' },
+    data: { status: 'SHIPPED' },
+  });
+  if (updated.count === 0) throw new Error('Order is not ready for dispatch');
+
+  revalidatePath('/pack_done');
+  revalidatePath('/sales');
+  return { success: true };
+}
+
 export async function getPackagingStats() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
   const [
     pendingOrders,
-    shippedToday,
+    readyForDispatch,
     totalPackagedThisWeek
   ] = await Promise.all([
     // Pending orders count
@@ -157,14 +193,9 @@ export async function getPackagingStats() {
       where: { status: 'CONFIRMED' }
     }),
 
-    // Orders shipped today
+    // Orders packed and ready for dispatch
     db.saleOrder.count({
-      where: {
-        status: 'SHIPPED',
-        updatedAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0))
-        }
-      }
+      where: { status: 'READY_FOR_DISPATCH' }
     }),
 
     // Total items packaged this week
@@ -183,7 +214,7 @@ export async function getPackagingStats() {
 
   return {
     pendingOrders,
-    shippedToday,
+    shippedToday: readyForDispatch,
     weeklyRevenue: Number(totalPackagedThisWeek._sum.totalAmount || 0)
   };
 }

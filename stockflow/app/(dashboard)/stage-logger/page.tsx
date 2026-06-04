@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { StageLoggingForm } from '@/components/StageLoggingForm'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
+import { getOperatorDepartments } from '@/lib/operator-access'
 
 export const metadata: Metadata = {
   title: 'Stage Logger | StockFlow',
@@ -13,12 +14,14 @@ async function getActiveOrders() {
   try {
     const user = await requireActiveAuth()
     const db = getTenantPrisma(user.organizationId)
+    const departments = getOperatorDepartments(user)
 
     const orders = await db.productionOrder.findMany({
       where: {
         status: {
           in: ['IN_PRODUCTION', 'APPROVED'],
         },
+        ...(user.role === 'OPERATOR' ? { currentDept: { in: departments } } : {}),
       },
       include: {
         design: {
@@ -43,6 +46,7 @@ async function getActiveOrders() {
 }
 
 export default async function StageLoggerPage() {
+  const user = await requireActiveAuth()
   const activeOrders = await getActiveOrders()
 
   return (
@@ -60,7 +64,7 @@ export default async function StageLoggerPage() {
         {activeOrders.length > 0 ? (
           <StageLoggingForm
             activeOrders={activeOrders}
-            currentDepartment="CUTTING"
+            currentDepartment={user.departments[0] || user.department || ''}
             onSuccess={() => {
               // Optional: trigger refresh or additional actions
               console.log('Stage logged successfully')

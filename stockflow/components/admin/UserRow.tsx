@@ -22,6 +22,7 @@ interface UserRowProps {
     email: string;
     role: UserRole;
     department?: string | null;
+    departments?: string[];
     isVerified?: boolean;
   }
 }
@@ -107,6 +108,10 @@ export function UserRow({ user }: UserRowProps) {
   const handleEdit = () => {
     const newName = prompt("Enter new name:", user.name || "");
     if (newName === null) return;
+    const departments = user.role === 'OPERATOR'
+      ? prompt('Enter assigned departments separated by commas:', (user.departments || []).join(', '))
+      : '';
+    if (departments === null) return;
 
     setError(null);
     startTransition(async () => {
@@ -115,6 +120,7 @@ export function UserRow({ user }: UserRowProps) {
         formData.append("userId", user.id);
         formData.append("name", newName);
         formData.append("role", user.role);
+        formData.append("departments", departments);
         // branchId is now optional
         
         await updateUser(formData);

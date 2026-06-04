@@ -2,7 +2,6 @@
 
 import { requireAuth } from "@/lib/auth";
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
-import type { SaleStatus } from "@prisma/client";
 import { normalizeBranchCode } from "@/lib/branches";
 
 interface ParsedSaleRow {
@@ -84,6 +83,17 @@ export async function importSalesData(rawText: string) {
   let created = 0;
 
   await withTenantTransaction(user.organizationId, async (tx) => {
+    let placeholderDesign = await tx.design.findFirst({ where: { code: 'IMPORTED' } });
+    if (!placeholderDesign) {
+      placeholderDesign = await tx.design.create({
+        data: {
+          name: 'Manual sale placeholder',
+          code: 'IMPORTED',
+          description: 'Placeholder design used when importing historical sales.',
+        },
+      });
+    }
+
     for (const sale of sales) {
       let product = await tx.product.findFirst({
         where: { name: sale.productName, branchId: branch.id },
@@ -101,15 +111,33 @@ export async function importSalesData(rawText: string) {
         });
       }
 
+      const finishedGoods = await tx.finishedGoods.upsert({
+        where: {
+          organizationId_sku: {
+            organizationId: user.organizationId,
+            sku: product.sku || product.id,
+          },
+        },
+        update: {},
+        create: {
+          sku: product.sku || product.id,
+          designId: placeholderDesign.id,
+          quantity: 0,
+          kgProduced: 0,
+          unitCost: sale.unitPrice,
+        },
+      });
+
       await tx.saleOrder.create({
         data: {
           customerName: sale.customerName,
           totalAmount: sale.totalAmount,
-          status: 'CONFIRMED' satisfies SaleStatus,
+          // Imported sales are historical transactions that already left stock.
+          status: 'SHIPPED',
           createdAt: sale.date,
           SaleItem: {
             create: {
-              finishedGoodsId: product.id,
+              finishedGoodsId: finishedGoods.id,
               quantity: sale.quantity,
               unitPrice: sale.unitPrice,
               totalPrice: sale.totalAmount,

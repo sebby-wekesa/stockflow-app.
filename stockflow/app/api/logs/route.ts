@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
+import { completeStage } from '@/app/actions/stage-completion'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     const db = getTenantPrisma(user.organizationId)
 
     const body = await request.json()
-    const { orderId, department, inputWeight, outputWeight, scrapWeight, timestamp } = body
+    const { orderId, department, inputWeight, outputWeight, scrapWeight } = body
 
     // Validate input
     if (!orderId || !department || inputWeight === undefined || outputWeight === undefined || scrapWeight === undefined) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Get the order to find current stage (automatically scoped)
     const order = await db.productionOrder.findFirst({
       where: { id: orderId },
-      include: { design: true },
+      include: { design: { include: { stages: true } } },
     })
 
     if (!order) {
@@ -50,32 +51,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create stage log in database (organizationId injected automatically)
-    const stageLog = await db.stageLog.create({
-      data: {
-        orderId,
-        stageName: department,
-        department: department,
-        sequence: order.currentStage,
-        kgIn: inputWeight,
-        kgOut: outputWeight,
-        kgScrap: scrapWeight,
-        operatorId: user.id,
-        notes: `Logged at ${new Date().toLocaleString()}`,
-        completedAt: new Date(timestamp),
-      } as any,
-      include: {
-        User: {
-          select: { name: true, email: true },
-        },
-      },
+    const stage = order.design.stages.find(stage => stage.sequence === order.currentStage)
+    if (!stage) {
+      return NextResponse.json({ error: 'Current stage not found' }, { status: 400 })
+    }
+    const result = await completeStage({
+      orderId,
+      stageId: stage.id,
+      stageName: stage.name,
+      department,
+      sequence: stage.sequence,
+      kgIn: Number(inputWeight),
+      kgOut: Number(outputWeight),
+      kgScrap: Number(scrapWeight),
     })
 
     return NextResponse.json(
       {
         success: true,
         message: 'Stage log created successfully',
-        data: stageLog,
+        data: result.stageLog,
       },
       { status: 201 }
     )

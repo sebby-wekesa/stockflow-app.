@@ -34,7 +34,7 @@ export default async function ReportsPage({
   ] = await Promise.all([
     db.saleOrder.aggregate({
       where: {
-        status: { in: ['CONFIRMED', 'SHIPPED'] },
+        status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED'] },
         createdAt: periodFilter,
       },
       _count: { _all: true },
@@ -60,7 +60,7 @@ export default async function ReportsPage({
     }),
     db.saleOrder.findMany({
       where: {
-        status: { in: ['CONFIRMED', 'SHIPPED'] },
+        status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED'] },
         createdAt: periodFilter,
       },
       select: {

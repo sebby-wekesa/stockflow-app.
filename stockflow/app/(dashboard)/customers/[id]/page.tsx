@@ -19,7 +19,7 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
     where: { id },
     include: {
       SaleOrder: {
-        where: { status: { in: ['CONFIRMED', 'SHIPPED'] } },
+        where: { status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED'] } },
         orderBy: { createdAt: 'desc' },
         include: {
           SaleItem: {

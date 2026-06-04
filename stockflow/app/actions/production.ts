@@ -3,12 +3,16 @@
 import { revalidatePath } from 'next/cache';
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
+import { assertOperatorDepartment, getOperatorDepartments } from "@/lib/operator-access";
 
 export async function getOperatorQueue(role?: string, department?: string) {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
-  const effectiveRole = role || user.role;
-  const effectiveDept = department || user.department;
+  void role;
+  const effectiveRole = user.role;
+  const operatorDepartments = getOperatorDepartments(user);
+  const effectiveDept = department || operatorDepartments[0];
+  if (user.role === 'OPERATOR' && effectiveDept) assertOperatorDepartment(user, effectiveDept);
 
   // If user is ADMIN or MANAGER, they see all queues.
   // If OPERATOR, they see their department's queue.
@@ -17,7 +21,7 @@ export async function getOperatorQueue(role?: string, department?: string) {
     orders = await db.productionOrder.findMany({
       where: {
         status: "IN_PRODUCTION",
-        ...(effectiveRole === "OPERATOR" && effectiveDept ? { currentDept: effectiveDept } : {}),
+        ...(effectiveRole === "OPERATOR" ? { currentDept: { in: operatorDepartments } } : {}),
       },
       include: {
         design: {
@@ -119,6 +123,7 @@ export async function getOrderForLogging(id: string) {
   }
 
   if (!order) throw new Error("Order not found");
+  assertOperatorDepartment(user, order.currentDept);
 
   // Determine inheritedKg (from previous stage log or targetKg if first stage)
   const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
@@ -172,11 +177,9 @@ export async function getActiveDepartments() {
       .map(d => d.currentDept)
       .filter((d): d is string => !!d);
 
-    // Always include user's own department if set
-    if (user.department && !active.includes(user.department)) {
-      active.unshift(user.department);
+    if (user.role === 'OPERATOR') {
+      return getOperatorDepartments(user).filter(department => active.includes(department));
     }
-
     return active;
   } catch (error) {
     console.warn("Failed to fetch active departments:", error);
