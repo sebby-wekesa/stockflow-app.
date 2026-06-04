@@ -10,10 +10,13 @@ export const dynamic = 'force-dynamic';
 export default async function RawmaterialsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ q?: string; category?: string }>
 }) {
   const params = await searchParams
   const query = (params.q || '').trim()
+  const category = RAW_MATERIAL_CATEGORIES.includes(params.category as (typeof RAW_MATERIAL_CATEGORIES)[number])
+    ? params.category as (typeof RAW_MATERIAL_CATEGORIES)[number]
+    : ''
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
   const materialSearch = query
@@ -21,7 +24,6 @@ export default async function RawmaterialsPage({
         OR: [
           { sku: { contains: query, mode: 'insensitive' as const } },
           { materialName: { contains: query, mode: 'insensitive' as const } },
-          { category: { contains: query, mode: 'insensitive' as const } },
           { diameter: { contains: query, mode: 'insensitive' as const } },
           { length: { contains: query, mode: 'insensitive' as const } },
           { width: { contains: query, mode: 'insensitive' as const } },
@@ -29,15 +31,16 @@ export default async function RawmaterialsPage({
         ],
       }
     : undefined
-  const receiptSearch = query
-    ? {
+  const receiptSearch = {
+    ...(category ? { RawMaterial: { category } } : {}),
+    ...(query ? {
         OR: [
           { reference: { contains: query, mode: 'insensitive' as const } },
           { loggedBy: { contains: query, mode: 'insensitive' as const } },
           { RawMaterial: materialSearch },
         ],
-      }
-    : undefined
+      } : {}),
+  }
 
   const materials = await withRetry(() => db.rawMaterial.findMany({
     where: { category: { in: [...RAW_MATERIAL_CATEGORIES] } },
@@ -103,7 +106,7 @@ export default async function RawmaterialsPage({
             <div className="section-sub">Recent raw material receipts</div>
           </div>
         </div>
-        <form action="/rawmaterials" className="mb-16" style={{display:'flex',gap:'12px',alignItems:'end'}}>
+        <form action="/rawmaterials" className="mb-16" style={{display:'flex',gap:'12px',alignItems:'end',flexWrap:'wrap'}}>
           <div className="form-group" style={{flex:1,marginBottom:0}}>
             <label className="form-label" htmlFor="raw-material-search">Search receipt history</label>
             <input
@@ -112,11 +115,25 @@ export default async function RawmaterialsPage({
               type="search"
               className="form-input"
               defaultValue={query}
-              placeholder="Search material, category, dimensions, reference, or user"
+              placeholder="Search material, dimensions, reference, or user"
             />
           </div>
-          <button type="submit" className="btn btn-primary">Search</button>
-          {query && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
+          <div className="form-group" style={{minWidth:'190px',marginBottom:0}}>
+            <label className="form-label" htmlFor="raw-material-category">Category</label>
+            <select
+              id="raw-material-category"
+              name="category"
+              className="form-input"
+              defaultValue={category}
+            >
+              <option value="">All categories</option>
+              {RAW_MATERIAL_CATEGORIES.map((item) => (
+                <option key={item} value={item}>{categoryLabels[item]}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className="btn btn-primary">Filter</button>
+          {(query || category) && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
         </form>
         <div className="table-wrap">
           <table>
@@ -177,7 +194,7 @@ export default async function RawmaterialsPage({
             })}
             {receipts.length === 0 && (
               <tr><td colSpan={9} style={{textAlign: 'center', color: 'var(--muted)'}}>
-                {query ? `No receipts match "${query}".` : 'No receipts found.'}
+                {(query || category) ? 'No receipts match the selected filters.' : 'No receipts found.'}
               </td></tr>
             )}
           </tbody>
