@@ -21,6 +21,7 @@ interface HistoryItem {
   orderNumber: string;
   designName: string;
   completedAt: string | Date;
+  kgIn: number;
   kgOut: number;
   kgScrap: number;
   department: string;
@@ -82,25 +83,51 @@ export default function OperatorDashboard() {
   }, []);
 
   return (
-    <div className="mb-24">
-      <div className="section-header mb-12">
+    <div className="operator-page">
+      <div className="section-header mb-16">
         <div>
           <div className="section-title">Operator Dashboard</div>
           <div className="section-sub">
-            Your station queue, logging, and completed work — all in one place
+            Live station workload and your recent production output
           </div>
+        </div>
+        <span className="badge badge-purple">{jobs.length} jobs ready</span>
+      </div>
+
+      <div className="stats-grid operator-stats">
+        <div className="stat-card purple">
+          <div className="stat-label">Current queue</div>
+          <div className="stat-value">{jobs.length}</div>
+          <div className="stat-sub">{selectedDept || "No active station"}</div>
+        </div>
+        <div className="stat-card amber">
+          <div className="stat-label">Urgent work</div>
+          <div className="stat-value">{jobs.filter((job) => job.priority === "URGENT" || job.priority === "HIGH").length}</div>
+          <div className="stat-sub">High priority jobs</div>
+        </div>
+        <div className="stat-card teal">
+          <div className="stat-label">Recent output</div>
+          <div className="stat-value">
+            {history.reduce((sum, item) => sum + Number(item.kgOut), 0).toFixed(1)}
+            <span className="stat-suffix">kg</span>
+          </div>
+          <div className="stat-sub">Last {history.length} completed stages</div>
         </div>
       </div>
 
-      {/* Department Chooser */}
-      <div className="mb-8">
-        <div className="text-xs uppercase tracking-[1px] text-muted mb-2">Choose Department / Station</div>
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Current Station</div>
+            <div className="section-sub">Choose a station to view its live queue</div>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           {departments.map((dept) => (
             <button
               key={dept}
               onClick={() => setSelectedDept(dept)}
-              className={`btn btn-sm ${selectedDept === dept ? "btn-primary" : "btn-secondary"}`}
+              className={`btn ${selectedDept === dept ? "btn-primary" : "btn-ghost"}`}
             >
               {dept}
             </button>
@@ -111,11 +138,13 @@ export default function OperatorDashboard() {
         </div>
       </div>
 
-      {/* Active Queue (full featured, matching /operator/queue) */}
-      <div className="card mb-10">
-        <div className="section-header mb-8">
-          <div className="section-title">{selectedDept || "Loading..."} — Active Jobs</div>
-          <div className="section-sub">Jobs waiting to be processed at this station. Click to log production.</div>
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">{selectedDept || "Station"} Queue</div>
+            <div className="section-sub">Open a job to record production for its current stage</div>
+          </div>
+          <Link href="/operator_queue" className="btn btn-ghost btn-sm">View full queue →</Link>
         </div>
 
         {loading && (
@@ -128,23 +157,31 @@ export default function OperatorDashboard() {
               const isUrgent = job.priority === "URGENT" || job.priority === "HIGH";
               return (
                 <Link key={job.id} href={`/operator_log/${job.id}`} className="block">
-                  <div className={`job-card ${isUrgent ? "urgent" : "inprog"}`}>
+                  <div className={`operator-job ${isUrgent ? "urgent" : ""}`}>
                     <div className="job-header">
                       <span className="job-id">
-                        {job.orderNumber} · Stage {job.currentStage}/{job.totalStages}
+                        {job.orderNumber}
                       </span>
                       <span className={`badge ${isUrgent ? "badge-red" : "badge-amber"}`}>
                         {isUrgent ? "Urgent" : "Ready"}
                       </span>
                     </div>
-                    <div className="job-design">
-                      {job.designName} — {job.workDescription}
+                    <div className="operator-job-body">
+                      <div>
+                        <div className="job-design">{job.designName}</div>
+                        <div className="section-sub">{job.workDescription}</div>
+                      </div>
+                      <div className="operator-stage">
+                        <span>Stage</span>
+                        <strong>{job.currentStage}/{job.totalStages}</strong>
+                      </div>
                     </div>
-                    <div className="job-meta" style={{ marginTop: "6px", fontSize: "12px", color: "var(--muted)" }}>
+                    <div className="job-meta operator-job-meta">
                       <span>
-                        Target: <span className="job-kg">{Number(job.targetKg).toFixed(1)} kg</span>
+                        Received <span className="job-kg">{Number(job.inheritedKg).toFixed(1)} kg</span>
                       </span>
-                      <span>Received: {Number(job.inheritedKg).toFixed(1)} kg</span>
+                      <span>Order target <strong>{Number(job.targetKg).toFixed(1)} kg</strong></span>
+                      <span className="operator-open">Open job →</span>
                     </div>
                   </div>
                 </Link>
@@ -168,11 +205,13 @@ export default function OperatorDashboard() {
         )}
       </div>
 
-      {/* My History (everything from the dedicated operator history) */}
       <div className="card">
-        <div className="section-header mb-8">
-          <div className="section-title">My Completed Work</div>
-          <div className="section-sub">Recent stages you have logged</div>
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">My Recent Output</div>
+            <div className="section-sub">Latest stages logged from the production database</div>
+          </div>
+          <Link href="/operator_history" className="btn btn-ghost btn-sm">View history →</Link>
         </div>
 
         {loadingHistory && <div className="p-6 text-center text-muted">Loading history...</div>}
@@ -182,28 +221,24 @@ export default function OperatorDashboard() {
         )}
 
         {!loadingHistory && history.length > 0 && (
-          <div className="space-y-3">
-            {history.map((item) => (
-              <div key={item.id} className="job-card completed">
-                <div className="job-header">
-                  <span className="job-id">{item.orderNumber}</span>
-                  <span className="badge badge-green">Completed</span>
-                </div>
-                <div className="job-design">{item.designName} — {item.stageName} ({item.department})</div>
-                <div className="job-meta" style={{ marginTop: "6px", fontSize: "12px", color: "var(--muted)" }}>
-                  <span>Out: {Number(item.kgOut).toFixed(1)} kg</span>
-                  {item.kgScrap > 0 && <span>Scrap: {Number(item.kgScrap).toFixed(1)} kg</span>}
-                  <span>{new Date(item.completedAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-            ))}
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Order</th><th>Design / stage</th><th>Department</th><th>Output</th><th>Scrap</th><th>Completed</th></tr></thead>
+              <tbody>
+                {history.slice(0, 8).map((item) => (
+                  <tr key={item.id}>
+                    <td><span className="job-id">{item.orderNumber}</span></td>
+                    <td><strong>{item.designName}</strong><div className="section-sub">{item.stageName}</div></td>
+                    <td><span className="badge badge-muted">{item.department}</span></td>
+                    <td><span className="job-kg">{Number(item.kgOut).toFixed(1)} kg</span></td>
+                    <td style={{ color: item.kgScrap > 0 ? "var(--red)" : "var(--muted)" }}>{Number(item.kgScrap).toFixed(1)} kg</td>
+                    <td className="section-sub">{new Date(item.completedAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
-
-      {/* Quick links to full logging/history if needed */}
-      <div className="mt-6 text-center text-xs text-muted">
-        Full operator tools also available at <Link href="/operator_queue" className="underline">/operator_queue</Link> and <Link href="/operator_history" className="underline">/operator_history</Link>
       </div>
     </div>
   );

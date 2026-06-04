@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getOperatorQueue, getActiveDepartments } from "@/app/actions/production";
+import {
+  getOperatorQueue,
+  getActiveDepartments,
+  type OperatorQueueItem,
+} from "@/app/actions/production";
 
 export default function OperatorQueuePage() {
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [departments, setDepartments] = useState<string[]>([]);
-  const [orders, setOrders] = useState<any[]>([]); // TODO: proper type from production action
+  const [orders, setOrders] = useState<OperatorQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Load available departments on mount
@@ -42,25 +46,51 @@ export default function OperatorQueuePage() {
   }, [selectedDept]);
 
   return (
-    <div>
+    <div className="operator-page">
       <div className="section-header mb-16">
         <div>
-          <div className="section-title">Department Queue</div>
-          <div className="section-sub">Choose your current station to see available active jobs</div>
+          <div className="section-title">Job Queue</div>
+          <div className="section-sub">Live production work assigned to your stations</div>
+        </div>
+        <span className="badge badge-purple">{orders.length} active</span>
+      </div>
+
+      <div className="stats-grid operator-stats">
+        <div className="stat-card purple">
+          <div className="stat-label">Jobs at station</div>
+          <div className="stat-value">{orders.length}</div>
+          <div className="stat-sub">{selectedDept || "No station selected"}</div>
+        </div>
+        <div className="stat-card amber">
+          <div className="stat-label">Urgent jobs</div>
+          <div className="stat-value">
+            {orders.filter((order) => order.priority === "URGENT" || order.priority === "HIGH").length}
+          </div>
+          <div className="stat-sub">High priority work</div>
+        </div>
+        <div className="stat-card teal">
+          <div className="stat-label">Incoming weight</div>
+          <div className="stat-value">
+            {orders.reduce((sum, order) => sum + order.inheritedKg, 0).toFixed(1)}
+            <span className="stat-suffix">kg</span>
+          </div>
+          <div className="stat-sub">Available to process</div>
         </div>
       </div>
 
-      {/* Department Chooser */}
-      <div className="mb-8">
-        <div className="section-header mb-3">
-          <div className="section-title text-sm">Select Department / Station</div>
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Select Station</div>
+            <div className="section-sub">Your queue refreshes when you change stations</div>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {departments.map((dept) => (
             <button
               key={dept}
               onClick={() => setSelectedDept(dept)}
-              className={`btn btn-sm ${selectedDept === dept ? "btn-primary" : "btn-secondary"}`}
+              className={`btn ${selectedDept === dept ? "btn-primary" : "btn-ghost"}`}
             >
               {dept}
             </button>
@@ -73,8 +103,11 @@ export default function OperatorQueuePage() {
 
       <div className="card">
         <div className="section-header mb-16">
-          <div className="section-title">Active Jobs — {selectedDept || "Loading..."}</div>
-          <div className="section-sub">Jobs currently waiting at this department</div>
+          <div>
+            <div className="section-title">{selectedDept || "Station"} Queue</div>
+            <div className="section-sub">Open a job to record production for its current stage</div>
+          </div>
+          {selectedDept && <span className="badge badge-muted">{selectedDept}</span>}
         </div>
 
         {loading && <div className="p-6 text-center text-muted">Loading jobs...</div>}
@@ -86,26 +119,34 @@ export default function OperatorQueuePage() {
               return (
                 <Link
                   key={order.id}
-                  href={`/operator_log?orderId=${order.id}`}
+                  href={`/operator_log/${order.id}`}
                   style={{ textDecoration: "none", color: "inherit" }}
                 >
-                  <div className={`job-card ${isUrgent ? "urgent" : ""}`} style={{ cursor: "pointer" }}>
+                  <div className={`operator-job ${isUrgent ? "urgent" : ""}`}>
                     <div className="job-header">
                       <span className="job-id">
-                        {order.orderNumber} · Stage {order.currentStage}/{order.totalStages}
+                        {order.orderNumber}
                       </span>
                       <span className={`badge ${isUrgent ? "badge-red" : "badge-amber"}`}>
                         {isUrgent ? "Urgent" : "In progress"}
                       </span>
                     </div>
-                    <div className="job-design">
-                      {order.designName} — {order.workDescription}
+                    <div className="operator-job-body">
+                      <div>
+                        <div className="job-design">{order.designName}</div>
+                        <div className="section-sub">{order.workDescription}</div>
+                      </div>
+                      <div className="operator-stage">
+                        <span>Stage</span>
+                        <strong>{order.currentStage}/{order.totalStages}</strong>
+                      </div>
                     </div>
-                    <div className="job-meta" style={{ marginTop: "8px", display: "flex", gap: "16px", fontSize: "12px", color: "var(--muted)" }}>
+                    <div className="job-meta operator-job-meta">
                       <span>
-                        Received: <span className="job-kg">{order.inheritedKg.toFixed(2)} kg</span>
+                        Received <span className="job-kg">{order.inheritedKg.toFixed(2)} kg</span>
                       </span>
-                      <span>Target: {order.targetKg.toFixed(2)} kg</span>
+                      <span>Order target <strong>{order.targetKg.toFixed(2)} kg</strong></span>
+                      <span className="operator-open">Open job →</span>
                     </div>
                   </div>
                 </Link>

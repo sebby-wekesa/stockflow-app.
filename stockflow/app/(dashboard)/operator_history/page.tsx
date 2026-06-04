@@ -24,19 +24,51 @@ export default async function OperatorHistoryPage() {
     orderBy: { completedAt: 'desc' },
     take: 50,
   })
+  const totalKgOut = logs.reduce((sum, log) => sum + Number(log.kgOut), 0)
+  const totalScrap = logs.reduce((sum, log) => sum + Number(log.kgScrap), 0)
+  const totalKgIn = logs.reduce((sum, log) => sum + Number(log.kgIn), 0)
+  const yieldRate = totalKgIn > 0 ? (totalKgOut / totalKgIn) * 100 : 0
 
   return (
-    <div>
+    <div className="operator-page">
       <div className="section-header mb-16">
         <div>
-          <div className="section-title">Operator History</div>
-          <div className="section-sub">Recent stage logs from production</div>
+          <div className="section-title">{user.role === 'OPERATOR' ? 'My Completed Work' : 'Operator History'}</div>
+          <div className="section-sub">Live stage completion records from the production database</div>
+        </div>
+        <span className="badge badge-teal">{logs.length} recent logs</span>
+      </div>
+
+      <div className="stats-grid operator-stats">
+        <div className="stat-card teal">
+          <div className="stat-label">Stages completed</div>
+          <div className="stat-value">{logs.length}</div>
+          <div className="stat-sub">Most recent production logs</div>
+        </div>
+        <div className="stat-card amber">
+          <div className="stat-label">Output recorded</div>
+          <div className="stat-value">{totalKgOut.toFixed(1)}<span className="stat-suffix">kg</span></div>
+          <div className="stat-sub">Across completed stages</div>
+        </div>
+        <div className="stat-card purple">
+          <div className="stat-label">Recorded yield</div>
+          <div className="stat-value">{yieldRate.toFixed(1)}<span className="stat-suffix">%</span></div>
+          <div className="stat-sub">{totalScrap.toFixed(1)} kg scrap recorded</div>
         </div>
       </div>
 
       <div className="card">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Completion Log</div>
+            <div className="section-sub">Newest stage completions first</div>
+          </div>
+        </div>
         {logs.length === 0 ? (
-          <div className="p-8 text-center text-muted text-sm">No completed work logged yet.</div>
+          <div className="operator-empty">
+            <div className="section-title">No completed work yet</div>
+            <div className="section-sub">Completed stages will appear here after production is logged.</div>
+          </div>
         ) : (
           <div className="table-wrap">
             <table>
@@ -54,12 +86,12 @@ export default async function OperatorHistoryPage() {
               <tbody>
                 {logs.map((log) => (
                   <tr key={log.id}>
-                    <td className="font-mono text-sm">{log.ProductionOrder.orderNumber}</td>
+                    <td><span className="job-id">{log.ProductionOrder.orderNumber}</span></td>
                     <td>{log.ProductionOrder.design.name}</td>
                     <td>{log.stageName}</td>
-                    <td>{log.department}</td>
-                    <td className="font-mono text-sm">{Number(log.kgOut).toFixed(2)} kg</td>
-                    <td className="font-mono text-sm">{Number(log.kgScrap).toFixed(2)} kg</td>
+                    <td><span className="badge badge-muted">{log.department || 'Unassigned'}</span></td>
+                    <td><span className="job-kg">{Number(log.kgOut).toFixed(2)} kg</span></td>
+                    <td style={{ color: Number(log.kgScrap) > 0 ? 'var(--red)' : 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{Number(log.kgScrap).toFixed(2)} kg</td>
                     <td className="text-muted text-sm">
                       {new Date(log.completedAt).toLocaleDateString()}
                     </td>

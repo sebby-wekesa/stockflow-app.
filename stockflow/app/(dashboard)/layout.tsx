@@ -48,11 +48,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // 2. Security: If the user is on the wrong page, redirect them
   // This stops the "Permission Denied" flash by catching it before render
   return (
-    <div className="flex h-screen bg-zinc-950 text-white">
+    <div className="app">
       <PresenceHeartbeat />
       <Sidebar role={role} counts={sidebarCounts} />
-      <div className="flex-1 overflow-auto">
-        {children}
+      <div className="main">
+        <main className="content">
+          {children}
+        </main>
       </div>
     </div>
   );

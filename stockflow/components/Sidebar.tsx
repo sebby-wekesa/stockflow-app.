@@ -78,6 +78,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
     case 'OPERATOR':
       return [
         { section: "My Work" },
+        { label: "Dashboard", href: "/dashboard" },
         {
           label: "Job queue",
           href: "/operator_queue",

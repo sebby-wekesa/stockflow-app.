@@ -5,6 +5,30 @@ import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { assertOperatorDepartment, getOperatorDepartments } from "@/lib/operator-access";
 
+export type OperatorQueueItem = {
+  id: string;
+  orderNumber: string;
+  designName: string;
+  currentStage: number;
+  totalStages: number;
+  priority: string;
+  targetKg: number;
+  workDescription: string;
+  inheritedKg: number;
+};
+
+export type OperatorHistoryItem = {
+  id: string;
+  orderNumber: string;
+  designName: string;
+  completedAt: Date;
+  kgIn: number;
+  kgOut: number;
+  kgScrap: number;
+  department: string;
+  stageName: string;
+};
+
 export async function getOperatorQueue(role?: string, department?: string) {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
@@ -21,7 +45,11 @@ export async function getOperatorQueue(role?: string, department?: string) {
     orders = await db.productionOrder.findMany({
       where: {
         status: "IN_PRODUCTION",
-        ...(effectiveRole === "OPERATOR" ? { currentDept: { in: operatorDepartments } } : {}),
+        ...(effectiveDept
+          ? { currentDept: effectiveDept }
+          : effectiveRole === "OPERATOR"
+            ? { currentDept: { in: operatorDepartments } }
+            : {}),
       },
       include: {
         design: {
@@ -29,17 +57,20 @@ export async function getOperatorQueue(role?: string, department?: string) {
             stages: true,
           },
         },
+        StageLog: {
+          orderBy: { sequence: "desc" },
+          take: 1,
+          select: { kgOut: true },
+        },
       },
-      orderBy: {
-        priority: "desc",
-      },
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     });
   } catch (error) {
     console.warn('Failed to fetch operator queue:', error)
     orders = []
   }
 
-  return orders.map(o => ({
+  return orders.map((o): OperatorQueueItem => ({
     id: o.id,
     orderNumber: o.orderNumber,
     designName: o.design.name,
@@ -48,7 +79,7 @@ export async function getOperatorQueue(role?: string, department?: string) {
     priority: o.priority,
     targetKg: o.targetKg ? Number(o.targetKg) : 0,
     workDescription: o.design.stages.find((s: { sequence: number; name: string }) => s.sequence === o.currentStage)?.name || "Production",
-    inheritedKg: o.targetKg ? Number(o.targetKg) : 0,
+    inheritedKg: o.StageLog[0]?.kgOut ? Number(o.StageLog[0].kgOut) : Number(o.targetKg ?? 0),
   }));
 }
 
@@ -79,14 +110,15 @@ export async function getOperatorHistory() {
     logs = []
   }
 
-  return logs.map(log => ({
+  return logs.map((log): OperatorHistoryItem => ({
     id: log.id,
     orderNumber: log.ProductionOrder.orderNumber,
     designName: log.ProductionOrder.design.name,
     completedAt: log.completedAt,
-    kgOut: log.kgOut,
-    kgScrap: log.kgScrap,
-    department: log.department,
+    kgIn: Number(log.kgIn),
+    kgOut: Number(log.kgOut),
+    kgScrap: Number(log.kgScrap),
+    department: log.department || "Unassigned",
     stageName: log.stageName,
   }));
 }
