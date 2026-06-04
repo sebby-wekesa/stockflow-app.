@@ -369,6 +369,9 @@ export async function approveOrder(orderId: string) {
   const result = await updateOrderStatus(orderId, 'APPROVED');
   if (!result.success) throw new Error(result.error);
   revalidatePath('/manager');
+  revalidatePath('/dashboard');
+  revalidatePath('/approvals');
+  revalidatePath('/jobs');
   revalidatePath('/admin/approvals');
   return result;
 }

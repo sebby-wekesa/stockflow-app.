@@ -319,9 +319,45 @@ select.form-input option { background: var(--surface2); }
 .sales-order-total { margin-top: 12px; color: var(--accent); font-family: var(--font-mono); font-size: 28px; font-weight: 600; }
 .sales-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 8px; padding-top: 4px; }
 
+/* MANAGER WORKSPACE */
+.manager-page { max-width: 1320px; margin: 0 auto; }
+.manager-overview-grid { margin-bottom: 16px; }
+.manager-departments, .manager-alerts { display: flex; flex-direction: column; gap: 8px; }
+.manager-department-row, .manager-alert-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.manager-alert-row { transition: border-color 0.15s, background 0.15s; }
+.manager-alert-row:hover { background: #222428; border-color: var(--border2); }
+.manager-department-copy, .manager-alert-row > div:first-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.manager-department-copy strong, .manager-alert-row strong { font-size: 13px; }
+.manager-department-copy span, .manager-alert-row span { color: var(--muted); font-size: 11px; }
+.manager-department-metrics { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+.manager-department-metrics span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.manager-department-metrics strong { color: var(--text); font-family: var(--font-mono); font-weight: 500; }
+.manager-warn strong, .manager-alert-value { color: var(--red) !important; }
+.manager-alert-value { flex-shrink: 0; font-family: var(--font-mono); font-size: 18px; font-weight: 600; }
+.manager-empty { padding: 32px 18px; text-align: center; color: var(--muted); background: var(--surface2); border: 1px dashed var(--border2); border-radius: var(--radius-sm); }
+.manager-full { grid-column: 1 / -1; }
+.manager-approval-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.manager-approval-card { padding: 16px; background: var(--surface2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); }
+.manager-approval-title { margin: 4px 0 2px; font-family: var(--font-head); font-size: 15px; font-weight: 700; }
+.manager-approval-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+.manager-approval-metrics span { padding: 8px; color: var(--muted); font-size: 10px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.manager-approval-metrics strong { display: block; margin-bottom: 2px; color: var(--text); font-family: var(--font-mono); font-size: 12px; }
+.manager-progress { width: 110px; height: 4px; overflow: hidden; margin-bottom: 5px; background: var(--border2); border-radius: 4px; }
+.manager-progress span { display: block; height: 100%; background: var(--teal); }
+
 @media (max-width: 900px) {
   .operator-stats { grid-template-columns: 1fr; }
   .sales-dashboard-grid, .sales-summary-grid { grid-template-columns: 1fr; }
+  .manager-overview-grid, .manager-approval-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -333,6 +369,9 @@ select.form-input option { background: var(--surface2); }
   .sales-search-form .form-group { max-width: none; }
   .sales-form-actions { flex-direction: column-reverse; }
   .sales-form-actions .btn { width: 100%; }
+  .manager-department-row { align-items: flex-start; flex-direction: column; }
+  .manager-department-metrics { justify-content: flex-start; }
+  .manager-approval-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* APPROVAL CARD */

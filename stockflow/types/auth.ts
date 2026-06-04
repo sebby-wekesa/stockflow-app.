@@ -13,7 +13,7 @@ export interface UserProfile {
 export const ROLE_HOME_PAGES: Record<UserRole, string> = {
   PENDING: '/dashboard', // PENDING users go to dashboard until approved
   ADMIN: '/admin/dashboard',
-  MANAGER: '/manager',
+  MANAGER: '/dashboard',
   OPERATOR: '/dashboard',
   WAREHOUSE: '/warehouse',
   SALES: '/operator/queue',
