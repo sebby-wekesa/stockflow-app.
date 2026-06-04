@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
 import { formatKES } from '@/lib/branches'
+import { EditCustomerButton } from './_components/EditCustomerButton'
 
 const PAGE_SIZE = 50
 
@@ -35,6 +36,7 @@ export default async function CustomersPage({
         SaleOrder: {
           where: { status: { in: ['CONFIRMED', 'SHIPPED'] } },
           select: {
+            createdAt: true,
             SaleItem: { select: { totalPrice: true } }
           }
         }
@@ -52,7 +54,7 @@ export default async function CustomersPage({
       return sum + order.SaleItem.reduce((itemSum, item) => itemSum + Number(item.totalPrice), 0)
     }, 0)
     const lastOrderDate = customer.SaleOrder.length > 0
-      ? new Date(Math.max(...customer.SaleOrder.map(() => Date.now()))) // Simplified - in real app would track order dates
+      ? new Date(Math.max(...customer.SaleOrder.map(order => order.createdAt.getTime())))
       : null
 
     return {
@@ -65,12 +67,12 @@ export default async function CustomersPage({
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6">
+      <div className="section-header mb-16">
         <div>
-          <h1 className="font-head text-2xl font-bold">Customers</h1>
-          <p className="text-muted text-sm mt-1">
+          <div className="section-title">Customers</div>
+          <div className="section-sub">
             Customer master data and purchase history
-          </p>
+          </div>
         </div>
         <Link href="/customers/new" className="btn btn-primary">
           + Add customer
@@ -78,37 +80,44 @@ export default async function CustomersPage({
       </div>
 
       {/* SEARCH */}
-      <div className="card p-4 mb-6">
-        <form className="flex gap-4">
-          <input
-            type="search"
-            name="q"
-            placeholder="Search by name or phone..."
-            defaultValue={q}
-            className="input flex-1"
-          />
-          <button type="submit" className="btn btn-secondary">
+      <div className="card mb-16">
+        <form className="flex gap-4 items-end">
+          <div className="form-group flex-1">
+            <label className="form-label">Search customers</label>
+            <input
+              type="search"
+              name="q"
+              placeholder="Search by name or phone..."
+              defaultValue={q}
+              className="form-input"
+            />
+          </div>
+          <button type="submit" className="btn btn-primary">
             Search
           </button>
+          {q && <Link href="/customers" className="btn btn-ghost">Clear</Link>}
         </form>
       </div>
 
       {/* TABLE */}
       <div className="card">
-        <table className="w-full text-sm">
+        <div className="table-wrap">
+        <table>
           <thead>
-            <tr className="text-xs uppercase tracking-wider text-muted text-left border-b border-border">
-              <th className="px-4 py-3 font-medium">Customer</th>
-              <th className="px-4 py-3 font-medium">Contact</th>
-              <th className="px-4 py-3 font-medium text-right">Orders</th>
-              <th className="px-4 py-3 font-medium text-right">Total Spent</th>
-              <th className="px-4 py-3 font-medium">Last Order</th>
+            <tr>
+              <th>Customer</th>
+              <th>Contact person</th>
+              <th>Phone & email</th>
+              <th>Orders</th>
+              <th>Total spent</th>
+              <th>Last order</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {customersWithTotals.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-muted text-sm">
+                <td colSpan={7} className="py-12 text-center text-muted text-sm">
                   No customers found.{' '}
                   <Link href="/customers/new" className="text-accent">
                     Add your first customer
@@ -118,42 +127,48 @@ export default async function CustomersPage({
               </tr>
             ) : (
               customersWithTotals.map((customer) => (
-                <tr key={customer.id} className="border-b border-border last:border-b-0 hover:bg-surface2">
-                  <td className="px-4 py-3">
+                <tr key={customer.id}>
+                  <td>
                     <Link
                       href={`/customers/${customer.id}`}
-                      className="font-medium text-accent hover:underline"
+                      className="font-medium text-accent-amber hover:underline"
                     >
                       {customer.name}
                     </Link>
+                    <div className="text-xs text-muted font-mono">{customer.code}</div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td>{customer.contactName || '—'}</td>
+                  <td>
                     <div className="text-sm">{customer.phone || '—'}</div>
                     {customer.email && (
                       <div className="text-xs text-muted">{customer.email}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono">
+                  <td className="font-mono">
                     {customer.totalOrders}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono">
+                  <td className="font-mono">
                     {formatKES(customer.totalSpent)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted">
+                  <td className="text-muted">
                     {customer.lastOrderDate
                       ? customer.lastOrderDate.toLocaleDateString()
                       : '—'
                     }
+                  </td>
+                  <td>
+                    <EditCustomerButton customer={customer} compact />
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+        </div>
 
         {/* PAGINATION */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+          <div className="pt-4 border-t border-border flex items-center justify-between">
             <div className="text-sm text-muted">
               Showing {customers.length} of {total} customers
             </div>

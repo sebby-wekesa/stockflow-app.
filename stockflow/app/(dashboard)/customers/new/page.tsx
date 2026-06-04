@@ -6,64 +6,66 @@ export const dynamic = "force-dynamic";
 export default function NewCustomerPage() {
   return (
     <div className="max-w-2xl">
-      <div className="mb-6">
-        <Link href="/customers" className="text-sm text-muted hover:text-text">
-          ← Back to customers
-        </Link>
-        <h1 className="font-head text-2xl font-bold mt-2">Add new customer</h1>
-        <p className="text-muted text-sm mt-1">
+      <div className="section-header mb-16">
+        <div>
+        <Link href="/customers" className="text-xs text-muted hover:text-text">← Back to customers</Link>
+        <div className="section-title mt-2">Add new customer</div>
+        <div className="section-sub">
           Create a new customer record for sales orders
-        </p>
+        </div>
+        </div>
       </div>
 
       <div className="card p-6">
         <form action={createCustomer} className="space-y-6">
           <div>
-            <label className="label">
-              <span className="label-text">Customer name <span className="text-red">*</span></span>
-            </label>
+            <label className="form-label">Customer name <span className="text-red">*</span></label>
             <input
               type="text"
               name="name"
-              className="input input-bordered w-full"
+              className="form-input w-full"
               placeholder="e.g. ABC Hardware Ltd"
               required
             />
           </div>
 
+          <div>
+            <label className="form-label">Contact person</label>
+            <input type="text" name="contactName" className="form-input w-full" placeholder="e.g. Jane Doe" />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="label">
-                <span className="label-text">Phone number</span>
-              </label>
+              <label className="form-label">Phone number</label>
               <input
                 type="tel"
                 name="phone"
-                className="input input-bordered w-full"
+                className="form-input w-full"
                 placeholder="e.g. +254 712 345 678"
               />
             </div>
 
             <div>
-              <label className="label">
-                <span className="label-text">Email address</span>
-              </label>
+              <label className="form-label">Email address</label>
               <input
                 type="email"
                 name="email"
-                className="input input-bordered w-full"
+                className="form-input w-full"
                 placeholder="e.g. contact@company.com"
               />
             </div>
           </div>
 
           <div>
-            <label className="label">
-              <span className="label-text">Address</span>
-            </label>
+            <label className="form-label">Tax ID</label>
+            <input name="taxId" className="form-input w-full" placeholder="Optional tax identifier" />
+          </div>
+
+          <div>
+            <label className="form-label">Address</label>
             <textarea
               name="address"
-              className="textarea textarea-bordered w-full"
+              className="form-input w-full"
               placeholder="Physical address for delivery and invoicing"
               rows={3}
             />
