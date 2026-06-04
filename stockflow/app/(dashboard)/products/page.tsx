@@ -83,7 +83,7 @@ export default async function ProductsPage({
     const stockByBranchRows = await db.product.groupBy({
       by: ['branchId'],
       _count: { _all: true },
-      _sum: { currentStock: true },
+      _sum: { currentStock: true, piecesSets: true },
     })
 
     return [counts, products, total, stockByBranchRows] as const
@@ -106,19 +106,22 @@ export default async function ProductsPage({
   const branchSummaries = Object.fromEntries(
     ALL_BRANCHES.map((branch) => [
       branch,
-      { productCount: 0, stock: 0 },
+      { productCount: 0, stock: 0, piecesSets: 0 },
     ])
-  ) as Record<BranchCode, { productCount: number; stock: number }>
+  ) as Record<BranchCode, { productCount: number; stock: number; piecesSets: number }>
   let unassignedProductCount = 0
   let unassignedStock = 0
+  let unassignedPiecesSets = 0
   for (const row of stockByBranchRows) {
     const code = row.branchId ? branchCodeById.get(row.branchId) : undefined
     if (code) {
       branchSummaries[code].productCount += row._count._all
       branchSummaries[code].stock += row._sum.currentStock ?? 0
+      branchSummaries[code].piecesSets += row._sum.piecesSets ?? 0
     } else {
       unassignedProductCount += row._count._all
       unassignedStock += row._sum.currentStock ?? 0
+      unassignedPiecesSets += row._sum.piecesSets ?? 0
     }
   }
   const totalBranchStock = ALL_BRANCHES.reduce(
@@ -127,6 +130,10 @@ export default async function ProductsPage({
   )
   const totalBranchProducts = ALL_BRANCHES.reduce(
     (sum, branch) => sum + branchSummaries[branch].productCount,
+    0
+  )
+  const totalBranchPiecesSets = ALL_BRANCHES.reduce(
+    (sum, branch) => sum + branchSummaries[branch].piecesSets,
     0
   )
 
@@ -172,6 +179,7 @@ export default async function ProductsPage({
             >
               <div className="text-muted text-xs uppercase tracking-wider">{BRANCH_LABELS[branch]}</div>
               <div className="font-mono text-xl mt-2">{summary.stock.toLocaleString()} kg</div>
+              <div className="font-mono text-sm mt-1">{summary.piecesSets.toLocaleString()} PCS/Sets</div>
               <div className="text-muted text-xs mt-1">{summary.productCount} products</div>
             </Link>
           )
@@ -179,10 +187,11 @@ export default async function ProductsPage({
         <Link href={buildHref({ branch: '', page: 1 })} className="card p-4">
           <div className="text-muted text-xs uppercase tracking-wider">All branches total</div>
           <div className="font-mono text-xl mt-2">{totalBranchStock.toLocaleString()} kg</div>
+          <div className="font-mono text-sm mt-1">{totalBranchPiecesSets.toLocaleString()} PCS/Sets</div>
           <div className="text-muted text-xs mt-1">
             {totalBranchProducts} products
             {unassignedProductCount > 0
-              ? ` · ${unassignedStock.toLocaleString()} kg unassigned`
+              ? ` · ${unassignedStock.toLocaleString()} kg / ${unassignedPiecesSets.toLocaleString()} PCS/Sets unassigned`
               : ''}
           </div>
         </Link>
