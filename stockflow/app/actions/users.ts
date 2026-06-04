@@ -46,9 +46,7 @@ async function assertAdminAccess() {
 function getAuthCallbackUrl() {
   const configuredUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
-    process.env.VERCEL_URL ??
-    "http://localhost:3000";
+    "https://stockflow-app-beta.vercel.app";
   const appUrl = configuredUrl.startsWith("http")
     ? configuredUrl
     : `https://${configuredUrl}`;
