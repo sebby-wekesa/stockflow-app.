@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { uploadSpecialized } from './actions'
-import { ALL_BRANCHES, BRANCH_LABELS } from '@/lib/branches'
-import type { BranchCode as Branch } from '@/lib/branches'
 import * as XLSX from 'xlsx'
 
 type SheetTypeOption = {
@@ -51,14 +49,11 @@ const SHEET_TYPES: SheetTypeOption[] = [
   },
 ]
 
-export function QuickImportForm() {
+export function QuickImportForm({ assignedBranchName }: { assignedBranchName: string | null }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [sheetType, setSheetType] = useState<string>('sales_simple') // default to the most common case for you
-  const [branch, setBranch] = useState<Branch>('mombasa')
-
-  const selected = SHEET_TYPES.find((t) => t.value === sheetType)!
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
@@ -148,12 +143,7 @@ export function QuickImportForm() {
     const fd = new FormData(e.currentTarget)
     fd.set('file', file)
 
-    // TEMPORARY UNBLOCK for your sales file — forces the correct parser
-    // Remove this line once your file imports successfully
-    fd.set('sheet_type', 'sales_simple')
-
-    // fd.set('sheet_type', sheetType)   // <-- original line (commented while debugging)
-    if (selected.needsBranch) fd.set('branch', branch)
+    fd.set('sheet_type', sheetType)
     startTransition(async () => {
       try {
         await uploadSpecialized(fd)
@@ -198,24 +188,15 @@ export function QuickImportForm() {
         </div>
       </div>
 
-      {selected.needsBranch && (
-        <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-            Which branch?
-          </label>
-          <select
-            value={branch}
-            onChange={(e) => setBranch(e.target.value as Branch)}
-            className="input"
-          >
-            {ALL_BRANCHES.map((b) => (
-              <option key={b} value={b}>
-                {BRANCH_LABELS[b]}
-              </option>
-            ))}
-          </select>
+      <div className="mb-4 p-3 rounded-md bg-surface2 border border-border">
+        <div className="text-xs uppercase tracking-wider text-muted">Import branch</div>
+        <div className="font-medium mt-1">
+          {assignedBranchName ?? 'No branch assigned'}
         </div>
-      )}
+        <div className="text-xs text-muted mt-1">
+          Imported data is automatically assigned to your user branch.
+        </div>
+      </div>
 
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
@@ -251,7 +232,7 @@ export function QuickImportForm() {
       </div>
 
       <div className="flex justify-end mt-6">
-        <button type="submit" disabled={isPending || !file} className="btn btn-primary">
+        <button type="submit" disabled={isPending || !file || !assignedBranchName} className="btn btn-primary">
           {isPending ? 'Parsing file...' : 'Parse & preview →'}
         </button>
       </div>

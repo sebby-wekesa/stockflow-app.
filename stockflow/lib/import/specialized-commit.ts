@@ -86,9 +86,12 @@ export async function commitProductMaster(
   rows: ParsedProductRow[],
   importBatchId: string,
   userId: string,
-  organizationId: string
+  organizationId: string,
+  branchCode: string
 ): Promise<CommitResult> {
   const result: CommitResult = { total: rows.length, written: 0, skipped: 0, errors: [] }
+  const branchId = await resolveBranchId(organizationId, branchCode)
+  if (!branchId) throw new Error(`Assigned branch "${branchCode}" was not found`)
 
   const CHUNK = 50
   for (let i = 0; i < rows.length; i += CHUNK) {
@@ -114,6 +117,7 @@ export async function commitProductMaster(
                 name: row.canonical_name,
                 category: mapCategory(row.category),
                 uom: normalizeProductUom(row.uom) ?? 'KG',
+                branchId,
                 ...(row.cost_price !== null && { unitCost: row.cost_price }),
               },
             })
@@ -127,6 +131,7 @@ export async function commitProductMaster(
                 uom: normalizeProductUom(row.uom) ?? 'KG',
                 currentStock: 0,
                 unitCost: row.cost_price ?? null,
+                branchId,
               },
             })
           }
@@ -167,7 +172,8 @@ export async function commitSalesImport(
   rows: ParsedSalesRow[],
   importBatchId: string,
   userId: string,
-  organizationId: string
+  organizationId: string,
+  branchCode: string
 ): Promise<CommitResult> {
   const result: CommitResult = {
     total: rows.length,
@@ -178,6 +184,8 @@ export async function commitSalesImport(
   }
 
   const db = getTenantPrisma(organizationId)
+  const branchId = await resolveBranchId(organizationId, branchCode)
+  if (!branchId) throw new Error(`Assigned branch "${branchCode}" was not found`)
 
   // Match every raw_product_name once, tenant-scoped
   const uniqueNames = new Set<string>()
@@ -214,6 +222,7 @@ export async function commitSalesImport(
           uom: 'KG',
           currentStock: 0,
           organizationId,
+          branchId,
         },
       })
 
@@ -279,7 +288,7 @@ export async function commitSalesImport(
       orderGroups.set(orderKey, {
         order_number: orderKey,
         customer_name: row.customer_name ?? 'Walk-in customer',
-        branch_code: row.branch ?? 'mombasa',
+        branch_code: branchCode,
         invoice_date: row.movement_date,
         lines: [],
       })
@@ -318,8 +327,6 @@ export async function commitSalesImport(
   // Write each order group transactionally
   for (const group of Array.from(orderGroups.values())) {
     try {
-      const branchId = await resolveBranchId(organizationId, group.branch_code)
-
       // Idempotency: skip if this invoice number already exists in our org
       const existing = await db.saleOrder.findFirst({ where: { id: group.order_number } })
       if (existing) {
@@ -390,7 +397,10 @@ export async function commitSalesImport(
 
           await tx.product.update({
             where: { id: line.product_id },
-            data: { currentStock: { decrement: line.qty } },
+            data: {
+              branchId,
+              currentStock: { decrement: line.qty },
+            },
           })
         }
       }, { maxWait: 10000, timeout: 30000 })
@@ -423,7 +433,8 @@ export async function commitConsumablesImport(
   rows: ParsedStockRow[],
   importBatchId: string,
   userId: string,
-  organizationId: string
+  organizationId: string,
+  branchCode: string
 ): Promise<CommitResult> {
   const result: CommitResult = {
     total: rows.length,
@@ -450,15 +461,8 @@ export async function commitConsumablesImport(
     }
   }
 
-  // Pre-resolve branch IDs
-  const branchCodes = new Set<string>()
-  for (const r of rows) {
-    if (r.branch) branchCodes.add(r.branch)
-  }
-  const branchCodeToId = new Map<string, string | null>()
-  for (const code of branchCodes) {
-    branchCodeToId.set(code, await resolveBranchId(organizationId, code))
-  }
+  const branchId = await resolveBranchId(organizationId, branchCode)
+  if (!branchId) throw new Error(`Assigned branch "${branchCode}" was not found`)
 
   const CHUNK = 100
   for (let i = 0; i < rows.length; i += CHUNK) {
@@ -482,8 +486,6 @@ export async function commitConsumablesImport(
         const isInbound = row.direction === 'in'
         const signedQty = isInbound ? row.qty : -row.qty
         const movementType = isInbound ? 'stock_in' : 'stock_out'
-        const branchId = branchCodeToId.get(row.branch) ?? null
-
         try {
           await tx.stockMovement.create({
             data: {
@@ -498,7 +500,10 @@ export async function commitConsumablesImport(
 
           await tx.product.update({
             where: { id: productId },
-            data: { currentStock: { increment: signedQty } },
+            data: {
+              branchId,
+              currentStock: { increment: signedQty },
+            },
           })
 
           result.written++

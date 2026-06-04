@@ -3,6 +3,7 @@
 import { requireAuth } from "@/lib/auth";
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import type { SaleStatus } from "@prisma/client";
+import { normalizeBranchCode } from "@/lib/branches";
 
 interface ParsedSaleRow {
   date: Date;
@@ -14,7 +15,7 @@ interface ParsedSaleRow {
   totalAmount: number;
 }
 
-export async function importSalesData(rawText: string, branchName: string = "Nairobi") {
+export async function importSalesData(rawText: string) {
   const user = await requireAuth();
 
   if (!["ADMIN", "WAREHOUSE"].includes(user.role)) {
@@ -22,10 +23,19 @@ export async function importSalesData(rawText: string, branchName: string = "Nai
   }
 
   const db = getTenantPrisma(user.organizationId);
-  const branch = await db.branch.findFirst({ where: { name: branchName, organizationId: user.organizationId } });
-  if (!branch) {
-    throw new Error(`Branch '${branchName}' not found for this organization`);
+  const assignedBranch = user.branches[0];
+  if (!assignedBranch) {
+    throw new Error("Your user account must be assigned to a branch before importing sales");
   }
+  const branch = await db.branch.findFirst({
+    where: { id: assignedBranch.id },
+    select: { id: true, name: true, code: true, location: true },
+  });
+  if (!branch) {
+    throw new Error("Your assigned branch was not found for this organization");
+  }
+  const branchCode = normalizeBranchCode(branch.code, branch.name, branch.location);
+  if (!branchCode) throw new Error("Your assigned branch must be Nairobi, Mombasa, or Bunje");
 
   const lines = rawText.trim().split(/\r?\n/);
   if (lines.length < 2) {
@@ -83,7 +93,7 @@ export async function importSalesData(rawText: string, branchName: string = "Nai
         product = await tx.product.create({
           data: {
             name: sale.productName,
-            sku: `${branchName}-${sale.productName}`,
+            sku: `${branchCode}-${sale.productName}`,
             category: "break_linings",
             branchId: branch.id,
             currentStock: 0,

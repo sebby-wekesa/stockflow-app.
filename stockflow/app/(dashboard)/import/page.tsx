@@ -103,7 +103,7 @@ export default async function ImportCentrePage() {
         <div className="space-y-12">
           <div>
             <div className="font-medium mb-4 text-sm text-muted">QUICK IMPORT</div>
-            <QuickImportForm />
+            <QuickImportForm assignedBranchName={user.branches[0]?.name ?? null} />
           </div>
         </div>
       </div>

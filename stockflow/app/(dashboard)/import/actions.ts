@@ -24,6 +24,7 @@ import {
 } from '@/lib/import/specialized-commit'
 import { clearAliasCache } from '@/lib/import/alias-matcher'
 import * as XLSX from 'xlsx'
+import { normalizeBranchCode } from '@/lib/branches'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH
@@ -37,6 +38,32 @@ async function requireImporter(): Promise<AuthUser> {
   return user
 }
 
+async function getImporterBranch(user: AuthUser): Promise<{
+  id: string
+  code: BranchCode
+  name: string
+}> {
+  const assignedBranch = user.branches[0]
+  if (!assignedBranch) {
+    throw new Error('Your user account must be assigned to a branch before importing data')
+  }
+
+  const db = getTenantPrisma(user.organizationId)
+  const branch = await db.branch.findFirst({
+    where: { id: assignedBranch.id },
+    select: { id: true, name: true, code: true, location: true },
+  })
+  const code = branch
+    ? normalizeBranchCode(branch.code, branch.name, branch.location)
+    : null
+
+  if (!branch || !code) {
+    throw new Error('Your assigned branch must be Nairobi, Mombasa, or Bunje before importing data')
+  }
+
+  return { id: branch.id, code, name: branch.name }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SPECIALIZED UPLOAD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,9 +71,10 @@ async function requireImporter(): Promise<AuthUser> {
 export async function uploadSpecialized(formData: FormData) {
   const user = await requireImporter()
   const db = getTenantPrisma(user.organizationId)
+  const importerBranch = await getImporterBranch(user)
   const file = formData.get('file') as File | null
   const sheetType = formData.get('sheet_type') as SpecializedSheetType | null
-  const branchOverride = formData.get('branch') as BranchCode | null
+  const branchOverride = importerBranch.code
 
   if (!file || file.size === 0) throw new Error('Please choose a file to upload')
   if (!sheetType) throw new Error('Please pick a file type')
@@ -59,12 +87,18 @@ export async function uploadSpecialized(formData: FormData) {
 
   try {
     if (sheetType === 'sales_quickbooks_v2') {
-      const rows = parseSalesQuickbooks(buffer)
+      const rows = parseSalesQuickbooks(buffer).map((row) => ({
+        ...row,
+        branch: branchOverride,
+      }))
       parsedCount = rows.length
       parsedPreview = rows.slice(0, 10)
       sourceLabel = 'QuickBooks sales export'
     } else if (sheetType === 'sales_simple') {
-      const rows = parseSimpleSales(buffer)
+      const rows = parseSimpleSales(buffer).map((row) => ({
+        ...row,
+        branch: branchOverride,
+      }))
       parsedCount = rows.length
       parsedPreview = rows.slice(0, 10)
       sourceLabel = 'Simple sales list'
@@ -79,9 +113,6 @@ export async function uploadSpecialized(formData: FormData) {
       parsedPreview = rows.slice(0, 10)
       sourceLabel = 'U-bolt master list'
     } else if (sheetType === 'consumables_stock') {
-      if (!branchOverride) {
-        throw new Error('Pick the branch this file belongs to')
-      }
       const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
       const inOutSheets = wb.SheetNames.filter((n) =>
         n.toUpperCase().includes('IN-OUT')
@@ -122,7 +153,7 @@ export async function uploadSpecialized(formData: FormData) {
       file_url: base64,
       sheet_type: sheetType,
       import_mode: 'update',
-      target_branch: branchOverride ?? null,
+      target_branch: branchOverride,
       status: 'preview',
       row_count: parsedCount,
       mapping_config: {
@@ -145,6 +176,7 @@ export async function uploadSpecialized(formData: FormData) {
 export async function commitSpecializedBatch(batchId: string): Promise<CommitResult> {
   const user = await requireImporter()
   const db = getTenantPrisma(user.organizationId)
+  const importerBranch = await getImporterBranch(user)
 
   const batch = await db.importBatch.findFirst({ where: { id: batchId } })
   if (!batch) throw new Error('Batch not found')
@@ -169,20 +201,17 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
   try {
     if (sheetType === 'sales_quickbooks_v2') {
       const rows = parseSalesQuickbooks(buffer)
-      result = await commitSalesImport(rows, batch.id, user.id, user.organizationId)
+      result = await commitSalesImport(rows, batch.id, user.id, user.organizationId, importerBranch.code)
     } else if (sheetType === 'sales_simple') {
       const rows = parseSimpleSales(buffer)
-      result = await commitSalesImport(rows, batch.id, user.id, user.organizationId)
+      result = await commitSalesImport(rows, batch.id, user.id, user.organizationId, importerBranch.code)
     } else if (sheetType === 'springs_master') {
       const rows = parseSpringsList(buffer)
-      result = await commitProductMaster(rows, batch.id, user.id, user.organizationId)
+      result = await commitProductMaster(rows, batch.id, user.id, user.organizationId, importerBranch.code)
     } else if (sheetType === 'ubolt_master') {
       const rows = parseUBoltList(buffer)
-      result = await commitProductMaster(rows, batch.id, user.id, user.organizationId)
+      result = await commitProductMaster(rows, batch.id, user.id, user.organizationId, importerBranch.code)
     } else if (sheetType === 'consumables_stock') {
-      if (!batch.target_branch) {
-        throw new Error('Branch not set on batch')
-      }
       const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
       const inOutSheets = wb.SheetNames.filter((n) =>
         n.toUpperCase().includes('IN-OUT')
@@ -193,12 +222,18 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
           const parsed = parseConsumablesStock(
             buffer,
             name,
-            batch.target_branch as BranchCode
+            importerBranch.code
           )
           merged.push(...parsed)
         } catch {}
       }
-      result = await commitConsumablesImport(merged, batch.id, user.id, user.organizationId)
+      result = await commitConsumablesImport(
+        merged,
+        batch.id,
+        user.id,
+        user.organizationId,
+        importerBranch.code
+      )
     } else {
       throw new Error(`Unknown sheet type: ${sheetType}`)
     }
@@ -217,6 +252,7 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
     where: { id: batchId },
     data: {
       status: 'imported',
+      target_branch: importerBranch.code,
       ok_count: result.written,
       skipped_count: result.skipped,
       error_count: result.errors.length,
@@ -283,4 +319,3 @@ export async function runUnifiedImport(formData: FormData) {
 export async function uploadImport(formData: FormData) {
   throw new Error(DEPRECATED_ERROR)
 }
-
