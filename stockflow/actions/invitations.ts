@@ -15,8 +15,8 @@ export async function acceptInvitation(formData: FormData) {
     return { error: "Enter the email address that received the invitation." };
   }
 
-  if (!/^\d{6}$/.test(token)) {
-    return { error: "Enter the 6-digit invitation code from the email." };
+  if (!/^\d{6,10}$/.test(token)) {
+    return { error: "Enter the numeric invitation code exactly as shown in the email." };
   }
 
   try {

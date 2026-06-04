@@ -56,14 +56,14 @@ export function AcceptInviteForm() {
       </div>
 
       <div className="form-group" style={{ marginBottom: "24px" }}>
-        <label className="form-label">6-digit invitation code</label>
+        <label className="form-label">Invitation code</label>
         <input
           type="text"
           name="token"
           className="form-input"
           autoComplete="one-time-code"
           inputMode="numeric"
-          placeholder="123456"
+          placeholder="Enter the code from the email"
           disabled={isPending}
         />
       </div>

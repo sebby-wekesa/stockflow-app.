@@ -27,7 +27,7 @@ export default function AcceptInvitePage() {
           Accept StockFlow invitation
         </h1>
         <p style={{ color: "var(--text-muted)", lineHeight: 1.5, marginBottom: "24px" }}>
-          Enter the email address and 6-digit code from your invitation email. You will then
+          Enter the email address and invitation code from your email. You will then
           create your password.
         </p>
 
