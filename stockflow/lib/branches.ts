@@ -9,7 +9,7 @@ export type BranchCode = 'mombasa' | 'nairobi' | 'bonje'
 export const BRANCH_LABELS: Record<BranchCode, string> = {
   mombasa: 'Mombasa HQ',
   nairobi: 'Nairobi',
-  bonje: 'Bonje',
+  bonje: 'Bunje',
 }
 
 export const BRANCH_SUB: Record<BranchCode, string> = {
@@ -32,6 +32,18 @@ export const BRANCH_TEXT_CLASS: Record<BranchCode, string> = {
 }
 
 export const ALL_BRANCHES: BranchCode[] = ['mombasa', 'nairobi', 'bonje']
+
+export function normalizeBranchCode(...values: Array<string | null | undefined>): BranchCode | null {
+  const normalized = values.filter(Boolean).join(' ').toLowerCase()
+
+  if (normalized.includes('mombasa') || /\bmsa\b/.test(normalized)) return 'mombasa'
+  if (normalized.includes('nairobi') || /\b(nbo|nbi)\b/.test(normalized)) return 'nairobi'
+  if (normalized.includes('bonje') || normalized.includes('bunje') || /\bbnj\b/.test(normalized)) {
+    return 'bonje'
+  }
+
+  return null
+}
 
 // KES formatter — used everywhere stock value is shown
 export function formatKES(amount: number | null | undefined): string {

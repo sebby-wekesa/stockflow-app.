@@ -2,6 +2,7 @@ import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { notFound, redirect } from 'next/navigation'
 import EditProductClient from './EditProductClient'
+import { normalizeBranchCode } from '@/lib/branches'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -15,6 +16,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   // Tenant-scoped load (extension injects organizationId)
   const product = await db.product.findUnique({
     where: { id },
+    include: { Branch: { select: { name: true, code: true, location: true } } },
   })
 
   if (!product) {
@@ -43,6 +45,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     leg_length_inch: (product as any).leg_length_inch ?? null,
     selling_price: (product as any).selling_price ?? null,
     currentStock: product.currentStock ?? null,
+    branch: product.Branch
+      ? normalizeBranchCode(product.Branch.code, product.Branch.name, product.Branch.location)
+      : null,
   }
 
   return <EditProductClient product={product} initialForForm={formInitial} />

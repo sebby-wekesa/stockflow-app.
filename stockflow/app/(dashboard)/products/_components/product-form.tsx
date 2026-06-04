@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CATEGORY_LABELS, ORIGIN_LABELS, PRODUCT_TYPES_BY_CATEGORY, PRODUCT_TYPE_LABELS, PRODUCT_UOM_LABELS, PRODUCT_UOMS, normalizeProductUom } from '@/lib/products'
 import type { ProductCategory, StockOrigin } from '@prisma/client'
+import { ALL_BRANCHES, BRANCH_LABELS, type BranchCode } from '@/lib/branches'
 
 type Mode = 'create' | 'edit'
 
@@ -26,6 +27,7 @@ type Initial = {
   reorder_point?: number | null
   pieces_sets?: number | null
   currentStock?: number | null
+  branch?: BranchCode | null
 }
 
 export function ProductForm({
@@ -172,6 +174,25 @@ export function ProductForm({
               {PRODUCT_UOMS.map((uom) => (
                 <option key={uom} value={uom}>
                   {PRODUCT_UOM_LABELS[uom]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+              Branch <span className="text-red">*</span>
+            </label>
+            <select
+              name="branch"
+              required
+              defaultValue={initial?.branch ?? ''}
+              className="form-input w-full"
+            >
+              <option value="" disabled>Select branch</option>
+              {ALL_BRANCHES.map((branch) => (
+                <option key={branch} value={branch}>
+                  {BRANCH_LABELS[branch]}
                 </option>
               ))}
             </select>

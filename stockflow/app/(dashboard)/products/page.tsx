@@ -8,6 +8,7 @@ import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
 import { ProductOriginSelect, ProductPiecesSetsInput } from './_components/product-inline-selects'
+import { ALL_BRANCHES, BRANCH_LABELS, normalizeBranchCode, type BranchCode } from '@/lib/branches'
 
 export const dynamic = 'force-dynamic';
 
@@ -29,11 +30,32 @@ export default async function ProductsPage({
   const category = rawCategory && rawCategory in CATEGORY_LABELS ? rawCategory as ProductCategory : undefined
   const q = params.q?.trim() ?? ''
   const page = Math.max(1, Number(params.page ?? 1))
+  const selectedBranch = ALL_BRANCHES.includes(params.branch as BranchCode)
+    ? params.branch as BranchCode
+    : undefined
+
+  const branches = await db.branch.findMany({
+    select: { id: true, name: true, code: true, location: true },
+    orderBy: { name: 'asc' },
+  })
+  const branchByCode = new Map<BranchCode, (typeof branches)[number]>()
+  const branchCodeById = new Map<string, BranchCode>()
+  for (const branch of branches) {
+    const code = normalizeBranchCode(branch.code, branch.name, branch.location)
+    if (code) {
+      branchByCode.set(code, branch)
+      branchCodeById.set(branch.id, code)
+    }
+  }
 
   // Build the WHERE clause
   const where: any = {}
   if (origin) where.origin = origin
   if (category) where.category = category
+  if (selectedBranch) {
+    const branch = branchByCode.get(selectedBranch)
+    where.branchId = branch?.id ?? '__missing_branch__'
+  }
   if (q) {
     where.OR = [
       { sku: { contains: q, mode: 'insensitive' } },
@@ -42,7 +64,7 @@ export default async function ProductsPage({
   }
 
   // Fetch in parallel: category counts, the page of products, total
-  const [counts, products, total] = await withRetry(async () => {
+  const [counts, products, total, stockByBranchRows] = await withRetry(async () => {
     const counts = await db.product.groupBy({
       by: ['origin'],
       _count: { _all: true },
@@ -53,12 +75,18 @@ export default async function ProductsPage({
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
       include: {
+        Branch: { select: { id: true, name: true, code: true, location: true } },
         _count: { select: { ProductAlias: true } },
       },
     })
     const total = await db.product.count({ where })
+    const stockByBranchRows = await db.product.groupBy({
+      by: ['branchId'],
+      _count: { _all: true },
+      _sum: { currentStock: true },
+    })
 
-    return [counts, products, total] as const
+    return [counts, products, total, stockByBranchRows] as const
   })
 
   const totalAll = counts.reduce((sum, c) => sum + c._count._all, 0)
@@ -75,15 +103,44 @@ export default async function ProductsPage({
     { key: 'IMPORTED', label: 'Imported', count: countByOrigin.IMPORTED ?? 0 },
   ]
 
-  function buildHref(overrides: { origin?: string; category?: string; q?: string; page?: number }) {
+  const branchSummaries = Object.fromEntries(
+    ALL_BRANCHES.map((branch) => [
+      branch,
+      { productCount: 0, stock: 0 },
+    ])
+  ) as Record<BranchCode, { productCount: number; stock: number }>
+  let unassignedProductCount = 0
+  let unassignedStock = 0
+  for (const row of stockByBranchRows) {
+    const code = row.branchId ? branchCodeById.get(row.branchId) : undefined
+    if (code) {
+      branchSummaries[code].productCount += row._count._all
+      branchSummaries[code].stock += row._sum.currentStock ?? 0
+    } else {
+      unassignedProductCount += row._count._all
+      unassignedStock += row._sum.currentStock ?? 0
+    }
+  }
+  const totalBranchStock = ALL_BRANCHES.reduce(
+    (sum, branch) => sum + branchSummaries[branch].stock,
+    0
+  )
+  const totalBranchProducts = ALL_BRANCHES.reduce(
+    (sum, branch) => sum + branchSummaries[branch].productCount,
+    0
+  )
+
+  function buildHref(overrides: { origin?: string; category?: string; q?: string; branch?: string; page?: number }) {
     const params = new URLSearchParams()
     const org = overrides.origin ?? origin
     const cat = overrides.category ?? category
     const query = overrides.q ?? q
+    const branch = overrides.branch ?? selectedBranch
     const pg = overrides.page ?? page
     if (org) params.set('origin', org)
     if (cat) params.set('category', cat)
     if (query) params.set('q', query)
+    if (branch) params.set('branch', branch)
     if (pg > 1) params.set('page', String(pg))
     const qs = params.toString()
     return qs ? `/products?${qs}` : '/products'
@@ -100,6 +157,34 @@ export default async function ProductsPage({
         </div>
         <Link href="/products/new" className="btn btn-primary">
           + Add Product
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-16">
+        {ALL_BRANCHES.map((branch) => {
+          const summary = branchSummaries[branch]
+          const active = selectedBranch === branch
+          return (
+            <Link
+              key={branch}
+              href={buildHref({ branch: active ? '' : branch, page: 1 })}
+              className={`card p-4 ${active ? 'ring-2 ring-accent-amber' : ''}`}
+            >
+              <div className="text-muted text-xs uppercase tracking-wider">{BRANCH_LABELS[branch]}</div>
+              <div className="font-mono text-xl mt-2">{summary.stock.toLocaleString()} kg</div>
+              <div className="text-muted text-xs mt-1">{summary.productCount} products</div>
+            </Link>
+          )
+        })}
+        <Link href={buildHref({ branch: '', page: 1 })} className="card p-4">
+          <div className="text-muted text-xs uppercase tracking-wider">All branches total</div>
+          <div className="font-mono text-xl mt-2">{totalBranchStock.toLocaleString()} kg</div>
+          <div className="text-muted text-xs mt-1">
+            {totalBranchProducts} products
+            {unassignedProductCount > 0
+              ? ` · ${unassignedStock.toLocaleString()} kg unassigned`
+              : ''}
+          </div>
         </Link>
       </div>
 
@@ -132,6 +217,7 @@ export default async function ProductsPage({
 
       <form className="mb-16 flex gap-2 items-end">
         {origin && <input type="hidden" name="origin" value={origin} />}
+        {selectedBranch && <input type="hidden" name="branch" value={selectedBranch} />}
         <div className="form-group max-w-md flex-1">
           <label className="form-label">Search</label>
           <input
@@ -184,6 +270,7 @@ export default async function ProductsPage({
                 <th>Category</th>
                 <th>Origin</th>
                 <th>UOM</th>
+                <th>Branch</th>
                 <th>Current Stock</th>
                 <th>PCS/Sets</th>
                 <th>Status</th>
@@ -193,7 +280,7 @@ export default async function ProductsPage({
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={10} className="py-12 text-center text-muted text-sm">
                     {q || origin || category ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -236,6 +323,16 @@ export default async function ProductsPage({
                      </td>
                     <td>
                       <span className="badge badge-muted">KG</span>
+                    </td>
+                    <td>
+                      <span className="badge badge-blue">
+                        {(() => {
+                          const code = p.Branch
+                            ? normalizeBranchCode(p.Branch.code, p.Branch.name, p.Branch.location)
+                            : null
+                          return code ? BRANCH_LABELS[code] : p.Branch?.name ?? 'Unassigned'
+                        })()}
+                      </span>
                     </td>
                     <td className="font-mono text-sm">
                       {p.currentStock.toLocaleString()} <span className="text-muted">kg</span>

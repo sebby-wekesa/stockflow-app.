@@ -6,8 +6,8 @@ import { z } from 'zod'
 import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import type { ProductCategory, StockOrigin } from '@prisma/client'
-import { Prisma } from '@prisma/client'
 import { PRODUCT_CATEGORIES, normalizeProductUom } from '@/lib/products'
+import { ALL_BRANCHES, normalizeBranchCode, type BranchCode } from '@/lib/branches'
 
 /** Returns the auth user if role is ADMIN or MANAGER, else throws. */
 async function requireProductManager(): Promise<AuthUser> {
@@ -35,6 +35,7 @@ const createSchema = z.object({
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
   reorder_point: z.coerce.number().int().nonnegative().optional().nullable(),
   pieces_sets: z.coerce.number().int().nonnegative().optional().default(0),
+  branch: z.enum(ALL_BRANCHES as [BranchCode, ...BranchCode[]]),
   vendor: z.string().max(200).optional().nullable(),
   // Fields below are not in the schema — accepted but ignored so existing forms don't crash:
   product_type: z.string().optional().nullable(),
@@ -85,6 +86,7 @@ function extractForm(formData: FormData) {
     selling_price: formData.get('selling_price') || null,
     reorder_point: formData.get('reorder_point') || null,
     pieces_sets: formData.get('pieces_sets') || 0,
+    branch: formData.get('branch'),
     vendor: formData.get('vendor') || null,
     product_type: formData.get('product_type') || null,
     description: formData.get('description') || null,
@@ -99,18 +101,39 @@ function extractForm(formData: FormData) {
   }
 }
 
+async function resolveProductBranch(
+  db: ReturnType<typeof getTenantPrisma>,
+  branchCode: BranchCode
+) {
+  const branches = await db.branch.findMany({
+    select: { id: true, name: true, code: true, location: true },
+  })
+  const branch = branches.find(
+    (candidate) =>
+      normalizeBranchCode(candidate.code, candidate.name, candidate.location) === branchCode
+  )
+
+  if (!branch) {
+    throw new Error(`The ${branchCode} branch has not been configured for this organization`)
+  }
+
+  return branch
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function createProduct(formData: FormData) {
   const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
 
   const parsed = createSchema.safeParse(extractForm(formData))
   if (!parsed.success) {
     const firstError = parsed.error.issues[0]
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
   }
+  const branch = await resolveProductBranch(db, parsed.data.branch)
 
   // Transactional create + alias (sku unique constraint in DB prevents real dups even on race)
   let product: any
@@ -128,6 +151,7 @@ export async function createProduct(formData: FormData) {
           reorderLevel: parsed.data.reorder_point ?? null,
           piecesSets: parsed.data.pieces_sets ?? 0,
           currentStock: 0,
+          branchId: branch.id,
           organizationId: user.organizationId,
         },
       })
@@ -174,6 +198,7 @@ export async function updateProduct(productId: string, formData: FormData) {
     const firstError = parsed.error.issues[0]
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
   }
+  const branch = await resolveProductBranch(db, parsed.data.branch)
 
   // findFirst guarantees this product belongs to OUR org (extension adds the filter)
   const existing = await db.product.findFirst({ where: { id: productId } })
@@ -206,6 +231,7 @@ export async function updateProduct(productId: string, formData: FormData) {
         vendor: parsed.data.vendor ?? null,
         reorderLevel: parsed.data.reorder_point ?? null,
         piecesSets: parsed.data.pieces_sets ?? 0,
+        branchId: branch.id,
         ...(stockChanged ? { currentStock: nextStock } : {}),
       },
     })
