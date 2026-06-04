@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect('/login');
 
   const role = user.role;
-  const sidebarCounts: { operatorQueue?: number } = {};
+  const sidebarCounts: { operatorQueue?: number; packagingQueue?: number } = {};
 
   if (role === 'OPERATOR') {
     const db = getTenantPrisma(user.organizationId);
@@ -20,6 +20,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
         status: 'IN_PRODUCTION',
         ...(user.department ? { currentDept: user.department } : {}),
       },
+    });
+  }
+
+  if (role === 'PACKAGING') {
+    const db = getTenantPrisma(user.organizationId);
+    sidebarCounts.packagingQueue = await db.saleOrder.count({
+      where: { status: 'CONFIRMED' },
     });
   }
 

@@ -9,10 +9,19 @@ import { signOut } from "@/actions/auth";
 
 type SidebarCounts = {
   operatorQueue?: number
+  packagingQueue?: number
+}
+
+type NavItem = {
+  section?: string
+  label?: string
+  href?: string
+  badge?: string
+  badgeColor?: string
 }
 
 // Generate role-specific navigation items
-function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): any[] {
+function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] {
   // Common navigation for all roles
   const commonItems = [
     { section: "Account" },
@@ -91,7 +100,12 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): any[] {
     case 'PACKAGING':
       return [
         { section: "Fulfilment" },
-        { label: "Pending orders", href: "/packaging", badge: "5", badgeColor: "purple" },
+        {
+          label: "Pending orders",
+          href: "/packaging",
+          badge: counts.packagingQueue && counts.packagingQueue > 0 ? String(counts.packagingQueue) : undefined,
+          badgeColor: "purple",
+        },
         { label: "Fulfilled today", href: "/pack_done" },
       ];
 

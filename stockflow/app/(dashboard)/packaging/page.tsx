@@ -1,10 +1,13 @@
-import { getPackagingQueue } from "@/app/actions/packaging";
+import { getPackagingQueue, getPackagingStats } from "@/app/actions/packaging";
 import { PackagingQueue } from "@/components/PackagingQueue";
 
 export const dynamic = 'force-dynamic';
 
 export default async function PackagingPage() {
-  const orders = await getPackagingQueue();
+  const [orders, stats] = await Promise.all([
+    getPackagingQueue(),
+    getPackagingStats(),
+  ]);
 
   return (
     <div>
@@ -12,7 +15,7 @@ export default async function PackagingPage() {
         <div><div className="section-title">Packaging Team Dashboard</div><div className="section-sub">Fulfil sales orders and prepare shipments</div></div>
       </div>
 
-      <PackagingQueue orders={orders} />
+      <PackagingQueue orders={orders} initialStats={stats} />
     </div>
   );
 }

@@ -45,11 +45,17 @@ export async function getPackagingQueue() {
 
   return packableOrders.map(order => ({
     id: order.id,
-    orderNumber: `SO-${order.id.slice(-6).toUpperCase()}`,
+    orderNumber: order.id,
     customerName: order.Customer?.name || order.customerName,
     totalItems: order.SaleItem.length,
     totalQuantity: order.SaleItem.reduce((sum, item) => sum + item.quantity, 0),
-    totalKg: order.SaleItem.reduce((sum, item) => sum + Number(item.FinishedGoods?.kgProduced || 0), 0),
+    totalKg: order.SaleItem.reduce((sum, item) => {
+      const finishedGoods = item.FinishedGoods
+      const kgPerUnit = finishedGoods.quantity > 0
+        ? Number(finishedGoods.kgProduced) / finishedGoods.quantity
+        : 0
+      return sum + (item.quantity * kgPerUnit)
+    }, 0),
     createdAt: order.createdAt,
     items: order.SaleItem.map(item => ({
       id: item.id,
@@ -125,6 +131,7 @@ export async function fulfillOrder(orderId: string) {
     });
 
     revalidatePath('/packaging');
+    revalidatePath('/pack_done');
     revalidatePath('/sales');
 
     return {

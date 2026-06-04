@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { fulfillOrder, getPackagingStats } from '@/app/actions/packaging'
 
-import { Loader2, Package, Truck, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Loader2, Package, AlertTriangle } from 'lucide-react'
 
 interface PackagingItem {
   id: string
@@ -28,13 +28,20 @@ interface PackagingOrder {
 
 interface PackagingQueueProps {
   orders: PackagingOrder[]
+  initialStats: PackagingStats
 }
 
-export function PackagingQueue({ orders: initialOrders }: PackagingQueueProps) {
+interface PackagingStats {
+  pendingOrders: number
+  shippedToday: number
+  weeklyRevenue: number
+}
+
+export function PackagingQueue({ orders: initialOrders, initialStats }: PackagingQueueProps) {
   const [orders, setOrders] = useState(initialOrders)
   const [fulfilling, setFulfilling] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<PackagingStats>(initialStats)
 
   const handleFulfillOrder = async (orderId: string) => {
     setFulfilling(orderId)
@@ -46,8 +53,8 @@ export function PackagingQueue({ orders: initialOrders }: PackagingQueueProps) {
       setOrders(prev => prev.filter(order => order.id !== orderId))
       // Refresh stats
       loadStats()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fulfill order')
     } finally {
       setFulfilling(null)
     }
@@ -61,11 +68,6 @@ export function PackagingQueue({ orders: initialOrders }: PackagingQueueProps) {
       console.error('Failed to load packaging stats:', err)
     }
   }
-
-  // Load stats on mount
-  React.useEffect(() => {
-    loadStats()
-  }, [])
 
   return (
     <div>
@@ -89,13 +91,18 @@ export function PackagingQueue({ orders: initialOrders }: PackagingQueueProps) {
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-label">Pending orders</div>
-          <div className="stat-value">{stats?.pendingOrders || orders.length}</div>
+          <div className="stat-value">{stats.pendingOrders}</div>
           <div className="stat-sub">Ready for fulfillment</div>
         </div>
         <div className="stat-card teal">
           <div className="stat-label">Fulfilled today</div>
-          <div className="stat-value">{stats?.shippedToday || 0}</div>
+          <div className="stat-value">{stats.shippedToday}</div>
           <div className="stat-sub">Orders shipped</div>
+        </div>
+        <div className="stat-card amber">
+          <div className="stat-label">Packaged this week</div>
+          <div className="stat-value">KES {stats.weeklyRevenue.toLocaleString()}</div>
+          <div className="stat-sub">Value of shipped orders</div>
         </div>
       </div>
 

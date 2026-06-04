@@ -31,24 +31,22 @@ export default async function RawmaterialsPage({
         ],
       }
     : undefined
-  const receiptSearch = {
-    ...(category ? { RawMaterial: { category } } : {}),
-    ...(query ? {
-        OR: [
-          { reference: { contains: query, mode: 'insensitive' as const } },
-          { loggedBy: { contains: query, mode: 'insensitive' as const } },
-          { RawMaterial: materialSearch },
-        ],
-      } : {}),
-  }
-
   const materials = await withRetry(() => db.rawMaterial.findMany({
     where: { category: { in: [...RAW_MATERIAL_CATEGORIES] } },
     orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
   }), undefined);
+
+  const matchingMaterials = (query || category)
+    ? await withRetry(() => db.rawMaterial.findMany({
+        where: {
+          ...(category ? { category } : { category: { in: [...RAW_MATERIAL_CATEGORIES] } }),
+          ...(materialSearch ?? {}),
+        },
+        orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
+      }), undefined)
+    : []
   
   const receipts = await withRetry(() => db.materialReceipt.findMany({
-    where: receiptSearch,
     include: { RawMaterial: true },
     orderBy: { createdAt: 'desc' },
     take: 20
@@ -99,23 +97,23 @@ export default async function RawmaterialsPage({
         })}
       </div>
 
-      <div className="card">
+      <div className="card mb-24">
         <div className="section-header mb-16">
           <div>
-            <div className="section-title">Receipt history</div>
-            <div className="section-sub">Recent raw material receipts</div>
+            <div className="section-title">Find Raw Materials</div>
+            <div className="section-sub">Search the complete raw material database</div>
           </div>
         </div>
         <form action="/rawmaterials" className="mb-16" style={{display:'flex',gap:'12px',alignItems:'end',flexWrap:'wrap'}}>
           <div className="form-group" style={{flex:1,marginBottom:0}}>
-            <label className="form-label" htmlFor="raw-material-search">Search receipt history</label>
+            <label className="form-label" htmlFor="raw-material-search">Search raw materials</label>
             <input
               id="raw-material-search"
               name="q"
               type="search"
               className="form-input"
               defaultValue={query}
-              placeholder="Search material, dimensions, reference, or user"
+              placeholder="Search by SKU, material name, or dimensions"
             />
           </div>
           <div className="form-group" style={{minWidth:'190px',marginBottom:0}}>
@@ -135,6 +133,41 @@ export default async function RawmaterialsPage({
           <button type="submit" className="btn btn-primary">Filter</button>
           {(query || category) && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
         </form>
+
+        {(query || category) && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>SKU</th><th>Category</th><th>Material</th><th>Dimensions</th><th>Available kg</th><th>Reserved kg</th><th>Pieces</th></tr>
+              </thead>
+              <tbody>
+                {matchingMaterials.map((material) => (
+                  <tr key={material.id}>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{material.sku}</td>
+                    <td>{categoryLabels[material.category as keyof typeof categoryLabels] || material.category}</td>
+                    <td>{material.materialName}</td>
+                    <td>{material.length || '—'} L · {material.width || '—'} W/D · {material.height || '—'} H · {material.diameter}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availableKg.toNumber().toLocaleString()} kg</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{material.reservedKg.toNumber().toLocaleString()} kg</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availablePieces.toLocaleString()}</td>
+                  </tr>
+                ))}
+                {matchingMaterials.length === 0 && (
+                  <tr><td colSpan={7} style={{textAlign: 'center', color: 'var(--muted)'}}>No raw materials match the selected filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Receipt history</div>
+            <div className="section-sub">Most recent raw material receipts</div>
+          </div>
+        </div>
         <div className="table-wrap">
           <table>
           <thead><tr><th>Date</th><th>Category</th><th>Material</th><th>Dimensions</th><th>Kg received</th><th>Pieces</th><th>Reference</th><th>Logged by</th><th>Action</th></tr></thead>
@@ -194,7 +227,7 @@ export default async function RawmaterialsPage({
             })}
             {receipts.length === 0 && (
               <tr><td colSpan={9} style={{textAlign: 'center', color: 'var(--muted)'}}>
-                {(query || category) ? 'No receipts match the selected filters.' : 'No receipts found.'}
+                No receipts found.
               </td></tr>
             )}
           </tbody>
