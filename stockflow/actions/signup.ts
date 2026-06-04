@@ -12,12 +12,16 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { checkRateLimitAsync, getClientIp } from '@/lib/rate-limit'
 import { validatePassword } from '@/lib/security'
+import { ALL_BRANCHES } from '@/lib/branches'
 
 const signUpSchema = z.object({
   organizationId: z.string().trim().min(1, 'Select a valid organization'),
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8).max(128),
   fullName: z.string().trim().min(2).max(120),
+  branchCode: z.enum(ALL_BRANCHES as [string, ...string[]], {
+    errorMap: () => ({ message: 'Select a valid branch' }),
+  }),
 })
 
 export async function signUpOrganization(formData: FormData) {
@@ -44,6 +48,7 @@ export async function signUpOrganization(formData: FormData) {
       email: formData.get('email'),
       password: formData.get('password'),
       fullName: formData.get('fullName'),
+      branchCode: formData.get('branchCode'),
     })
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -67,6 +72,18 @@ export async function signUpOrganization(formData: FormData) {
   })
   if (!organization) {
     return { error: 'Select a valid active organization.' }
+  }
+
+  // Find the branch by code and organization
+  const branch = await prisma.branch.findFirst({
+    where: {
+      organizationId: data.organizationId,
+      code: data.branchCode,
+    },
+    select: { id: true },
+  })
+  if (!branch) {
+    return { error: 'Select a valid branch.' }
   }
 
   // Pre-check: does a User with this email already exist in our DB? If so,
@@ -124,6 +141,7 @@ export async function signUpOrganization(formData: FormData) {
         name: data.fullName,
         role: 'PENDING',
         organizationId: organization.id,
+        branchId: branch.id,
       },
     })
   } catch (err) {

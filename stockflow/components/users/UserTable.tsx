@@ -47,11 +47,13 @@ export function UserTable({ users }: { users: any[] }) {
                 </td>
                 <td>
                   <div className="flex flex-wrap gap-1">
-                    {(user.branches ?? []).map((branch) => (
-                      <span key={branch} className="badge badge-outline badge-xs">
-                        {BRANCH_LABELS[branch as keyof typeof BRANCH_LABELS]}
+                    {user.Branch ? (
+                      <span className="badge badge-outline badge-xs">
+                        {BRANCH_LABELS[user.Branch.code as keyof typeof BRANCH_LABELS] || user.Branch.code}
                       </span>
-                    ))}
+                    ) : (
+                      <span className="badge badge-ghost badge-xs">No branch</span>
+                    )}
                   </div>
                 </td>
                 <td>

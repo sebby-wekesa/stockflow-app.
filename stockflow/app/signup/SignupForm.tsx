@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { signUpOrganization } from '@/actions/signup'
+import { BRANCH_LABELS, ALL_BRANCHES } from '@/lib/branches'
 
 type SignupOrganization = {
   id: string
@@ -210,6 +211,26 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
               placeholder="At least 8 characters"
               disabled={isPending}
             />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Branch</label>
+            <select
+              name="branchCode"
+              required
+              className="form-input"
+              disabled={isPending}
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Select your branch
+              </option>
+              {ALL_BRANCHES.map((branch) => (
+                <option key={branch} value={branch}>
+                  {BRANCH_LABELS[branch]}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div style={{ position: 'absolute', left: '-9999px', opacity: 0 }}>

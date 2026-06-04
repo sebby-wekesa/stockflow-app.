@@ -19,6 +19,8 @@ type AdminUserRow = {
   lastSeenAt: Date | null;
   isVerified: boolean;
   authMissing: boolean;
+  branchId: string | null;
+  Branch: { code: string } | null;
 };
 
 type AuthOnlyUser = {
@@ -45,6 +47,12 @@ async function getUsers() {
         role: true,
         department: true,
         lastSeenAt: true,
+        branchId: true,
+        Branch: {
+          select: {
+            code: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -75,6 +83,8 @@ async function getUsers() {
       lastSeenAt: user.lastSeenAt,
       isVerified: Boolean(authUsersById.get(user.id)?.email_confirmed_at),
       authMissing: Boolean(supabaseAdmin && !authUsersById.get(user.id)),
+      branchId: user.branchId,
+      Branch: user.Branch,
     })) as AdminUserRow[];
   } catch (error) {
     console.error('Failed to fetch users:', error);
