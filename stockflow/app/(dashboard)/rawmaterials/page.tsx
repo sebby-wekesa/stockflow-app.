@@ -40,7 +40,7 @@ export default async function RawmaterialsPage({
     : undefined
 
   const materials = await withRetry(() => db.rawMaterial.findMany({
-    where: materialSearch,
+    where: { category: { in: [...RAW_MATERIAL_CATEGORIES] } },
     orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
   }), undefined);
   
@@ -51,72 +51,75 @@ export default async function RawmaterialsPage({
     take: 20
   }), undefined).catch(() => []); // Temporary fallback if schema is out of sync
 
+  const totalKg = materials.reduce((sum, material) => sum + material.availableKg.toNumber(), 0)
+  const totalReservedKg = materials.reduce((sum, material) => sum + material.reservedKg.toNumber(), 0)
+  const categoryLabels: Record<(typeof RAW_MATERIAL_CATEGORIES)[number], string> = {
+    'Flat Bars': 'Flat Bars',
+    'Round Bars': 'Round Bar',
+    'Spring Bushes': 'Spring Bushes',
+  }
+
   return (
     <div>
       <div className="section-header mb-16">
         <div>
           <div className="section-title">Raw materials</div>
-          <div className="section-sub">Current stock levels in kg and pieces</div>
+          <div className="section-sub">Current stock totals by raw material category</div>
         </div>
         <Link href="/import" className="btn btn-primary">+ Receive stock</Link>
       </div>
-      <form action="/rawmaterials" className="card mb-24" style={{display:'flex',gap:'12px',alignItems:'end'}}>
-        <div className="form-group" style={{flex:1,marginBottom:0}}>
-          <label className="form-label" htmlFor="raw-material-search">Search raw materials</label>
-          <input
-            id="raw-material-search"
-            name="q"
-            type="search"
-            className="form-input"
-            defaultValue={query}
-            placeholder="Search material, category, dimensions, reference, or user"
-          />
+
+      <div className="stats-grid mb-24">
+        <div className="stat-card amber">
+          <div className="stat-label">Total raw materials</div>
+          <div className="stat-value">{materials.length.toLocaleString()}</div>
+          <div className="stat-sub">Across 3 categories</div>
         </div>
-        <button type="submit" className="btn btn-primary">Search</button>
-        {query && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
-      </form>
-      <div className="mb-24" style={{display:'grid',gap:'24px'}}>
+        <div className="stat-card teal">
+          <div className="stat-label">Total available kg</div>
+          <div className="stat-value">{totalKg.toLocaleString()}<span className="stat-suffix">kg</span></div>
+          <div className="stat-sub">{Math.max(0, totalKg - totalReservedKg).toLocaleString()} kg free</div>
+        </div>
         {RAW_MATERIAL_CATEGORIES.map((category) => {
           const categoryMaterials = materials.filter((m) => m.category === category)
+          const categoryKg = categoryMaterials.reduce((sum, material) => sum + material.availableKg.toNumber(), 0)
+          const categoryPieces = categoryMaterials.reduce((sum, material) => sum + material.availablePieces, 0)
           return (
-            <section key={category}>
-              <div className="section-header mb-16">
-                <div className="section-title">{category}</div>
-                <span className="badge badge-muted">{categoryMaterials.length} materials</span>
+            <div key={category} className="stat-card purple">
+              <div className="stat-label">{categoryLabels[category]}</div>
+              <div className="stat-value">{categoryKg.toLocaleString()}<span className="stat-suffix">kg</span></div>
+              <div className="stat-sub">
+                {categoryMaterials.length} materials · {categoryPieces.toLocaleString()} pieces
               </div>
-              <div className="stats-grid" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
-                {categoryMaterials.map(m => {
-                  const availableNum = m.availableKg.toNumber();
-                  const reservedNum = m.reservedKg.toNumber();
-                  const free = availableNum - reservedNum;
-                  const trend = free > 500 ? 'teal' : free > 0 ? 'amber' : 'red';
-                  return (
-                    <div key={m.id} className={`stat-card ${trend}`}>
-                      <div className="stat-label">{m.materialName}</div>
-                      <div className="stat-sub">{m.length || '—'} L · {m.width || '—'} W/D · {m.height || '—'} H · {m.diameter}</div>
-                      <div className="stat-value">{availableNum.toLocaleString()}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-                      <div className="stat-sub"><span>{m.availablePieces.toLocaleString()} pieces</span> · {Math.max(0, free).toLocaleString()} kg free · {reservedNum.toLocaleString()} kg reserved</div>
-                    </div>
-                  )
-                })}
-                {categoryMaterials.length === 0 && (
-                  <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>
-                    {query ? 'No matching materials in this category.' : 'No materials in this category.'}
-                  </div>
-                )}
-              </div>
-            </section>
+            </div>
           )
         })}
-        {materials.length === 0 && (
-          <div style={{ color: 'var(--muted)', gridColumn: '1 / -1' }}>
-            {query ? `No raw materials match "${query}".` : 'No raw materials defined.'}
-          </div>
-        )}
       </div>
+
       <div className="card">
-        <div className="section-header mb-16"><div className="section-title">Receipt history</div></div>
-        <table>
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Receipt history</div>
+            <div className="section-sub">Recent raw material receipts</div>
+          </div>
+        </div>
+        <form action="/rawmaterials" className="mb-16" style={{display:'flex',gap:'12px',alignItems:'end'}}>
+          <div className="form-group" style={{flex:1,marginBottom:0}}>
+            <label className="form-label" htmlFor="raw-material-search">Search receipt history</label>
+            <input
+              id="raw-material-search"
+              name="q"
+              type="search"
+              className="form-input"
+              defaultValue={query}
+              placeholder="Search material, category, dimensions, reference, or user"
+            />
+          </div>
+          <button type="submit" className="btn btn-primary">Search</button>
+          {query && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
+        </form>
+        <div className="table-wrap">
+          <table>
           <thead><tr><th>Date</th><th>Category</th><th>Material</th><th>Dimensions</th><th>Kg received</th><th>Pieces</th><th>Reference</th><th>Logged by</th><th>Action</th></tr></thead>
           <tbody>
             {receipts.map(r => {
@@ -178,7 +181,8 @@ export default async function RawmaterialsPage({
               </td></tr>
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );
