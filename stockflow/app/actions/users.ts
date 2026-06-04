@@ -43,14 +43,27 @@ async function assertAdminAccess() {
   return currentUser;
 }
 
+function getAuthCallbackUrl() {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
+    process.env.VERCEL_URL ??
+    "http://localhost:3000";
+  const appUrl = configuredUrl.startsWith("http")
+    ? configuredUrl
+    : `https://${configuredUrl}`;
+
+  return `${appUrl.replace(/\/$/, "")}/auth/callback`;
+}
+
 export async function inviteUser(_prevState: unknown, formData: FormData) {
   try {
     const currentUser = await assertAdminAccess();
     const db = getTenantPrisma(currentUser.organizationId);
     const payload = resolveFormPayload(_prevState, formData);
 
-    const email = getPayloadValue(payload, 'email') as string;
-    const name = getPayloadValue(payload, 'name') as string;
+    const email = (getPayloadValue(payload, 'email') as string)?.trim().toLowerCase();
+    const name = (getPayloadValue(payload, 'name') as string)?.trim();
     const role = getPayloadValue(payload, 'role') as string;
     const branchId = getPayloadValue(payload, 'branchId') as string | null;
 
@@ -62,17 +75,32 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
       return { success: false, error: "Invalid role" };
     }
 
-    // 1. Create user in Supabase Auth
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: "tempPassword123!",
-      email_confirm: true,
-      user_metadata: {
-        name,
-        role,
-      }
+    const existingUser = await db.user.findFirst({
+      where: { email },
+      select: { id: true },
     });
+    if (existingUser) {
+      return { success: false, error: "User with this email already exists." };
+    }
 
+    const adminClient = getSupabaseAdmin();
+    if (!adminClient) {
+      return { success: false, error: "Supabase admin client is not configured." };
+    }
+
+    // inviteUserByEmail creates the auth user and asks Supabase to deliver the
+    // password-setup email. createUser does not send any email.
+    const { data: authUser, error: authError } = await adminClient.auth.admin.inviteUserByEmail(
+      email,
+      {
+        redirectTo: getAuthCallbackUrl(),
+        data: {
+          name,
+          role,
+          organizationId: currentUser.organizationId,
+        },
+      }
+    );
     if (authError) {
       if (authError.message.includes("already registered")) {
          return { success: false, error: "User with this email already exists." };
@@ -80,23 +108,38 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
       throw new Error(`Auth Error: ${authError.message}`);
     }
 
-    // 2. Create user in Prisma (properly tenant-scoped)
-    const createData: any = {
-      id: authUser.user!.id,
-      email,
-      name,
-      role: role as typeof USER_ROLES[number],
-      organizationId: currentUser.organizationId,
-    };
-    if (branchId) createData.branchId = branchId;
+    if (!authUser.user) {
+      throw new Error("Supabase did not return the invited user.");
+    }
 
-    await db.user.create({ data: createData });
+    try {
+      await db.user.create({
+        data: {
+          id: authUser.user.id,
+          email,
+          name,
+          role: role as typeof USER_ROLES[number],
+          organizationId: currentUser.organizationId,
+          ...(branchId ? { branchId } : {}),
+        },
+      });
+    } catch (error) {
+      // Do not leave an unusable auth-only account that prevents re-inviting.
+      const { error: cleanupError } = await adminClient.auth.admin.deleteUser(authUser.user.id);
+      if (cleanupError) {
+        console.error("Failed to clean up invited auth user:", cleanupError);
+      }
+      throw error;
+    }
 
     revalidatePath("/users");
     return { success: true };
   } catch (error) {
     console.error("Invite Error:", error);
-    return { success: false, error: "Failed to invite user." };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to invite user.",
+    };
   }
 }
 
