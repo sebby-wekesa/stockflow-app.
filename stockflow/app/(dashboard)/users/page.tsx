@@ -9,6 +9,7 @@ import InviteUserModal from "@/components/admin/InviteUserModal";
 import { isUserOnline } from "@/lib/presence";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { prisma } from "@/lib/prisma";
+import { BRANCH_LABELS } from "@/lib/branches";
 
 type AdminUserRow = {
   id: string;
@@ -195,6 +196,7 @@ export default async function UsersPage() {
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
+              <th>Branch</th>
               <th>Department</th>
               <th>Status</th>
               <th>Actions</th>
@@ -214,6 +216,15 @@ export default async function UsersPage() {
                   }`}>
                     {user.role.charAt(0) + user.role.slice(1).toLowerCase()}
                   </span>
+                </td>
+                <td>
+                  {user.Branch ? (
+                    <span className="badge badge-outline badge-sm">
+                      {BRANCH_LABELS[user.Branch.code as keyof typeof BRANCH_LABELS] || user.Branch.code}
+                    </span>
+                  ) : (
+                    <span className="badge badge-ghost badge-sm">No branch</span>
+                  )}
                 </td>
                 <td>{user.role === 'OPERATOR' ? (user.department || '—') : '—'}</td>
                 <td>
@@ -238,7 +249,7 @@ export default async function UsersPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} style={{textAlign: 'center', padding: '40px 20px', color: 'var(--muted)'}}>
+                <td colSpan={7} style={{textAlign: 'center', padding: '40px 20px', color: 'var(--muted)'}}>
                   <div style={{
                     display: 'inline-block',
                     marginBottom: '12px'
