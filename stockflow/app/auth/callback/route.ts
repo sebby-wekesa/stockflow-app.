@@ -6,8 +6,9 @@ import { getRoleHomePage, resolveUserRole, setAuthCookies } from '@/lib/auth-ses
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // Change the default from /admin/dashboard to /dashboard
-  const next = searchParams.get('next') ?? '/dashboard'
+  // Invite and recovery links establish a temporary session first. The user
+  // must set a password before normal email/password login can work.
+  const next = searchParams.get('next') ?? '/set-password'
 
   if (code) {
     const cookieStore = await cookies()

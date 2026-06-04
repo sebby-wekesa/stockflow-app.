@@ -16,6 +16,7 @@ const PUBLIC_ROUTES = [
   '/auth/auth-code-error',
   '/forgot-password',
   '/reset-password',
+  '/set-password',
 ]
 
 /**
@@ -27,6 +28,7 @@ const STATUS_ROUTES = [
   '/account-suspended',
   '/account-closed',
   '/signup',
+  '/set-password',
 ]
 
 type OrganizationStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
