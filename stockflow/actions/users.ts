@@ -7,6 +7,7 @@ import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js
 import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import type { UserRole } from '@/lib/types'
+import { getAuthCallbackUrl } from '@/lib/app-url'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH — only admins can manage users
@@ -74,7 +75,7 @@ export async function inviteUser(formData: FormData) {
   const supabaseAdmin = getSupabaseAdmin()
 
   // Send invite via Supabase. This creates auth.users with a confirmation token.
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/auth/callback`
+  const redirectTo = getAuthCallbackUrl()
   const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
     data: { name },
     redirectTo,
@@ -206,7 +207,7 @@ export async function resendInvite(userId: string) {
   if (!target) throw new Error('User not found')
 
   const supabaseAdmin = getSupabaseAdmin()
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/auth/callback`
+  const redirectTo = getAuthCallbackUrl()
 
   const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(target.email, {
     data: { name: target.name },
@@ -232,7 +233,7 @@ export async function sendPasswordReset(userId: string) {
   if (!target) throw new Error('User not found')
 
   const supabaseAdmin = getSupabaseAdmin()
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/auth/callback`
+  const redirectTo = getAuthCallbackUrl()
 
   const { error } = await supabaseAdmin.auth.admin.generateLink({
     type: 'recovery',

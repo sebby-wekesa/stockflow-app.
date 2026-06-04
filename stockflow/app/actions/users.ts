@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin, supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUserRole, USER_ROLES } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
+import { getAuthCallbackUrl } from "@/lib/app-url";
 
 type UserFormPayload = FormData | Record<string, FormDataEntryValue | null | undefined>;
 
@@ -41,17 +42,6 @@ async function assertAdminAccess() {
   }
 
   return currentUser;
-}
-
-function getAuthCallbackUrl() {
-  const configuredUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "https://stockflow-app-beta.vercel.app";
-  const appUrl = configuredUrl.startsWith("http")
-    ? configuredUrl
-    : `https://${configuredUrl}`;
-
-  return `${appUrl.replace(/\/$/, "")}/auth/callback`;
 }
 
 export async function inviteUser(_prevState: unknown, formData: FormData) {
