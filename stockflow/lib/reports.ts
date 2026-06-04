@@ -45,10 +45,10 @@ export function toCSV(
   rows: Record<string, unknown>[],
   columns?: { key: string; label: string }[]
 ): string {
-  if (rows.length === 0) return ''
+  if (rows.length === 0 && !columns) return ''
 
   // If columns aren't specified, use keys from first row
-  const cols = columns ?? Object.keys(rows[0]).map((k) => ({ key: k, label: k }))
+  const cols = columns ?? Object.keys(rows[0] ?? {}).map((k) => ({ key: k, label: k }))
 
   const escape = (val: unknown): string => {
     if (val === null || val === undefined) return ''

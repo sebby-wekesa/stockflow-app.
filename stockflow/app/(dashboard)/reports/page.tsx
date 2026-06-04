@@ -3,6 +3,7 @@ import { requireActiveAuth } from '@/lib/auth'
 import { formatKES } from '@/lib/branches'
 import { getDateRange, RANGE_LABELS, type DateRangeKey } from '@/lib/reports'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { DownloadReportButton } from './_components/DownloadReportButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,22 +100,22 @@ export default async function ReportsPage({
       title: 'Sales Report',
       description: 'Revenue, branch breakdown, top products & customers',
       href: `/api/reports/sales?range=${currentRange}`,
+      filename: `sales-${currentRange}.csv`,
       icon: '📊',
-      disabled: false,
     },
     {
       title: 'Stock Report',
       description: 'Current inventory levels across all branches',
       href: `/api/reports/stock?range=${currentRange}`,
+      filename: `stock-report-${currentRange}.csv`,
       icon: '📦',
-      disabled: false,
     },
     {
       title: 'Production Report',
       description: 'Output, scrap rate per stage and yield analysis',
       href: `/api/reports/production?range=${currentRange}`,
+      filename: `production-report-${currentRange}.csv`,
       icon: '⚙️',
-      disabled: false,
     },
   ]
 
@@ -255,14 +256,10 @@ export default async function ReportsPage({
               <div className="text-3xl mb-4">{report.icon}</div>
               <h3 className="section-title mb-3">{report.title}</h3>
               <p className="text-muted text-sm mb-6 leading-relaxed">{report.description}</p>
-              <a
+              <DownloadReportButton
                 href={report.href}
-                className="btn btn-primary w-full group-hover:bg-accent-orange transition-colors"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Download CSV
-              </a>
+                filename={report.filename}
+              />
             </div>
           </div>
         ))}

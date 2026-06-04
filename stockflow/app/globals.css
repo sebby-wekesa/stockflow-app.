@@ -173,6 +173,9 @@ select.form-input option { background: var(--surface2); }
 .import-file-name { color: var(--teal); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
 .import-change-file { margin-top: 12px; }
 .import-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.report-download { display: flex; flex-direction: column; gap: 8px; }
+.report-download .btn:disabled { cursor: wait; opacity: 0.65; }
+.report-download-error { color: var(--red); font-size: 11px; text-align: center; }
 
 @media (max-width: 760px) {
   .import-type-grid { grid-template-columns: 1fr; }
