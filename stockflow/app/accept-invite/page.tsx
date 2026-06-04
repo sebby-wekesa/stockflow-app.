@@ -1,12 +1,6 @@
 import { AcceptInviteForm } from "./AcceptInviteForm";
 
-export default async function AcceptInvitePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token_hash?: string; type?: string }>;
-}) {
-  const params = await searchParams;
-
+export default function AcceptInvitePage() {
   return (
     <div
       style={{
@@ -33,13 +27,11 @@ export default async function AcceptInvitePage({
           Accept StockFlow invitation
         </h1>
         <p style={{ color: "var(--text-muted)", lineHeight: 1.5, marginBottom: "24px" }}>
-          Press the button below to confirm your invitation. You will then create your password.
+          Enter the email address and 6-digit code from your invitation email. You will then
+          create your password.
         </p>
 
-        <AcceptInviteForm
-          tokenHash={params.token_hash ?? ""}
-          type={params.type ?? ""}
-        />
+        <AcceptInviteForm />
       </div>
     </div>
   );

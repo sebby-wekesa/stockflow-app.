@@ -1,23 +1,36 @@
 "use client";
 
-import { useActionState } from "react";
+import { type FormEvent, useState, useTransition } from "react";
 import { acceptInvitation } from "@/actions/invitations";
 
-export function AcceptInviteForm({
-  tokenHash,
-  type,
-}: {
-  tokenHash: string;
-  type: string;
-}) {
-  const [state, formAction, isPending] = useActionState(acceptInvitation, null);
+export function AcceptInviteForm() {
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setError(null);
+
+    startTransition(async () => {
+      try {
+        const result = await acceptInvitation(formData);
+        if (result?.error) {
+          setError(result.error);
+        }
+      } catch (submissionError) {
+        setError(
+          submissionError instanceof Error
+            ? submissionError.message
+            : "Could not accept invitation. Please try again."
+        );
+      }
+    });
+  }
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="token_hash" value={tokenHash} />
-      <input type="hidden" name="type" value={type} />
-
-      {state?.error && (
+    <form onSubmit={handleSubmit} noValidate>
+      {error && (
         <div
           style={{
             background: "rgba(224, 85, 85, 0.15)",
@@ -27,15 +40,39 @@ export function AcceptInviteForm({
             marginBottom: "16px",
           }}
         >
-          {state.error}
+          {error}
         </div>
       )}
+
+      <div className="form-group" style={{ marginBottom: "16px" }}>
+        <label className="form-label">Invitation email</label>
+        <input
+          type="email"
+          name="email"
+          className="form-input"
+          autoComplete="email"
+          disabled={isPending}
+        />
+      </div>
+
+      <div className="form-group" style={{ marginBottom: "24px" }}>
+        <label className="form-label">6-digit invitation code</label>
+        <input
+          type="text"
+          name="token"
+          className="form-input"
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          placeholder="123456"
+          disabled={isPending}
+        />
+      </div>
 
       <button
         type="submit"
         className="btn btn-primary"
         style={{ width: "100%" }}
-        disabled={isPending || !tokenHash || type !== "invite"}
+        disabled={isPending}
       >
         {isPending ? "Accepting..." : "Accept invitation"}
       </button>
