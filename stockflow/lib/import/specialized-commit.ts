@@ -200,7 +200,7 @@ export async function commitProductMaster(
           })
         }
       }
-    }, { maxWait: 10000, timeout: 30000 })
+    }, { maxWait: 20000, timeout: 120000 })
   }
 
   return result
@@ -446,7 +446,7 @@ export async function commitSalesImport(
             },
           })
         }
-      }, { maxWait: 10000, timeout: 30000 })
+      }, { maxWait: 20000, timeout: 120000 })
 
       result.written += group.lines.length
     } catch (err) {
@@ -519,7 +519,7 @@ export async function commitConsumablesImport(
 
   clearAliasCache(organizationId)
 
-  const CHUNK = 100
+  const CHUNK = 20
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK)
 
@@ -569,7 +569,7 @@ export async function commitConsumablesImport(
           })
         }
       }
-    }, { maxWait: 10000, timeout: 30000 })
+    }, { maxWait: 20000, timeout: 120000 })
   }
 
   result.unmatchedNames = Array.from(unmatched.entries())

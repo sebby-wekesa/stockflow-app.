@@ -7,8 +7,13 @@ import { CATEGORY_LABELS } from '@/lib/products'
 import type { ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
-import { ProductBranchSelect, ProductOriginSelect, ProductPiecesSetsInput } from './_components/product-inline-selects'
-import { ALL_BRANCHES, BRANCH_LABELS, normalizeBranchCode, type BranchCode } from '@/lib/branches'
+import {
+  ProductBranchSelect,
+  ProductCurrentStockInput,
+  ProductOriginSelect,
+  ProductPiecesSetsInput,
+} from './_components/product-inline-selects'
+import { BRANCH_LABELS, normalizeBranchCode, type BranchCode } from '@/lib/branches'
 
 export const dynamic = 'force-dynamic';
 
@@ -30,23 +35,27 @@ export default async function ProductsPage({
   const category = rawCategory && rawCategory in CATEGORY_LABELS ? rawCategory as ProductCategory : undefined
   const q = params.q?.trim() ?? ''
   const page = Math.max(1, Number(params.page ?? 1))
-  const selectedBranch = ALL_BRANCHES.includes(params.branch as BranchCode)
-    ? params.branch as BranchCode
-    : undefined
 
   const branches = await db.branch.findMany({
     select: { id: true, name: true, code: true, location: true },
     orderBy: { name: 'asc' },
   })
+  const branchOptions: Array<{ code: BranchCode; label: string; id: string }> = []
   const branchByCode = new Map<BranchCode, (typeof branches)[number]>()
   const branchCodeById = new Map<string, BranchCode>()
   for (const branch of branches) {
     const code = normalizeBranchCode(branch.code, branch.name, branch.location)
     if (code) {
-      branchByCode.set(code, branch)
+      if (!branchByCode.has(code)) {
+        branchOptions.push({ code, label: branch.name, id: branch.id })
+        branchByCode.set(code, branch)
+      }
       branchCodeById.set(branch.id, code)
     }
   }
+  const selectedBranch = branchOptions.some((branch) => branch.code === params.branch)
+    ? params.branch as BranchCode
+    : undefined
 
   // Build the WHERE clause
   const where: any = {}
@@ -104,8 +113,8 @@ export default async function ProductsPage({
   ]
 
   const branchSummaries = Object.fromEntries(
-    ALL_BRANCHES.map((branch) => [
-      branch,
+    branchOptions.map((branch) => [
+      branch.code,
       { productCount: 0, stock: 0, piecesSets: 0 },
     ])
   ) as Record<BranchCode, { productCount: number; stock: number; piecesSets: number }>
@@ -114,7 +123,7 @@ export default async function ProductsPage({
   let unassignedPiecesSets = 0
   for (const row of stockByBranchRows) {
     const code = row.branchId ? branchCodeById.get(row.branchId) : undefined
-    if (code) {
+    if (code && branchSummaries[code]) {
       branchSummaries[code].productCount += row._count._all
       branchSummaries[code].stock += row._sum.currentStock ?? 0
       branchSummaries[code].piecesSets += row._sum.piecesSets ?? 0
@@ -124,16 +133,16 @@ export default async function ProductsPage({
       unassignedPiecesSets += row._sum.piecesSets ?? 0
     }
   }
-  const totalBranchStock = ALL_BRANCHES.reduce(
-    (sum, branch) => sum + branchSummaries[branch].stock,
+  const totalBranchStock = branchOptions.reduce(
+    (sum, branch) => sum + (branchSummaries[branch.code]?.stock ?? 0),
     0
   )
-  const totalBranchProducts = ALL_BRANCHES.reduce(
-    (sum, branch) => sum + branchSummaries[branch].productCount,
+  const totalBranchProducts = branchOptions.reduce(
+    (sum, branch) => sum + (branchSummaries[branch.code]?.productCount ?? 0),
     0
   )
-  const totalBranchPiecesSets = ALL_BRANCHES.reduce(
-    (sum, branch) => sum + branchSummaries[branch].piecesSets,
+  const totalBranchPiecesSets = branchOptions.reduce(
+    (sum, branch) => sum + (branchSummaries[branch.code]?.piecesSets ?? 0),
     0
   )
 
@@ -168,16 +177,16 @@ export default async function ProductsPage({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-16">
-        {ALL_BRANCHES.map((branch) => {
-          const summary = branchSummaries[branch]
-          const active = selectedBranch === branch
+        {branchOptions.map((branch) => {
+          const summary = branchSummaries[branch.code]
+          const active = selectedBranch === branch.code
           return (
             <Link
-              key={branch}
-              href={buildHref({ branch: active ? '' : branch, page: 1 })}
+              key={branch.id}
+              href={buildHref({ branch: active ? '' : branch.code, page: 1 })}
               className={`card p-4 ${active ? 'ring-2 ring-accent-amber' : ''}`}
             >
-              <div className="text-muted text-xs uppercase tracking-wider">{BRANCH_LABELS[branch]}</div>
+              <div className="text-muted text-xs uppercase tracking-wider">{branch.label}</div>
               <div className="font-mono text-xl mt-2">{summary.stock.toLocaleString()} kg</div>
               <div className="font-mono text-sm mt-1">{summary.piecesSets.toLocaleString()} PCS/Sets</div>
               <div className="text-muted text-xs mt-1">{summary.productCount} products</div>
@@ -251,9 +260,9 @@ export default async function ProductsPage({
           <label className="form-label">Branch</label>
           <select name="branch" defaultValue={selectedBranch ?? ''} className="form-input">
             <option value="">All branches</option>
-            {ALL_BRANCHES.map((branch) => (
-              <option key={branch} value={branch}>
-                {BRANCH_LABELS[branch]}
+            {branchOptions.map((branch) => (
+              <option key={branch.id} value={branch.code}>
+                {branch.label}
               </option>
             ))}
           </select>
@@ -358,8 +367,12 @@ export default async function ProductsPage({
                         )
                       })()}
                     </td>
-                    <td className="font-mono text-sm">
-                      {p.currentStock.toLocaleString()} <span className="text-muted">kg</span>
+                    <td>
+                      <ProductCurrentStockInput
+                        productId={p.id}
+                        currentStock={p.currentStock}
+                        canEdit={canEditProducts}
+                      />
                     </td>
                     <td>
                       <ProductPiecesSetsInput

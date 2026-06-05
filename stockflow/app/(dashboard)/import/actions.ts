@@ -210,7 +210,18 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
       result = await commitSalesImport(rows, batch.id, user.id, user.organizationId, importerBranch.code)
     } else if (sheetType === 'sales_simple') {
       const rows = parseSimpleSales(buffer)
-      result = await commitSalesImport(rows, batch.id, user.id, user.organizationId, importerBranch.code)
+      if (rows.length > 0) {
+        result = await commitSalesImport(rows, batch.id, user.id, user.organizationId, importerBranch.code)
+      } else {
+        const parsed = parseConsumablesWorkbook(buffer, importerBranch.code)
+        result = await commitConsumablesImport(
+          parsed.rows,
+          batch.id,
+          user.id,
+          user.organizationId,
+          importerBranch.code
+        )
+      }
     } else if (sheetType === 'springs_master') {
       const rows = parseSpringsList(buffer)
       result = await commitProductMaster(rows, batch.id, user.id, user.organizationId, importerBranch.code)

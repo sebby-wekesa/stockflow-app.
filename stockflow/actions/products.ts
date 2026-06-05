@@ -76,6 +76,10 @@ const updatePiecesSetsSchema = z.object({
   piecesSets: z.coerce.number().int().nonnegative(),
 })
 
+const updateCurrentStockSchema = z.object({
+  currentStock: z.coerce.number().nonnegative(),
+})
+
 function extractForm(formData: FormData) {
   return {
     product_code: formData.get('product_code'),
@@ -377,6 +381,48 @@ export async function updateProductPiecesSets(productId: string, piecesSets: num
     where: { id: productId },
     data: { piecesSets: parsed.data.piecesSets },
   })
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+}
+
+export async function updateProductCurrentStock(productId: string, currentStock: number) {
+  const user = await requireProductManager()
+  const db = getTenantPrisma(user.organizationId)
+
+  const parsed = updateCurrentStockSchema.safeParse({ currentStock })
+  if (!parsed.success) {
+    throw new Error('Current stock must be zero or greater')
+  }
+
+  const product = await db.product.findFirst({
+    where: { id: productId },
+    select: { id: true, sku: true, currentStock: true },
+  })
+  if (!product) throw new Error('Product not found')
+
+  const nextStock = parsed.data.currentStock
+  const stockDelta = nextStock - product.currentStock
+  if (stockDelta === 0) return
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    await tx.product.update({
+      where: { id: productId },
+      data: { currentStock: nextStock },
+    })
+
+    await syncProductShadowStock(tx, product.sku, product.sku, nextStock)
+
+    await tx.stockMovement.create({
+      data: {
+        productId,
+        movementType: 'adjustment',
+        quantity: stockDelta,
+        reference: `PRODUCT-STOCK-${Date.now().toString(36).toUpperCase()}`,
+        notes: 'Inline product stock adjustment',
+      },
+    })
+  }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/products')
   revalidatePath(`/products/${productId}`)

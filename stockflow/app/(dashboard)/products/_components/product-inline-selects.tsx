@@ -3,7 +3,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { StockOrigin } from '@prisma/client'
-import { updateProductBranch, updateProductOrigin, updateProductPiecesSets } from '@/actions/products'
+import {
+  updateProductBranch,
+  updateProductCurrentStock,
+  updateProductOrigin,
+  updateProductPiecesSets,
+} from '@/actions/products'
 import { ORIGIN_LABELS } from '@/lib/products'
 import { ALL_BRANCHES, BRANCH_LABELS, type BranchCode } from '@/lib/branches'
 
@@ -180,6 +185,82 @@ export function ProductPiecesSetsInput({
         }}
         className="form-input w-full py-1.5 text-xs font-mono"
       />
+      {error && <div className="mt-1 text-xs text-red">{error}</div>}
+    </div>
+  )
+}
+
+type ProductCurrentStockInputProps = {
+  productId: string
+  currentStock: number
+  canEdit: boolean
+}
+
+export function ProductCurrentStockInput({
+  productId,
+  currentStock,
+  canEdit,
+}: ProductCurrentStockInputProps) {
+  const router = useRouter()
+  const initialValue = String(Number(currentStock ?? 0))
+  const [value, setValue] = useState(initialValue)
+  const [lastSavedValue, setLastSavedValue] = useState(initialValue)
+  const [error, setError] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  if (!canEdit) {
+    return (
+      <span className="font-mono text-sm">
+        {Number(currentStock ?? 0).toLocaleString()} <span className="text-muted">kg</span>
+      </span>
+    )
+  }
+
+  function save(nextValue = value) {
+    const parsed = Number(nextValue)
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Zero or greater')
+      setValue(lastSavedValue)
+      return
+    }
+    if (parsed === Number(lastSavedValue)) return
+
+    const normalized = String(parsed)
+    setError('')
+    startTransition(async () => {
+      try {
+        await updateProductCurrentStock(productId, parsed)
+        setLastSavedValue(normalized)
+        setValue(normalized)
+        router.refresh()
+      } catch (err) {
+        setValue(lastSavedValue)
+        setError(err instanceof Error ? err.message : 'Could not update stock')
+      }
+    })
+  }
+
+  return (
+    <div className="min-w-[104px]">
+      <div className="flex items-center gap-1">
+        <input
+          aria-label="Current stock"
+          type="number"
+          min="0"
+          step="0.01"
+          value={value}
+          disabled={isPending}
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={() => save()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur()
+            }
+          }}
+          className="form-input w-full py-1.5 text-xs font-mono"
+        />
+        <span className="text-muted text-xs">kg</span>
+      </div>
       {error && <div className="mt-1 text-xs text-red">{error}</div>}
     </div>
   )
