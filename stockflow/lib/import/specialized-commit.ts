@@ -78,6 +78,48 @@ function generateSku(productCode: string | null, name: string): string {
   return name.slice(0, 40).toUpperCase().replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-')
 }
 
+async function createImportedProduct(
+  organizationId: string,
+  name: string,
+  branchId: string
+): Promise<string> {
+  const db = getTenantPrisma(organizationId)
+  const trimmedName = name.trim()
+  const baseSku = generateSku(null, trimmedName)
+  let sku = baseSku
+  let suffix = 1
+
+  while (await db.product.findFirst({ where: { sku } })) {
+    suffix++
+    sku = `${baseSku}-${suffix}`
+  }
+
+  const product = await db.product.create({
+    data: {
+      name: trimmedName,
+      sku,
+      category: 'break_linings',
+      origin: 'LOCAL_PURCHASE',
+      uom: 'KG',
+      currentStock: 0,
+      organizationId,
+      branchId,
+    },
+  })
+
+  await db.productAlias.create({
+    data: {
+      product_id: product.id,
+      alias: trimmedName,
+      organizationId,
+    },
+  }).catch(() => {
+    // ignore duplicate alias errors
+  })
+
+  return product.id
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCT MASTER COMMIT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -464,6 +506,18 @@ export async function commitConsumablesImport(
 
   const branchId = await resolveBranchId(organizationId, branchCode)
   if (!branchId) throw new Error(`Assigned branch "${branchCode}" was not found`)
+
+  for (const name of Array.from(unmatched.keys())) {
+    try {
+      const productId = await createImportedProduct(organizationId, name, branchId)
+      nameToProductId.set(name, productId)
+      unmatched.delete(name)
+    } catch (err) {
+      console.error(`[commitConsumablesImport] Failed to auto-create product "${name}":`, err)
+    }
+  }
+
+  clearAliasCache(organizationId)
 
   const CHUNK = 100
   for (let i = 0; i < rows.length; i += CHUNK) {
