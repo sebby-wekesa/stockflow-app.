@@ -2,6 +2,7 @@
 
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
+import { withRetry } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { consumeSaleOrderReservation } from '@/lib/order-lifecycle';
 import { Prisma } from '@prisma/client';
@@ -43,6 +44,15 @@ type CompletedProductionOrder = Prisma.ProductionOrderGetPayload<{ include: type
 function assertPackagingAccess(user: PackagingUser) {
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only packaging staff can access this queue');
+  }
+}
+
+async function packagingQuery<T>(label: string, operation: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await withRetry(operation);
+  } catch (error) {
+    console.error(`[Packaging] Failed to fetch ${label}`, error);
+    return fallback;
   }
 }
 
@@ -328,22 +338,21 @@ export async function getPackagingStats() {
   const db = getTenantPrisma(user.organizationId);
   assertPackagingAccess(user)
 
-  const [
-    pendingOrders,
-    readyForDispatch,
-    totalPackagedThisWeek
-  ] = await Promise.all([
-    // Pending orders count
+  const pendingOrders = await packagingQuery('confirmed sales order count', () =>
     db.saleOrder.count({
       where: { status: 'CONFIRMED' }
     }),
+    0
+  );
 
-    // Orders packed and ready for dispatch
+  const readyForDispatch = await packagingQuery('ready for dispatch count', () =>
     db.saleOrder.count({
       where: { status: 'READY_FOR_DISPATCH' }
     }),
+    0
+  );
 
-    // Total items packaged this week
+  const totalPackagedThisWeek = await packagingQuery<any>('weekly shipped sales total', () =>
     db.saleOrder.aggregate({
       where: {
         status: 'SHIPPED',
@@ -354,8 +363,9 @@ export async function getPackagingStats() {
       _sum: {
         totalAmount: true
       }
-    })
-  ]);
+    }),
+    { _sum: { totalAmount: 0 } }
+  );
 
   return {
     pendingOrders,
@@ -373,31 +383,51 @@ export async function getPackagingDashboardData() {
   today.setHours(0, 0, 0, 0)
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const [confirmedOrders, readyForDispatch, recentShipments, shippedToday, shippedWeek, completedProduction] = await Promise.all([
+  const confirmedOrders = await packagingQuery<PackagingSaleOrder[]>('confirmed sales orders', () =>
     db.saleOrder.findMany({
       where: { status: 'CONFIRMED' },
       include: packagingOrderInclude,
       orderBy: { createdAt: 'asc' },
     }),
+    []
+  );
+
+  const readyForDispatch = await packagingQuery<PackagingSaleOrder[]>('ready for dispatch sales orders', () =>
     db.saleOrder.findMany({
       where: { status: 'READY_FOR_DISPATCH' },
       include: packagingOrderInclude,
       orderBy: { updatedAt: 'desc' },
       take: 6,
     }),
+    []
+  );
+
+  const recentShipments = await packagingQuery<PackagingSaleOrder[]>('recent sales shipments', () =>
     db.saleOrder.findMany({
       where: { status: 'SHIPPED' },
       include: packagingOrderInclude,
       orderBy: { updatedAt: 'desc' },
       take: 6,
     }),
+    []
+  );
+
+  const shippedToday = await packagingQuery('sales shipments today count', () =>
     db.saleOrder.count({
       where: { status: 'SHIPPED', updatedAt: { gte: today } },
     }),
+    0
+  );
+
+  const shippedWeek = await packagingQuery<any>('weekly shipped sales total', () =>
     db.saleOrder.aggregate({
       where: { status: 'SHIPPED', updatedAt: { gte: weekStart } },
       _sum: { totalAmount: true },
     }),
+    { _sum: { totalAmount: 0 } }
+  );
+
+  const completedProduction = await packagingQuery<CompletedProductionOrder[]>('completed production work', () =>
     db.productionOrder.findMany({
       where: {
         status: 'COMPLETED',
@@ -409,7 +439,8 @@ export async function getPackagingDashboardData() {
       include: completedProductionInclude,
       orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
     }),
-  ])
+    []
+  );
 
   const queue = confirmedOrders.filter(isPackableOrder).map(toPackagingOrder)
   const blockedOrders = confirmedOrders.length - queue.length

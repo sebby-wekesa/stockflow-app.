@@ -25,20 +25,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (role === 'PACKAGING') {
     const db = getTenantPrisma(user.organizationId);
-    const [completedProductionWork, readySalesOrders] = await Promise.all([
-      db.productionOrder.count({
-        where: {
-          status: 'COMPLETED',
-          OR: [
-            { currentDept: null },
-            { currentDept: { not: PACKAGING_DISPATCHED_DEPT } },
-          ],
-        },
-      }),
-      db.saleOrder.count({
-        where: { status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH'] } },
-      }),
-    ]);
+    const completedProductionWork = await db.productionOrder.count({
+      where: {
+        status: 'COMPLETED',
+        OR: [
+          { currentDept: null },
+          { currentDept: { not: PACKAGING_DISPATCHED_DEPT } },
+        ],
+      },
+    });
+    const readySalesOrders = await db.saleOrder.count({
+      where: { status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH'] } },
+    });
     sidebarCounts.packagingQueue = completedProductionWork + readySalesOrders;
   }
 

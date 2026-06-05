@@ -3,6 +3,7 @@ import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
 import { markOrderShipped } from '@/app/actions/packaging'
 import { PACKAGING_DISPATCHED_DEPT } from '@/lib/packaging-workflow'
+import { withRetry } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export default async function PackDonePage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [readySalesOrders, shippedSalesOrders, dispatchedProductionWork] = await Promise.all([
+  const readySalesOrders = await withRetry(() =>
     db.saleOrder.findMany({
       where: {
         status: 'READY_FOR_DISPATCH',
@@ -27,7 +28,10 @@ export default async function PackDonePage() {
         },
       },
       orderBy: { updatedAt: 'desc' },
-    }),
+    })
+  )
+
+  const shippedSalesOrders = await withRetry(() =>
     db.saleOrder.findMany({
       where: {
         status: 'SHIPPED',
@@ -43,7 +47,10 @@ export default async function PackDonePage() {
         },
       },
       orderBy: { updatedAt: 'desc' },
-    }),
+    })
+  )
+
+  const dispatchedProductionWork = await withRetry(() =>
     db.productionOrder.findMany({
       where: {
         status: 'COMPLETED',
@@ -60,8 +67,8 @@ export default async function PackDonePage() {
         },
       },
       orderBy: { updatedAt: 'desc' },
-    }),
-  ])
+    })
+  )
 
   const dispatchedCount = shippedSalesOrders.length + dispatchedProductionWork.length
 
