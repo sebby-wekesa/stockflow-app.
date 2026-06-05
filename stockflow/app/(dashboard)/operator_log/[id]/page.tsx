@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { useToast } from "@/components/Toast";
+import { recordProductionOutput } from "@/app/actions/production";
 
 export default function OperatorLogPage() {
   const params = useParams();
@@ -16,6 +17,11 @@ export default function OperatorLogPage() {
   const [kgOut, setKgOut] = useState<number>(0);
   const [kgScrap, setKgScrap] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [materialLineId, setMaterialLineId] = useState("");
+  const [weightIn, setWeightIn] = useState("");
+  const [actualPieces, setActualPieces] = useState("");
+  const [actualWeightOut, setActualWeightOut] = useState("");
+  const [outputResult, setOutputResult] = useState<null | { efficiency: number; actualPieces: number; expectedPieces: number }>(null);
 
   useEffect(() => {
     async function load() {
@@ -77,6 +83,167 @@ export default function OperatorLogPage() {
 
   if (loading) return <div className="p-8 text-[#7a8090] animate-pulse">Loading order details...</div>;
   if (!order) return null;
+
+  const isDirectOrder = !order.design;
+
+  const submitDirectOutput = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const result = await recordProductionOutput({
+        orderId: id,
+        materialLineId: materialLineId || undefined,
+        weightIn: Number(weightIn),
+        actualPieces: Number(actualPieces),
+        actualWeightOut: actualWeightOut === "" ? null : Number(actualWeightOut),
+      });
+      setOutputResult(result);
+      showToast(`Output recorded at ${result.efficiency}% efficiency`, "success");
+      setTimeout(() => router.push("/operator_queue"), 900);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to record production output", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isDirectOrder) {
+    const selectedMaterial = order.materials?.find((line: any) => line.id === materialLineId) ?? order.materials?.[0];
+    const canRecordOutput =
+      Number(weightIn) > 0 &&
+      Number.isInteger(Number(actualPieces)) &&
+      Number(actualPieces) > 0 &&
+      (order.materials?.length <= 1 || Boolean(materialLineId)) &&
+      !order.outputRecordedAt;
+
+    return (
+      <div>
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Record production output</div>
+            <div className="section-sub">{order.orderNumber} · {order.productName || "Direct order"} · expected {order.expectedPieces || order.quantity} pieces</div>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => router.push("/operator_queue")}>Back to queue</button>
+        </div>
+
+        <div className="card mb-16">
+          <div className="section-header mb-16">
+            <div>
+              <div className="section-title">{order.productName || "Direct order"}</div>
+              <div className="section-sub">Material is consumed when this output is saved</div>
+            </div>
+            <span className={`badge ${order.outputRecordedAt ? "badge-green" : "badge-amber"}`}>
+              {order.outputRecordedAt ? "Recorded" : order.priority}
+            </span>
+          </div>
+
+          <div className="grid-3">
+            <div className="card-sm">
+              <div className="stat-label">Expected pieces</div>
+              <div className="stat-value">{order.expectedPieces || order.quantity}</div>
+            </div>
+            <div className="card-sm">
+              <div className="stat-label">Material options</div>
+              <div className="stat-value">{order.materials?.length || 0}</div>
+            </div>
+            <div className="card-sm">
+              <div className="stat-label">Current department</div>
+              <div className="stat-sub">{order.currentDept || "Production"}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="log-form">
+          <div style={{fontSize:'13px',fontWeight:'600',marginBottom:'4px'}}>Production output</div>
+          <div style={{fontSize:'12px',color:'var(--muted)',marginBottom:'14px'}}>
+            Enter the actual material weight used and finished pieces produced.
+          </div>
+
+          {order.materials?.length > 1 && (
+            <div className="kg-input-group" style={{ textAlign: "left", marginBottom: "12px" }}>
+              <label>Material consumed</label>
+              <select
+                className="form-input"
+                value={materialLineId}
+                onChange={(event) => setMaterialLineId(event.target.value)}
+              >
+                <option value="">Choose material...</option>
+                {order.materials.map((line: any) => (
+                  <option key={line.id} value={line.id}>
+                    {line.RawMaterial.materialName} {line.RawMaterial.width || line.RawMaterial.diameter || ""}x{line.RawMaterial.height || line.RawMaterial.length || ""} · {line.pieces} pcs
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {order.materials?.length === 1 && selectedMaterial && (
+            <div className="card-sm mb-16">
+              <strong>{selectedMaterial.RawMaterial.materialName}</strong>
+              <div className="section-sub">
+                {selectedMaterial.pieces} pcs planned · {selectedMaterial.totalLength ?? "no"} total length · {selectedMaterial.RawMaterial.availableKg.toFixed(2)} kg available
+              </div>
+            </div>
+          )}
+
+          <div className="kg-inputs">
+            <div className="kg-input-group">
+              <label>Weight in consumed</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={weightIn}
+                onChange={(event) => setWeightIn(event.target.value)}
+                disabled={Boolean(order.outputRecordedAt)}
+              />
+            </div>
+            <div className="kg-input-group output">
+              <label>Actual finished pieces</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={actualPieces}
+                onChange={(event) => setActualPieces(event.target.value)}
+                disabled={Boolean(order.outputRecordedAt)}
+              />
+            </div>
+            <div className="kg-input-group">
+              <label>Weight out optional</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={actualWeightOut}
+                onChange={(event) => setActualWeightOut(event.target.value)}
+                disabled={Boolean(order.outputRecordedAt)}
+              />
+            </div>
+          </div>
+
+          <div className={`kg-balance ${outputResult ? "valid" : ""}`}>
+            {outputResult
+              ? `Recorded - ${outputResult.actualPieces} of ${outputResult.expectedPieces} pieces = ${outputResult.efficiency}% efficiency`
+              : order.outputRecordedAt
+                ? "Production output has already been recorded for this order"
+                : "Raw stock will be decremented only when you save this output"}
+          </div>
+
+          <div style={{marginTop:'14px',display:'flex',gap:'10px'}}>
+            <button
+              className="btn btn-primary"
+              disabled={!canRecordOutput || isSubmitting}
+              onClick={submitDirectOutput}
+            >
+              {isSubmitting ? "Saving..." : "Record output and consume material"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentStageInfo = order.design.stages.find((s: any) => s.sequence === order.currentStage);
   const nextStageInfo = order.design.stages.find((s: any) => s.sequence === order.currentStage + 1);

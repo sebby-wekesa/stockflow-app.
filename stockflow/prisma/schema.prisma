@@ -418,6 +418,7 @@ model Organization {
   products                Product[]
   productAliases          ProductAlias[]
   productReceipts         ProductReceipt[]
+  productionOrderMaterials ProductionOrderMaterial[]
   productionOrders        ProductionOrder[]
   purchaseOrders          PurchaseOrder[]
   purchaseOrderItems      PurchaseOrderItem[]
@@ -500,7 +501,13 @@ model ProductionOrder {
   saleOrderId            String?
   saleItemId             String?                  @unique
   orderNumber            String
-  designId               String
+  designId               String?
+  productName            String?
+  expectedPieces         Int?
+  actualPieces           Int?
+  actualWeightOut        Decimal?                 @db.Decimal(10, 4)
+  outputRecordedAt       DateTime?
+  outputRecordedBy       String?
   quantity               Int                      @default(1)
   targetKg               Decimal                  @db.Decimal(10, 4)
   status                 ProductionStatus         @default(PENDING)
@@ -515,7 +522,8 @@ model ProductionOrder {
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
   MaterialConsumptionLog MaterialConsumptionLog[]
-  design                 Design                   @relation(fields: [designId], references: [id])
+  design                 Design?                  @relation(fields: [designId], references: [id])
+  materials              ProductionOrderMaterial[]
   saleOrder              SaleOrder?               @relation(fields: [saleOrderId], references: [id])
   saleItem               SaleItem?                @relation(fields: [saleItemId], references: [id])
   StageLog               StageLog[]
@@ -525,6 +533,25 @@ model ProductionOrder {
   @@unique([organizationId, orderNumber])
   @@index([organizationId])
   @@index([saleOrderId])
+}
+
+model ProductionOrderMaterial {
+  id                String          @id @default(uuid())
+  organizationId    String
+  productionOrderId String
+  rawMaterialId     String
+  cutLength         Decimal?        @db.Decimal(10, 4)
+  pieces            Int
+  totalLength       Decimal?        @db.Decimal(10, 4)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
+  Organization      Organization    @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([productionOrderId])
+  @@index([rawMaterialId])
 }
 
 model PurchaseOrder {
@@ -589,6 +616,7 @@ model RawMaterial {
   InventoryRawMaterial   InventoryRawMaterial[]
   MaterialConsumptionLog MaterialConsumptionLog[]
   MaterialReceipt        MaterialReceipt[]
+  ProductionOrderMaterial ProductionOrderMaterial[]
   PurchaseOrderItem      PurchaseOrderItem[]
   Supplier               Supplier?                @relation(fields: [supplierId], references: [id])
 

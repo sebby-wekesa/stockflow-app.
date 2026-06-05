@@ -171,8 +171,11 @@ export default async function JobsPage({
             <tbody>
               {jobs.map((job) => {
                 const completedStages = job.StageLog.length
-                const totalStages = job.design._count.stages
-                const progress = totalStages > 0 ? Math.min(100, (completedStages / totalStages) * 100) : 0
+                const isDirectOrder = !job.design
+                const totalStages = job.design?._count.stages ?? 1
+                const progress = isDirectOrder
+                  ? job.outputRecordedAt ? 100 : 0
+                  : totalStages > 0 ? Math.min(100, (completedStages / totalStages) * 100) : 0
 
                 return (
                   <tr key={job.id}>
@@ -181,7 +184,7 @@ export default async function JobsPage({
                         {job.orderNumber}
                       </Link>
                     </td>
-                    <td>{job.design.name}</td>
+                    <td>{job.design?.name ?? job.productName ?? 'Direct order'}</td>
                     <td>
                       <span className={`badge ${PRODUCTION_STATUS_BADGE_CLASS[job.status]}`}>
                         {job.status.replaceAll('_', ' ')}
@@ -196,13 +199,15 @@ export default async function JobsPage({
                     <td><span className="job-kg">{job.targetKg.toNumber().toLocaleString()} kg</span></td>
                     <td>
                       <div style={{ minWidth: '110px' }}>
-                        <div className="section-sub">{completedStages}/{totalStages} stages</div>
+                        <div className="section-sub">
+                          {isDirectOrder ? (job.outputRecordedAt ? 'Output recorded' : 'Awaiting output') : `${completedStages}/${totalStages} stages`}
+                        </div>
                         <div style={{ height: '4px', marginTop: '5px', overflow: 'hidden', background: 'var(--border2)', borderRadius: '4px' }}>
                           <div style={{ width: `${progress}%`, height: '100%', background: 'var(--teal)' }} />
                         </div>
                       </div>
                     </td>
-                    <td>{job.currentDept || (job.status === 'COMPLETED' ? 'Completed' : `Stage ${job.currentStage}`)}</td>
+                    <td>{job.currentDept || (job.status === 'COMPLETED' ? 'Completed' : isDirectOrder ? 'Production output' : `Stage ${job.currentStage}`)}</td>
                     <td>{job.createdAt.toLocaleDateString()}</td>
                     <td><Link href={`/jobs/${job.id}`} className="btn btn-ghost btn-sm">View details</Link></td>
                   </tr>

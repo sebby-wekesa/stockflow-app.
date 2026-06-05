@@ -44,7 +44,7 @@ type FinishedGoodsAggregate = {
 };
 
 type PendingApproval = ProductionOrder & {
-  design: Design;
+  design: Design | null;
 };
 
 type ActiveProductionSummary = {
@@ -352,7 +352,7 @@ export async function getDashboardStats(user?: AuthUser, role?: Role) {
     stats,
     recentOrders: recentOrders.map(o => ({
       id: o.orderNumber,
-      design: o.design.name,
+      design: o.design?.name ?? o.productName ?? 'Direct order',
       kg: toNumber(o.targetKg),
       status: o.status === "PENDING" ? "Pending approval" :
               o.status === "APPROVED" || o.status === "IN_PRODUCTION" ? "In production" : "Complete",

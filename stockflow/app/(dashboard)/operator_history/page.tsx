@@ -87,7 +87,7 @@ export default async function OperatorHistoryPage() {
                 {logs.map((log) => (
                   <tr key={log.id}>
                     <td><span className="job-id">{log.ProductionOrder.orderNumber}</span></td>
-                    <td>{log.ProductionOrder.design.name}</td>
+                    <td>{log.ProductionOrder.design?.name ?? log.ProductionOrder.productName ?? 'Direct order'}</td>
                     <td>{log.stageName}</td>
                     <td><span className="badge badge-muted">{log.department || 'Unassigned'}</span></td>
                     <td><span className="job-kg">{Number(log.kgOut).toFixed(2)} kg</span></td>

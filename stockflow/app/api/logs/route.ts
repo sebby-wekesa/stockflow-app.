@@ -51,6 +51,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!order.design) {
+      return NextResponse.json(
+        { error: 'Direct orders use production output recording instead of stage logging' },
+        { status: 400 }
+      )
+    }
+
     const stage = order.design.stages.find(stage => stage.sequence === order.currentStage)
     if (!stage) {
       return NextResponse.json({ error: 'Current stage not found' }, { status: 400 })
@@ -70,7 +77,13 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         message: 'Stage log created successfully',
-        data: result.stageLog,
+        data: {
+          ...result.stageLog,
+          kgIn: Number(result.stageLog.kgIn),
+          kgOut: Number(result.stageLog.kgOut),
+          kgScrap: Number(result.stageLog.kgScrap),
+          completedAt: result.stageLog.completedAt.toISOString(),
+        },
       },
       { status: 201 }
     )

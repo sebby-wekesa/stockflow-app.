@@ -26,7 +26,7 @@ export async function exportYieldToCSV() {
 
     return [
       order.id,
-      order.design.name,
+      order.design?.name ?? order.productName ?? "Direct order",
       totalIn,
       totalOut,
       totalScrap,

@@ -3,6 +3,7 @@
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { getDepartmentsForOrg } from "@/lib/department-settings";
 
 export async function updateOrderStatus(
   orderId: string,
@@ -42,29 +43,46 @@ export async function updateOrderStatus(
 
         if (!order) throw new Error("Production order not found");
         if (order.status !== "PENDING") throw new Error("Only pending orders can be approved");
-        if (order.design.stages.length === 0) throw new Error("Design has no production stages");
-        if (order.design.billOfMaterials.length === 0) throw new Error("Design has no raw material BOM");
 
-        for (const bomItem of order.design.billOfMaterials) {
-          const requiredKg = Number(bomItem.quantity) * order.quantity;
-          const availableKg = Number(bomItem.RawMaterial.availableKg);
+        if (order.design) {
+          if (order.design.stages.length === 0) throw new Error("Design has no production stages");
+          if (order.design.billOfMaterials.length === 0) throw new Error("Design has no raw material BOM");
 
-          if (availableKg < requiredKg) {
-            throw new Error(
-              `Insufficient stock for ${bomItem.RawMaterial.materialName}. Required: ${requiredKg}kg, available: ${availableKg}kg`
-            );
+          for (const bomItem of order.design.billOfMaterials) {
+            const requiredKg = Number(bomItem.quantity) * order.quantity;
+            const availableKg = Number(bomItem.RawMaterial.availableKg);
+
+            if (availableKg < requiredKg) {
+              throw new Error(
+                `Insufficient stock for ${bomItem.RawMaterial.materialName}. Required: ${requiredKg}kg, available: ${availableKg}kg`
+              );
+            }
+
+            await tx.rawMaterial.update({
+              where: { id: bomItem.rawMaterialId },
+              data: {
+                availableKg: { decrement: requiredKg },
+                reservedKg: { increment: requiredKg },
+              },
+            });
           }
 
-          await tx.rawMaterial.update({
-            where: { id: bomItem.rawMaterialId },
+          const firstStage = order.design.stages[0];
+          await tx.productionOrder.update({
+            where: { id: orderId },
             data: {
-              availableKg: { decrement: requiredKg },
-              reservedKg: { increment: requiredKg },
+              status: "IN_PRODUCTION",
+              approvedBy: user.id,
+              approvedAt: new Date(),
+              rejectionReason: null,
+              currentStage: firstStage.sequence,
+              currentDept: firstStage.department,
             },
           });
+          return;
         }
 
-        const firstStage = order.design.stages[0];
+        const firstDepartment = getDepartmentsForOrg(user.organizationId)[0] ?? "Cutting";
         await tx.productionOrder.update({
           where: { id: orderId },
           data: {
@@ -72,8 +90,8 @@ export async function updateOrderStatus(
             approvedBy: user.id,
             approvedAt: new Date(),
             rejectionReason: null,
-            currentStage: firstStage.sequence,
-            currentDept: firstStage.department,
+            currentStage: 1,
+            currentDept: order.currentDept ?? firstDepartment,
           },
         });
       });

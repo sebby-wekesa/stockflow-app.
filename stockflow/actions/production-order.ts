@@ -102,6 +102,10 @@ export async function releaseProductionOrder(orderId: string) {
     throw new Error("Order must be approved before release to production");
   }
 
+  if (!order.design) {
+    throw new Error("Direct orders are released during approval");
+  }
+
   if (order.design.stages.length === 0) {
     throw new Error("Design must have at least one production stage");
   }

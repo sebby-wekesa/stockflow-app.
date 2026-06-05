@@ -192,16 +192,18 @@ export default async function ManagerDashboard() {
               <div className="approval-header">
                 <div>
                   <span className="job-id">{order.orderNumber}</span>
-                  <div className="manager-approval-title">{order.design.name}</div>
-                  <div className="section-sub">{order.design.code} · {order.design.targetDimensions || 'No dimensions recorded'}</div>
+                  <div className="manager-approval-title">{order.design?.name ?? order.productName ?? 'Direct order'}</div>
+                  <div className="section-sub">
+                    {order.design ? `${order.design.code} · ${order.design.targetDimensions || 'No dimensions recorded'}` : `${order.expectedPieces ?? order.quantity} expected pieces · direct order`}
+                  </div>
                 </div>
                 <span className={`badge ${PRIORITY_BADGE[order.priority]}`}>{order.priority}</span>
               </div>
               <div className="manager-approval-metrics">
                 <span><strong>{order.quantity.toLocaleString()}</strong> units</span>
                 <span><strong>{Number(order.targetKg).toLocaleString()}</strong> kg</span>
-                <span><strong>{order.design._count.stages}</strong> stages</span>
-                <span><strong>{order.design._count.billOfMaterials}</strong> materials</span>
+                <span><strong>{order.design?._count.stages ?? 1}</strong> {order.design ? 'stages' : 'output step'}</span>
+                <span><strong>{order.design?._count.billOfMaterials ?? 0}</strong> {order.design ? 'materials' : 'BOM items'}</span>
               </div>
               <div className="approval-actions">
                 <form action={approveOrderAction}>
@@ -226,13 +228,15 @@ export default async function ManagerDashboard() {
             <thead><tr><th>Order</th><th>Design</th><th>Priority</th><th>Department</th><th>Target</th><th>Progress</th><th>Updated</th></tr></thead>
             <tbody>
               {activeOrders.slice(0, 10).map((order) => {
-                const totalStages = order.design._count.stages
+                const totalStages = order.design?._count.stages ?? 1
                 const completedStages = order.StageLog.length
-                const progress = totalStages > 0 ? Math.min(100, completedStages / totalStages * 100) : 0
+                const progress = order.design
+                  ? totalStages > 0 ? Math.min(100, completedStages / totalStages * 100) : 0
+                  : order.status === 'COMPLETED' ? 100 : 0
                 return (
                   <tr key={order.id}>
                     <td><Link href={`/jobs/${order.id}`} className="sales-order-link">{order.orderNumber}</Link></td>
-                    <td>{order.design.name}</td>
+                    <td>{order.design?.name ?? order.productName ?? 'Direct order'}</td>
                     <td><span className={`badge ${PRIORITY_BADGE[order.priority]}`}>{order.priority}</span></td>
                     <td><span className="badge badge-muted">{order.currentDept || 'Unassigned'}</span></td>
                     <td><span className="job-kg">{Number(order.targetKg).toLocaleString()} kg</span></td>

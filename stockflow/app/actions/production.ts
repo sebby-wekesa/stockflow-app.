@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from 'next/cache';
-import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { assertOperatorDepartment, getOperatorDepartments } from "@/lib/operator-access";
 
@@ -9,6 +9,7 @@ export type OperatorQueueItem = {
   id: string;
   orderNumber: string;
   designName: string;
+  isDirectOrder: boolean;
   currentStage: number;
   totalStages: number;
   priority: string;
@@ -28,6 +29,130 @@ export type OperatorHistoryItem = {
   department: string;
   stageName: string;
 };
+
+export type ProductionOutputResult = {
+  success: true;
+  efficiency: number;
+  actualPieces: number;
+  expectedPieces: number;
+  materialConsumedKg: number;
+};
+
+export async function recordProductionOutput(data: {
+  orderId: string;
+  materialLineId?: string;
+  weightIn: number;
+  actualPieces: number;
+  actualWeightOut?: number | null;
+  notes?: string;
+}): Promise<ProductionOutputResult> {
+  const user = await requireActiveAuth();
+  if (!["OPERATOR", "ADMIN", "MANAGER"].includes(user.role)) {
+    throw new Error("Only production staff can record output");
+  }
+
+  const weightIn = Number(data.weightIn);
+  const actualPieces = Number(data.actualPieces);
+  const actualWeightOut = data.actualWeightOut == null || data.actualWeightOut === 0
+    ? null
+    : Number(data.actualWeightOut);
+
+  if (!data.orderId) throw new Error("Order is required");
+  if (!Number.isFinite(weightIn) || weightIn <= 0) {
+    throw new Error("Weight in must be a positive number");
+  }
+  if (!Number.isInteger(actualPieces) || actualPieces <= 0) {
+    throw new Error("Actual finished pieces must be a positive whole number");
+  }
+  if (actualWeightOut != null && (!Number.isFinite(actualWeightOut) || actualWeightOut < 0)) {
+    throw new Error("Weight out cannot be negative");
+  }
+
+  return withTenantTransaction(user.organizationId, async (tx) => {
+    const order = await tx.productionOrder.findUnique({
+      where: { id: data.orderId },
+      include: {
+        materials: {
+          include: { RawMaterial: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!order) throw new Error("Production order not found");
+    if (order.designId) throw new Error("Use stage logging for saved-template orders");
+    if (order.status !== "IN_PRODUCTION") throw new Error("Order is not in production");
+    if (order.outputRecordedAt) throw new Error("Production output has already been recorded");
+    if (!order.expectedPieces || order.expectedPieces <= 0) {
+      throw new Error("Direct order is missing expected finished pieces");
+    }
+    assertOperatorDepartment(user, order.currentDept);
+
+    if (order.materials.length === 0) {
+      throw new Error("Direct order has no material lines");
+    }
+
+    const selectedLine = data.materialLineId
+      ? order.materials.find((line: any) => line.id === data.materialLineId)
+      : order.materials.length === 1
+        ? order.materials[0]
+        : null;
+
+    if (!selectedLine) {
+      throw new Error("Choose which material was consumed");
+    }
+
+    const availableKg = Number(selectedLine.RawMaterial.availableKg);
+    if (availableKg < weightIn) {
+      throw new Error(
+        `Insufficient stock for ${selectedLine.RawMaterial.materialName}. Available: ${availableKg.toFixed(2)}kg, requested: ${weightIn.toFixed(2)}kg`
+      );
+    }
+
+    await tx.rawMaterial.update({
+      where: { id: selectedLine.rawMaterialId },
+      data: {
+        availableKg: { decrement: weightIn },
+      },
+    });
+
+    await tx.materialConsumptionLog.create({
+      data: {
+        productionOrderId: order.id,
+        rawMaterialId: selectedLine.rawMaterialId,
+        quantityConsumed: weightIn,
+        notes: data.notes?.trim() || "Consumed when direct order output was recorded",
+      },
+    });
+
+    await tx.productionOrder.update({
+      where: { id: order.id },
+      data: {
+        actualPieces,
+        actualWeightOut,
+        outputRecordedAt: new Date(),
+        outputRecordedBy: user.id,
+        status: "COMPLETED",
+        completedAt: new Date(),
+      },
+    });
+
+    const efficiency = (actualPieces / order.expectedPieces) * 100;
+    revalidatePath("/dashboard");
+    revalidatePath("/jobs");
+    revalidatePath("/operator_log");
+    revalidatePath("/operator_queue");
+    revalidatePath("/stock");
+
+    return {
+      success: true,
+      efficiency: Math.round(efficiency * 10) / 10,
+      actualPieces,
+      expectedPieces: order.expectedPieces,
+      materialConsumedKg: weightIn,
+    };
+  });
+}
 
 export async function getOperatorQueue(role?: string, department?: string) {
   const user = await requireActiveAuth();
@@ -73,12 +198,13 @@ export async function getOperatorQueue(role?: string, department?: string) {
   return orders.map((o): OperatorQueueItem => ({
     id: o.id,
     orderNumber: o.orderNumber,
-    designName: o.design.name,
+    designName: o.design?.name ?? o.productName ?? "Direct order",
+    isDirectOrder: !o.designId,
     currentStage: o.currentStage,
-    totalStages: o.design.stages.length,
+    totalStages: o.design?.stages.length ?? 1,
     priority: o.priority,
     targetKg: o.targetKg ? Number(o.targetKg) : 0,
-    workDescription: o.design.stages.find((s: { sequence: number; name: string }) => s.sequence === o.currentStage)?.name || "Production",
+    workDescription: o.design?.stages.find((s: { sequence: number; name: string }) => s.sequence === o.currentStage)?.name || "Record production output",
     inheritedKg: o.StageLog[0]?.kgOut ? Number(o.StageLog[0].kgOut) : Number(o.targetKg ?? 0),
   }));
 }
@@ -113,7 +239,7 @@ export async function getOperatorHistory() {
   return logs.map((log): OperatorHistoryItem => ({
     id: log.id,
     orderNumber: log.ProductionOrder.orderNumber,
-    designName: log.ProductionOrder.design.name,
+    designName: log.ProductionOrder.design?.name ?? log.ProductionOrder.productName ?? "Direct order",
     completedAt: log.completedAt,
     kgIn: Number(log.kgIn),
     kgOut: Number(log.kgOut),
@@ -146,6 +272,14 @@ export async function getOrderForLogging(id: string) {
             sequence: "desc",
           },
           take: 1,
+        },
+        materials: {
+          include: {
+            RawMaterial: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
         },
       },
     });

@@ -42,7 +42,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      log: result.stageLog,
+      log: {
+        ...result.stageLog,
+        kgIn: Number(result.stageLog.kgIn),
+        kgOut: Number(result.stageLog.kgOut),
+        kgScrap: Number(result.stageLog.kgScrap),
+        completedAt: result.stageLog.completedAt.toISOString(),
+      },
       transition: {
         from: stageName,
         to: result.nextStage?.department ?? 'Completed',

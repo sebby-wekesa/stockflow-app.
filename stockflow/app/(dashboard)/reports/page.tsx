@@ -81,6 +81,7 @@ export default async function ReportsPage({
       select: {
         id: true,
         orderNumber: true,
+        productName: true,
         quantity: true,
         completedAt: true,
         design: { select: { name: true } },
@@ -229,7 +230,7 @@ export default async function ReportsPage({
                 {recentProduction.map((order) => (
                   <tr key={order.id}>
                     <td style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.orderNumber}</td>
-                    <td>{order.design.name}</td>
+                    <td>{order.design?.name ?? order.productName ?? 'Direct order'}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{order.quantity.toLocaleString()}</td>
                     <td>{order.completedAt?.toLocaleDateString() ?? '—'}</td>
                   </tr>

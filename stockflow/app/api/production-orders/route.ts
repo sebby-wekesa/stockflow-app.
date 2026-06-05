@@ -40,10 +40,18 @@ export async function POST(request: NextRequest) {
     const db = getTenantPrisma(user.organizationId);
 
     const body = await request.json()
-    const { orderNumber, designId, initialWeight, priority } = body
+    const {
+      designId,
+      initialWeight,
+      priority,
+      orderType,
+      productName,
+      expectedPieces,
+      materialLines,
+    } = body
 
     // Validate required fields
-    if (!orderNumber || !designId || !initialWeight || !priority) {
+    if (!priority) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -54,6 +62,125 @@ export async function POST(request: NextRequest) {
     if (!['LOW', 'MEDIUM', 'HIGH'].includes(priority)) {
       return NextResponse.json(
         { error: 'Invalid priority value' },
+        { status: 400 }
+      )
+    }
+
+    const generatedOrderNumber = `PO-${Date.now().toString().slice(-6)}`;
+
+    if (orderType === 'direct') {
+      if (!productName || typeof productName !== 'string' || productName.trim().length < 2) {
+        return NextResponse.json({ error: 'Product name is required' }, { status: 400 })
+      }
+      if (!Number.isInteger(Number(expectedPieces)) || Number(expectedPieces) <= 0) {
+        return NextResponse.json({ error: 'Expected finished pieces must be a positive whole number' }, { status: 400 })
+      }
+      if (!Array.isArray(materialLines) || materialLines.length === 0) {
+        return NextResponse.json({ error: 'Add at least one material line' }, { status: 400 })
+      }
+
+      const normalizedLines = materialLines.map((line: any) => ({
+        rawMaterialId: String(line.rawMaterialId || ''),
+        cutLength: line.cutLength === '' || line.cutLength == null ? null : Number(line.cutLength),
+        pieces: Number(line.pieces),
+        totalLength: line.totalLength === '' || line.totalLength == null ? null : Number(line.totalLength),
+      }))
+
+      for (const line of normalizedLines) {
+        if (!line.rawMaterialId) {
+          return NextResponse.json({ error: 'Each material line needs a raw material' }, { status: 400 })
+        }
+        if (!Number.isInteger(line.pieces) || line.pieces <= 0) {
+          return NextResponse.json({ error: 'Each material line needs positive pieces' }, { status: 400 })
+        }
+        if (line.cutLength != null && line.cutLength < 0) {
+          return NextResponse.json({ error: 'Cut length cannot be negative' }, { status: 400 })
+        }
+        if (line.totalLength != null && line.totalLength < 0) {
+          return NextResponse.json({ error: 'Total length cannot be negative' }, { status: 400 })
+        }
+      }
+
+      const materialIds = [...new Set(normalizedLines.map((line) => line.rawMaterialId))]
+      const materials = await db.rawMaterial.findMany({
+        where: { id: { in: materialIds } },
+        select: { id: true },
+      })
+      if (materials.length !== materialIds.length) {
+        return NextResponse.json({ error: 'One or more raw materials were not found' }, { status: 400 })
+      }
+
+      const targetKg = Number(initialWeight) > 0 ? Number(initialWeight) : 0.0001
+      const productionOrder = await db.productionOrder.create({
+        data: {
+          orderNumber: generatedOrderNumber,
+          productName: productName.trim(),
+          expectedPieces: Number(expectedPieces),
+          quantity: Number(expectedPieces),
+          targetKg,
+          priority: priority || 'MEDIUM',
+          status: 'PENDING',
+          currentStage: 1,
+          materials: {
+            create: normalizedLines.map((line) => ({
+              organizationId: user.organizationId,
+              rawMaterialId: line.rawMaterialId,
+              cutLength: line.cutLength,
+              pieces: line.pieces,
+              totalLength: line.totalLength,
+            })),
+          },
+        } as any,
+        include: {
+          materials: {
+            include: {
+              RawMaterial: {
+                select: {
+                  id: true,
+                  materialName: true,
+                  diameter: true,
+                  width: true,
+                  height: true,
+                  length: true,
+                },
+              },
+            },
+          },
+        },
+      })
+
+      const duration = Date.now() - startTime;
+      logger.performance('Direct production order created', duration, {
+        orderId: productionOrder.id,
+        orderNumber: productionOrder.orderNumber,
+      });
+
+      const response = NextResponse.json(
+        {
+          message: 'Direct production order created successfully',
+          order: {
+            ...productionOrder,
+            targetKg: Number(productionOrder.targetKg),
+            materials: productionOrder.materials.map((line: any) => ({
+              ...line,
+              cutLength: line.cutLength == null ? null : Number(line.cutLength),
+              totalLength: line.totalLength == null ? null : Number(line.totalLength),
+            })),
+          },
+        },
+        { status: 201 }
+      );
+
+      Object.entries(getSecurityHeaders()).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+
+      return response;
+    }
+
+    if (!designId || !initialWeight) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
         { status: 400 }
       )
     }
@@ -81,9 +208,6 @@ export async function POST(request: NextRequest) {
     if (design.stages.length === 0) {
       return NextResponse.json({ error: 'Design has no production stages' }, { status: 400 });
     }
-
-    // Generate a unique order number (e.g., PO-123456)
-    const generatedOrderNumber = `PO-${Date.now().toString().slice(-6)}`;
 
     // Create production order (organizationId injected automatically by tenant client)
     const productionOrder = await db.productionOrder.create({
@@ -203,6 +327,8 @@ export async function GET(request: NextRequest) {
           quantity: true,
           priority: true,
           status: true,
+          productName: true,
+          expectedPieces: true,
           design: {
             select: {
               name: true,
@@ -223,9 +349,10 @@ export async function GET(request: NextRequest) {
     const transformedOrders = orders.map((order) => ({
       id: order.id,
       orderNumber: order.orderNumber,
-      designName: order.design?.name || 'Unknown Design',
-      targetKg: order.targetKg,
+      designName: order.design?.name || order.productName || 'Direct order',
+      targetKg: Number(order.targetKg),
       quantity: order.quantity,
+      expectedPieces: order.expectedPieces,
       priority: order.priority,
       specs: `${order.design?.targetDimensions || ''}`,
       status: order.status,
@@ -234,7 +361,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: transformedOrders,
+      data: transformedOrders,
         pagination: {
           total,
           limit,

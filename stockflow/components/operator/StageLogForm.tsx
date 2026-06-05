@@ -32,6 +32,7 @@ export function StageLogForm({ order, onComplete }: { order: any, onComplete: ()
     try {
       const response = await fetch("/api/production/log-stage", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: order.id,
           stageId: order.currentStageId || order.currentStage,

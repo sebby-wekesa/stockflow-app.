@@ -38,6 +38,10 @@ export async function consumeMaterialsForOrder(productionOrderId: string) {
     throw new Error("Production order not found");
   }
 
+  if (!order.design) {
+    throw new Error("Direct orders consume material when production output is recorded");
+  }
+
   if (order.design.billOfMaterials.length === 0) {
     throw new Error("No BOM items found for this design");
   }

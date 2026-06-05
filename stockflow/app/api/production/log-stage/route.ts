@@ -65,7 +65,13 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: result.orderCompleted ? "Order completed" : `Advanced to ${result.nextStage?.department}`,
-      log: result.stageLog,
+      log: {
+        ...result.stageLog,
+        kgIn: Number(result.stageLog.kgIn),
+        kgOut: Number(result.stageLog.kgOut),
+        kgScrap: Number(result.stageLog.kgScrap),
+        completedAt: result.stageLog.completedAt.toISOString(),
+      },
       isCompleted: result.orderCompleted
     });
 

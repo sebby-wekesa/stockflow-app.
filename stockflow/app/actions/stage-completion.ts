@@ -236,6 +236,10 @@ export async function getOrderForCompletion(orderId: string) {
   // Check permissions - operators can only see orders in their department
   assertOperatorDepartment(user, order.currentDept);
 
+  if (!order.design) {
+    throw new Error('Direct orders use production output recording instead of stage completion');
+  }
+
   const currentStage = order.design.stages.find(s => s.sequence === order.currentStage);
   const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
 
