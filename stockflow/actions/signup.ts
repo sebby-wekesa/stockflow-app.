@@ -75,7 +75,7 @@ export async function signUpOrganization(formData: FormData) {
   }
 
   // Branch rows can use business codes like MSA/NBO/BNJ while the signup UI
-  // submits canonical app codes like mombasa/nairobi/bonje.
+  // submits canonical app codes like mombasa/nairobi/bunje.
   const branches = await prisma.branch.findMany({
     where: { organizationId: data.organizationId },
     select: { id: true, code: true, name: true, location: true },

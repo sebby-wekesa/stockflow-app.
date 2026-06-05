@@ -50,7 +50,7 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   raw_product_name: 'Product name (raw)',
   customer_name: 'Customer name',
   supplier_name: 'Supplier name',
-  branch: 'Branch (mombasa / nairobi / bonje)',
+  branch: 'Branch (mombasa / nairobi / bunje)',
   qty: 'Quantity',
   unit_price: 'Unit price',
   unit_cost: 'Unit cost',
@@ -211,12 +211,12 @@ export function extractString(value: unknown): string | null {
 }
 
 // Branch normalisation — handles "Mombasa", "MOMBASA", "Mombasa HQ", etc.
-export function extractBranch(value: unknown): 'mombasa' | 'nairobi' | 'bonje' | null {
+export function extractBranch(value: unknown): 'mombasa' | 'nairobi' | 'bunje' | null {
   const str = extractString(value)
   if (!str) return null
   const lower = str.toLowerCase()
   if (lower.includes('mombasa')) return 'mombasa'
   if (lower.includes('nairobi')) return 'nairobi'
-  if (lower.includes('bonje')) return 'bonje'
+  if (lower.includes('bunje') || lower.includes('bonje')) return 'bunje'
   return null
 }

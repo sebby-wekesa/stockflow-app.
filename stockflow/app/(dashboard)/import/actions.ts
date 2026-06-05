@@ -9,10 +9,9 @@ import {
   parseSimpleSales,
   parseSpringsList,
   parseUBoltList,
-  parseConsumablesStock,
+  parseConsumablesWorkbook,
   detectFile,
   type SpecializedSheetType,
-  type ParsedStockRow,
   type BranchCode,
 } from '@/lib/import/specialized-parsers'
 import {
@@ -23,7 +22,6 @@ import {
   type CommitResult,
 } from '@/lib/import/specialized-commit'
 import { clearAliasCache } from '@/lib/import/alias-matcher'
-import * as XLSX from 'xlsx'
 import { normalizeBranchCode } from '@/lib/branches'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +82,7 @@ export async function uploadSpecialized(formData: FormData) {
   let parsedCount = 0
   let parsedPreview: unknown[] = []
   let sourceLabel = ''
+  let effectiveSheetType: SpecializedSheetType = sheetType
 
   try {
     if (sheetType === 'sales_quickbooks_v2') {
@@ -99,9 +98,26 @@ export async function uploadSpecialized(formData: FormData) {
         ...row,
         branch: branchOverride,
       }))
-      parsedCount = rows.length
-      parsedPreview = rows.slice(0, 10)
-      sourceLabel = 'Simple sales list'
+      if (rows.length > 0) {
+        parsedCount = rows.length
+        parsedPreview = rows.slice(0, 10)
+        sourceLabel = 'Simple sales list'
+      } else {
+        const stockResult = parseConsumablesWorkbook(buffer, branchOverride)
+        if (stockResult.rows.length > 0) {
+          effectiveSheetType = 'consumables_stock'
+          parsedCount = stockResult.rows.length
+          parsedPreview = stockResult.rows.slice(0, 10)
+          sourceLabel =
+            `Consumables stock — auto-detected after sales parser found no rows; ` +
+            `${stockResult.candidateSheetNames.length} candidate sheets, ` +
+            `${stockResult.parsedSheets.filter((sheet) => sheet.rowCount > 0).length} with rows`
+        } else {
+          parsedCount = 0
+          parsedPreview = []
+          sourceLabel = 'Simple sales list'
+        }
+      }
     } else if (sheetType === 'springs_master') {
       const rows = parseSpringsList(buffer)
       parsedCount = rows.length
@@ -113,22 +129,12 @@ export async function uploadSpecialized(formData: FormData) {
       parsedPreview = rows.slice(0, 10)
       sourceLabel = 'U-bolt master list'
     } else if (sheetType === 'consumables_stock') {
-      const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
-      const inOutSheets = wb.SheetNames.filter((n) =>
-        n.toUpperCase().includes('IN-OUT')
-      )
-      const merged: ParsedStockRow[] = []
-      for (const name of inOutSheets) {
-        try {
-          const rows = parseConsumablesStock(buffer, name, branchOverride)
-          merged.push(...rows)
-        } catch {
-          // skip unparseable sheets silently
-        }
-      }
-      parsedCount = merged.length
-      parsedPreview = merged.slice(0, 10)
-      sourceLabel = `Consumables stock — ${inOutSheets.length} sheets parsed`
+      const result = parseConsumablesWorkbook(buffer, branchOverride)
+      parsedCount = result.rows.length
+      parsedPreview = result.rows.slice(0, 10)
+      sourceLabel =
+        `Consumables stock — ${result.candidateSheetNames.length} candidate sheets, ` +
+        `${result.parsedSheets.filter((sheet) => sheet.rowCount > 0).length} with rows`
     } else {
       throw new Error(`Unknown sheet type: ${sheetType}`)
     }
@@ -138,7 +144,7 @@ export async function uploadSpecialized(formData: FormData) {
 
   if (parsedCount === 0) {
     throw new Error(
-      `No usable rows found in the file (sheet type: ${sheetType}). ` +
+      `No usable rows found in the file (sheet type: ${effectiveSheetType}). ` +
       `Check that you selected the correct file type in the Import Centre. ` +
       `Detailed diagnostics were printed to the server console.`
     )
@@ -151,7 +157,7 @@ export async function uploadSpecialized(formData: FormData) {
     data: {
       file_name: file.name,
       file_url: base64,
-      sheet_type: sheetType,
+      sheet_type: effectiveSheetType,
       import_mode: 'update',
       target_branch: branchOverride,
       status: 'preview',
@@ -212,23 +218,9 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
       const rows = parseUBoltList(buffer)
       result = await commitProductMaster(rows, batch.id, user.id, user.organizationId, importerBranch.code)
     } else if (sheetType === 'consumables_stock') {
-      const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
-      const inOutSheets = wb.SheetNames.filter((n) =>
-        n.toUpperCase().includes('IN-OUT')
-      )
-      const merged: ParsedStockRow[] = []
-      for (const name of inOutSheets) {
-        try {
-          const parsed = parseConsumablesStock(
-            buffer,
-            name,
-            importerBranch.code
-          )
-          merged.push(...parsed)
-        } catch {}
-      }
+      const parsed = parseConsumablesWorkbook(buffer, importerBranch.code)
       result = await commitConsumablesImport(
-        merged,
+        parsed.rows,
         batch.id,
         user.id,
         user.organizationId,

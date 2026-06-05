@@ -14,7 +14,7 @@ export default async function TransferPage() {
   // Get user branches based on role or permissions
   const userBranches = ['ADMIN', 'MANAGER'].includes(user.role)
     ? ALL_BRANCHES
-    : (['mombasa', 'nairobi', 'bonje'] as Branch[]) // For now, assume all branches for other roles
+    : (['mombasa', 'nairobi', 'bunje'] as Branch[]) // For now, assume all branches for other roles
 
   // Get products with stock in any branch (tenant scoped)
   const productRecords = await db.product.findMany({

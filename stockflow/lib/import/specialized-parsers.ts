@@ -19,7 +19,7 @@
 import * as XLSX from 'xlsx'
 
 /** Branch codes — matches the strings used elsewhere in the app */
-export type BranchCode = 'mombasa' | 'nairobi' | 'bonje'
+export type BranchCode = 'mombasa' | 'nairobi' | 'bunje'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NORMALIZED OUTPUT TYPES
@@ -65,6 +65,13 @@ export type ParsedStockRow = {
   direction: 'in' | 'out' | 'balance'
   reference: string | null
   notes: string | null
+}
+
+export type ConsumablesWorkbookParseResult = {
+  rows: ParsedStockRow[]
+  candidateSheetNames: string[]
+  parsedSheets: Array<{ sheetName: string; rowCount: number }>
+  errors: Array<{ sheetName: string; error: string }>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,8 +151,8 @@ export function detectFile(file: File): Promise<DetectResult> {
           })
         }
 
-        // Check for consumables stock (sheets ending with IN-OUT)
-        const inOutSheets = sheetNames.filter((n) => n.toUpperCase().includes('IN-OUT'))
+        // Check for consumables stock sheets.
+        const inOutSheets = sheetNames.filter(isConsumablesStockSheetName)
         if (inOutSheets.length > 0) {
           return resolve({
             recommendedSheetType: 'consumables_stock',
@@ -217,7 +224,7 @@ function normaliseBranch(value: unknown): BranchCode | null {
   const lower = str.toLowerCase()
   if (lower.includes('mombasa')) return 'mombasa'
   if (lower.includes('nairobi')) return 'nairobi'
-  if (lower.includes('bonje')) return 'bonje'
+  if (lower.includes('bunje') || lower.includes('bonje')) return 'bunje'
   // Handle "Upcountry" as Mombasa
   if (lower.includes('upcountry')) return 'mombasa'
   return null
@@ -230,6 +237,88 @@ function readSheetAsRows(buffer: ArrayBuffer, sheetName?: string) {
   if (!ws) throw new Error(`Sheet "${targetSheet}" not found`)
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as unknown[][]
   return { rows, wb, ws }
+}
+
+function normalizeSheetName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+export function isConsumablesStockSheetName(sheetName: string): boolean {
+  const normalized = normalizeSheetName(sheetName)
+  return (
+    normalized.includes('in out') ||
+    normalized.includes('inout') ||
+    normalized.includes('consumable') ||
+    normalized.includes('stock')
+  )
+}
+
+function isConsumablesHeaderRow(row: unknown[]): boolean {
+  const cells = row.map((cell) => toStr(cell)?.toLowerCase() ?? '')
+  const nonEmpty = cells.filter(Boolean)
+  if (nonEmpty.length === 0) return true
+
+  const hasProductHeader = cells.some((cell) =>
+    ['product', 'item', 'description', 'particulars'].some((header) => cell.includes(header))
+  )
+  const hasQtyHeader = cells.some((cell) =>
+    cell === 'qty' || cell === 'quantity' || cell.includes('qty') || cell.includes('quantity')
+  )
+  const hasMovementHeader = cells.some((cell) =>
+    cell === 'in' ||
+    cell === 'out' ||
+    cell === 'stock in' ||
+    cell === 'stock out' ||
+    cell === 'balance' ||
+    cell === 'bal'
+  )
+
+  return (hasProductHeader && (hasQtyHeader || hasMovementHeader)) || (hasQtyHeader && hasMovementHeader)
+}
+
+export function parseConsumablesWorkbook(
+  buffer: ArrayBuffer,
+  branch: BranchCode
+): ConsumablesWorkbookParseResult {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
+  let candidateSheetNames = wb.SheetNames.filter(isConsumablesStockSheetName)
+
+  if (candidateSheetNames.length === 0 && wb.SheetNames.length === 1) {
+    candidateSheetNames = [...wb.SheetNames]
+  }
+
+  const rows: ParsedStockRow[] = []
+  const parsedSheets: ConsumablesWorkbookParseResult['parsedSheets'] = []
+  const errors: ConsumablesWorkbookParseResult['errors'] = []
+
+  for (const sheetName of candidateSheetNames) {
+    try {
+      const parsed = parseConsumablesStock(buffer, sheetName, branch)
+      parsedSheets.push({ sheetName, rowCount: parsed.length })
+      rows.push(...parsed)
+    } catch (err) {
+      errors.push({ sheetName, error: (err as Error).message })
+    }
+  }
+
+  if (rows.length === 0) {
+    console.error('=== Consumables Stock Parser - 0 rows produced ===')
+    console.error('Workbook sheets:', wb.SheetNames)
+    console.error('Candidate sheets:', candidateSheetNames)
+    console.error('Parsed sheets:', parsedSheets)
+    console.error('Sheet parser errors:', errors)
+
+    for (const sheetName of candidateSheetNames.slice(0, 5)) {
+      const ws = wb.Sheets[sheetName]
+      if (!ws) continue
+      const sample = XLSX.utils
+        .sheet_to_json(ws, { header: 1, defval: '' })
+        .slice(0, 8)
+      console.error(`Sample rows from "${sheetName}":`, sample)
+    }
+  }
+
+  return { rows, candidateSheetNames, parsedSheets, errors }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -575,6 +664,27 @@ export function parseSimpleSales(buffer: ArrayBuffer): ParsedSalesRow[] {
     }
   }
 
+  if (out.length === 0) {
+    console.error('=== Simple Sales Parser - 0 rows produced ===')
+    console.error('Total rows read from sheet:', rows.length)
+    console.error('Header row index found by detector:', headerRow)
+    console.error('Column indices used:', col)
+    console.error('First 8 raw rows:', rows.slice(0, 8))
+    console.error(
+      'First candidate rows using chosen columns:',
+      rows.slice(Math.max(1, headerRow + 1), Math.max(1, headerRow + 1) + 8).map((row, idx) => ({
+        excelRow: Math.max(1, headerRow + 1) + idx + 1,
+        product: toStr(getCell(row, col.product)),
+        qtyRaw: getCell(row, col.qty),
+        qtyParsed: toNumber(getCell(row, col.qty)),
+        invoice: toStr(getCell(row, col.invoice)),
+        customer: toStr(getCell(row, col.customer)),
+        location: toStr(getCell(row, col.location)),
+        date: getCell(row, col.date),
+      }))
+    )
+  }
+
   return out
 }
 
@@ -735,10 +845,7 @@ export function parseConsumablesStock(
   // Start from row 0 and skip header-like rows
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    const rowStr = JSON.stringify(row).toLowerCase()
-
-    // Skip obvious header rows
-    if (rowStr.includes('product') || rowStr.includes('qty') || rowStr.includes('in') || rowStr.includes('out')) {
+    if (isConsumablesHeaderRow(row)) {
       continue
     }
 
@@ -773,6 +880,23 @@ export function parseConsumablesStock(
         reference: `${sheetName} import`,
         notes: `Stock out from ${sheetName}`,
       })
+    }
+
+    // Layout 2: Product | Name | Category | UOM | Branch | Current stock
+    const snapshotProduct = toStr(getCell(row, 0))
+    const snapshotQty = toNumber(getCell(row, 5))
+    if (snapshotProduct && snapshotQty !== null && snapshotQty !== 0) {
+      out.push({
+        source_row: i + 1,
+        movement_date: null,
+        raw_product_name: snapshotProduct,
+        branch,
+        qty: Math.abs(snapshotQty),
+        direction: snapshotQty > 0 ? 'in' : 'out',
+        reference: `${sheetName} import`,
+        notes: `Stock snapshot from ${sheetName}`,
+      })
+      continue
     }
 
     // Layout 2: Product | Qty  (single movement per row, assume IN)

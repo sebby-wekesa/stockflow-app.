@@ -132,7 +132,7 @@ export default async function BranchStockPage({
     const stockByBranch: Record<Branch, number> = {
       mombasa: 0,
       nairobi: 0,
-      bonje: 0,
+      bunje: 0,
     }
 
     // Add raw material stock

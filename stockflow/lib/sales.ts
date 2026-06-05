@@ -7,7 +7,7 @@ export { STATUS_LABELS, STATUS_BADGE_CLASS, formatKES } from './sales-utils'
 const SPRINGTECH_INVOICE_PREFIX: Record<string, string> = {
   mombasa: '',
   nairobi: 'NBI',
-  bonje: 'BNJ',
+  bunje: 'BNJ',
 }
 
 /**

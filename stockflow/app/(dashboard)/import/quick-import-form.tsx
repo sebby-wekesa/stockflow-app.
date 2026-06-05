@@ -125,7 +125,7 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
         // If content inspection fails, fall back to filename
         if (lower.includes('sales') || lower.includes('invoice') || lower.includes('transaction')) {
           setSheetType('sales_simple')
-        } else if (lower.includes('mombasa') || lower.includes('nairobi') || lower.includes('bonje')) {
+        } else if (lower.includes('mombasa') || lower.includes('nairobi') || lower.includes('bunje') || lower.includes('bonje')) {
           setSheetType('sales_simple')
         }
       }

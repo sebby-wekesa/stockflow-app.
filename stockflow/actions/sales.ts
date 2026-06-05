@@ -46,16 +46,16 @@ const SALES_BRANCH_ALIASES: Record<string, string[]> = {
   nairobi: ['nairobi', 'nbo', 'nbi', 'nairobi branch'],
   nbo: ['nairobi', 'nbo', 'nbi', 'nairobi branch'],
   nbi: ['nairobi', 'nbo', 'nbi', 'nairobi branch'],
-  bonje: ['bonje', 'bunje', 'bnj', 'bonje branch', 'bunje branch'],
-  bunje: ['bonje', 'bunje', 'bnj', 'bonje branch', 'bunje branch'],
-  bnj: ['bonje', 'bunje', 'bnj', 'bonje branch', 'bunje branch'],
+  bunje: ['bunje', 'bonje', 'bnj', 'bunje branch', 'bonje branch'],
+  bonje: ['bunje', 'bonje', 'bnj', 'bunje branch', 'bonje branch'],
+  bnj: ['bunje', 'bonje', 'bnj', 'bunje branch', 'bonje branch'],
 }
 
 function normalizeSalesBranch(value: string) {
   const normalized = value.trim().toLowerCase()
   if (['mombasa', 'msa'].includes(normalized)) return 'mombasa'
   if (['nairobi', 'nbo', 'nbi'].includes(normalized)) return 'nairobi'
-  if (['bonje', 'bunje', 'bnj'].includes(normalized)) return 'bonje'
+  if (['bunje', 'bonje', 'bnj'].includes(normalized)) return 'bunje'
   return normalized
 }
 

@@ -96,8 +96,8 @@ function normalizeBranch(branchName: string): string {
   if (normalized.includes('nairobi')) {
     return 'nairobi'
   }
-  if (normalized.includes('bonje') || normalized.includes('bunje')) {
-    return 'bonje'
+  if (normalized.includes('bunje') || normalized.includes('bonje')) {
+    return 'bunje'
   }
 
   return 'mombasa' // default
