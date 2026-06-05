@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
 import { markOrderShipped } from '@/app/actions/packaging'
+import { PACKAGING_DISPATCHED_DEPT } from '@/lib/packaging-workflow'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,41 +12,85 @@ export default async function PackDonePage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const orders = await db.saleOrder.findMany({
-    where: {
-      status: 'READY_FOR_DISPATCH',
-      updatedAt: { gte: today },
-    },
-    include: {
-      SaleItem: {
-        include: {
-          FinishedGoods: {
-            include: { design: true },
+  const [readySalesOrders, shippedSalesOrders, dispatchedProductionWork] = await Promise.all([
+    db.saleOrder.findMany({
+      where: {
+        status: 'READY_FOR_DISPATCH',
+      },
+      include: {
+        SaleItem: {
+          include: {
+            FinishedGoods: {
+              include: { design: true },
+            },
           },
         },
       },
-    },
-    orderBy: { updatedAt: 'desc' },
-  })
+      orderBy: { updatedAt: 'desc' },
+    }),
+    db.saleOrder.findMany({
+      where: {
+        status: 'SHIPPED',
+        updatedAt: { gte: today },
+      },
+      include: {
+        SaleItem: {
+          include: {
+            FinishedGoods: {
+              include: { design: true },
+            },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    db.productionOrder.findMany({
+      where: {
+        status: 'COMPLETED',
+        currentDept: PACKAGING_DISPATCHED_DEPT,
+        updatedAt: { gte: today },
+      },
+      include: {
+        design: { select: { name: true, code: true } },
+        saleOrder: { select: { customerName: true } },
+        StageLog: {
+          orderBy: { completedAt: 'desc' },
+          take: 1,
+          include: { User: { select: { name: true, email: true } } },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    }),
+  ])
+
+  const dispatchedCount = shippedSalesOrders.length + dispatchedProductionWork.length
 
   return (
     <div>
       <div className="section-header mb-16">
         <div>
-          <div className="section-title">Ready for Dispatch</div>
-          <div className="section-sub">{orders.length} packaged orders awaiting dispatch</div>
+          <div className="section-title">Daily Dispatch Summary</div>
+          <div className="section-sub">
+            {dispatchedCount} dispatched today · {readySalesOrders.length} sales orders awaiting dispatch
+          </div>
         </div>
         <Link href="/packaging" className="btn btn-ghost">Packaging queue</Link>
       </div>
 
-      <div className="card">
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Packaged Sales Orders Awaiting Dispatch</div>
+            <div className="section-sub">{readySalesOrders.length} orders ready to leave</div>
+          </div>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr><th>Order</th><th>Customer</th><th>Items</th><th>Quantity</th><th>Value</th><th>Action</th></tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
+              {readySalesOrders.map((order) => (
                 <tr key={order.id}>
                   <td><Link href={`/sales/${order.id}`} style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</Link></td>
                   <td>{order.customerName}</td>
@@ -59,11 +104,79 @@ export default async function PackDonePage() {
                   </td>
                 </tr>
               ))}
-              {orders.length === 0 && (
+              {readySalesOrders.length === 0 && (
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No orders are awaiting dispatch.</td></tr>
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="grid-2 packaging-overview">
+        <div className="card">
+          <div className="section-header mb-16">
+            <div>
+              <div className="section-title">Production Work Dispatched Today</div>
+              <div className="section-sub">Completed operator jobs dispatched by packaging</div>
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Job</th><th>Product</th><th>Operator</th><th>Output</th></tr>
+              </thead>
+              <tbody>
+                {dispatchedProductionWork.map((work) => {
+                  const lastLog = work.StageLog[0]
+                  const piecesOut = lastLog?.piecesOut ?? work.actualPieces ?? work.expectedPieces ?? work.quantity
+                  const kgOut = lastLog?.kgOut == null
+                    ? work.actualWeightOut == null ? Number(work.targetKg) : Number(work.actualWeightOut)
+                    : Number(lastLog.kgOut)
+
+                  return (
+                    <tr key={work.id}>
+                      <td><Link href={`/jobs/${work.id}`} style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{work.orderNumber}</Link></td>
+                      <td>{work.design?.name ?? work.productName ?? 'Direct order'}</td>
+                      <td>{lastLog?.User?.name ?? lastLog?.User?.email ?? 'Unknown'}</td>
+                      <td><span className="job-kg">{piecesOut.toLocaleString()} pcs/sets · {kgOut.toFixed(1)} kg</span></td>
+                    </tr>
+                  )
+                })}
+                {dispatchedProductionWork.length === 0 && (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No completed production work has been dispatched today.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="section-header mb-16">
+            <div>
+              <div className="section-title">Sales Orders Shipped Today</div>
+              <div className="section-sub">Sales orders marked dispatched by packaging</div>
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Order</th><th>Customer</th><th>Quantity</th><th>Value</th></tr>
+              </thead>
+              <tbody>
+                {shippedSalesOrders.map((order) => (
+                  <tr key={order.id}>
+                    <td><Link href={`/sales/${order.id}`} style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</Link></td>
+                    <td>{order.customerName}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>KES {Number(order.totalAmount).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {shippedSalesOrders.length === 0 && (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No sales orders have been shipped today.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

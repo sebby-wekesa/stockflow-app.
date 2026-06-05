@@ -1,0 +1,8 @@
+export const PACKAGING_IN_PROGRESS_DEPT = 'Packaging'
+export const PACKAGING_READY_DEPT = 'Ready for dispatch'
+export const PACKAGING_DISPATCHED_DEPT = 'Dispatched'
+export const PACKAGING_WORK_DEPTS = [
+  PACKAGING_IN_PROGRESS_DEPT,
+  PACKAGING_READY_DEPT,
+  PACKAGING_DISPATCHED_DEPT,
+]

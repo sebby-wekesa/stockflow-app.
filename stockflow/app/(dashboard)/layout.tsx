@@ -3,6 +3,7 @@ import { getUser } from '@/lib/auth';
 import { getTenantPrisma } from '@/lib/tenant-prisma';
 import { Sidebar } from "@/components/Sidebar";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { PACKAGING_DISPATCHED_DEPT } from '@/lib/packaging-workflow';
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +25,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (role === 'PACKAGING') {
     const db = getTenantPrisma(user.organizationId);
-    sidebarCounts.packagingQueue = await db.productionOrder.count({
-      where: { status: 'COMPLETED' },
-    });
+    const [completedProductionWork, readySalesOrders] = await Promise.all([
+      db.productionOrder.count({
+        where: {
+          status: 'COMPLETED',
+          OR: [
+            { currentDept: null },
+            { currentDept: { not: PACKAGING_DISPATCHED_DEPT } },
+          ],
+        },
+      }),
+      db.saleOrder.count({
+        where: { status: { in: ['CONFIRMED', 'READY_FOR_DISPATCH'] } },
+      }),
+    ]);
+    sidebarCounts.packagingQueue = completedProductionWork + readySalesOrders;
   }
 
   if (role === 'PENDING') {

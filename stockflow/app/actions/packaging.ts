@@ -5,6 +5,12 @@ import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
 import { consumeSaleOrderReservation } from '@/lib/order-lifecycle';
 import { Prisma } from '@prisma/client';
+import {
+  PACKAGING_DISPATCHED_DEPT,
+  PACKAGING_IN_PROGRESS_DEPT,
+  PACKAGING_READY_DEPT,
+  PACKAGING_WORK_DEPTS,
+} from '@/lib/packaging-workflow';
 
 type PackagingUser = Awaited<ReturnType<typeof requireActiveAuth>>
 
@@ -33,11 +39,6 @@ const completedProductionInclude = Prisma.validator<Prisma.ProductionOrderInclud
 })
 
 type CompletedProductionOrder = Prisma.ProductionOrderGetPayload<{ include: typeof completedProductionInclude }>
-
-const PACKAGING_IN_PROGRESS_DEPT = 'Packaging'
-const PACKAGING_READY_DEPT = 'Ready for dispatch'
-const PACKAGING_DISPATCHED_DEPT = 'Dispatched'
-const PACKAGING_WORK_DEPTS = [PACKAGING_IN_PROGRESS_DEPT, PACKAGING_READY_DEPT, PACKAGING_DISPATCHED_DEPT]
 
 function assertPackagingAccess(user: PackagingUser) {
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
