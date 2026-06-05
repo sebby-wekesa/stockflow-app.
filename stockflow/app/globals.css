@@ -100,6 +100,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .btn-ghost:hover { border-color: var(--text); color: var(--text); }
 .btn-sm { padding: 5px 10px; font-size: 11px; }
 .btn-teal { background: var(--teal); color: #000; }
+.btn-blue { background: var(--blue); color: #000; }
 .btn-purple { background: var(--purple); color: #fff; }
 .btn-red { background: var(--red); color: #fff; }
 

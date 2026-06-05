@@ -34,6 +34,11 @@ const completedProductionInclude = Prisma.validator<Prisma.ProductionOrderInclud
 
 type CompletedProductionOrder = Prisma.ProductionOrderGetPayload<{ include: typeof completedProductionInclude }>
 
+const PACKAGING_IN_PROGRESS_DEPT = 'Packaging'
+const PACKAGING_READY_DEPT = 'Ready for dispatch'
+const PACKAGING_DISPATCHED_DEPT = 'Dispatched'
+const PACKAGING_WORK_DEPTS = [PACKAGING_IN_PROGRESS_DEPT, PACKAGING_READY_DEPT, PACKAGING_DISPATCHED_DEPT]
+
 function assertPackagingAccess(user: PackagingUser) {
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only packaging staff can access this queue');
@@ -78,6 +83,13 @@ function isPackableOrder(order: PackagingSaleOrder) {
 
 function toCompletedProductionWork(order: CompletedProductionOrder) {
   const lastLog = order.StageLog[0]
+  const currentDept = order.currentDept ?? null
+  const packagingStatus = currentDept === PACKAGING_IN_PROGRESS_DEPT
+    ? 'IN_PACKAGING'
+    : currentDept === PACKAGING_READY_DEPT
+      ? 'READY_FOR_DISPATCH'
+      : 'AWAITING_PACKAGING'
+
   return {
     id: order.id,
     orderNumber: order.orderNumber,
@@ -86,7 +98,8 @@ function toCompletedProductionWork(order: CompletedProductionOrder) {
     customerName: order.saleOrder?.customerName ?? null,
     completedAt: order.completedAt ?? order.updatedAt,
     operatorName: lastLog?.User?.name ?? lastLog?.User?.email ?? 'Unknown operator',
-    department: lastLog?.department ?? order.currentDept ?? 'Completed',
+    department: lastLog?.department ?? (currentDept && !PACKAGING_WORK_DEPTS.includes(currentDept) ? currentDept : null) ?? 'Completed',
+    packagingStatus,
     kgOut: lastLog?.kgOut == null
       ? order.actualWeightOut == null
         ? Number(order.targetKg)
@@ -94,6 +107,64 @@ function toCompletedProductionWork(order: CompletedProductionOrder) {
       : Number(lastLog.kgOut),
     piecesOut: lastLog?.piecesOut ?? order.actualPieces ?? order.expectedPieces ?? order.quantity,
   }
+}
+
+function revalidatePackagingWork() {
+  revalidatePath('/packaging');
+  revalidatePath('/pack_done');
+  revalidatePath('/jobs');
+  revalidatePath('/dashboard');
+}
+
+export async function startCompletedProductionPackaging(orderId: string) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+  assertPackagingAccess(user)
+
+  const updated = await db.productionOrder.updateMany({
+    where: {
+      id: orderId,
+      status: 'COMPLETED',
+      OR: [
+        { currentDept: null },
+        { currentDept: { notIn: PACKAGING_WORK_DEPTS } },
+      ],
+    },
+    data: {
+      currentDept: PACKAGING_IN_PROGRESS_DEPT,
+    },
+  });
+
+  if (updated.count === 0) {
+    throw new Error('Production work is not available for packaging');
+  }
+
+  revalidatePackagingWork();
+  return { success: true };
+}
+
+export async function markCompletedProductionReadyForDispatch(orderId: string) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+  assertPackagingAccess(user)
+
+  const updated = await db.productionOrder.updateMany({
+    where: {
+      id: orderId,
+      status: 'COMPLETED',
+      currentDept: PACKAGING_IN_PROGRESS_DEPT,
+    },
+    data: {
+      currentDept: PACKAGING_READY_DEPT,
+    },
+  });
+
+  if (updated.count === 0) {
+    throw new Error('Production work must be in packaging before it can be marked ready');
+  }
+
+  revalidatePackagingWork();
+  return { success: true };
 }
 
 export async function dispatchCompletedProductionWork(orderId: string) {
@@ -105,25 +176,18 @@ export async function dispatchCompletedProductionWork(orderId: string) {
     where: {
       id: orderId,
       status: 'COMPLETED',
-      OR: [
-        { currentDept: null },
-        { currentDept: { not: 'Dispatched' } },
-      ],
+      currentDept: PACKAGING_READY_DEPT,
     },
     data: {
-      currentDept: 'Dispatched',
+      currentDept: PACKAGING_DISPATCHED_DEPT,
     },
   });
 
   if (updated.count === 0) {
-    throw new Error('Production work is not available for dispatch');
+    throw new Error('Production work must be ready for dispatch first');
   }
 
-  revalidatePath('/packaging');
-  revalidatePath('/pack_done');
-  revalidatePath('/jobs');
-  revalidatePath('/dashboard');
-
+  revalidatePackagingWork();
   return { success: true };
 }
 
@@ -338,7 +402,7 @@ export async function getPackagingDashboardData() {
         status: 'COMPLETED',
         OR: [
           { currentDept: null },
-          { currentDept: { not: 'Dispatched' } },
+          { currentDept: { not: PACKAGING_DISPATCHED_DEPT } },
         ],
       },
       include: completedProductionInclude,

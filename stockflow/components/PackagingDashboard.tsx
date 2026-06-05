@@ -1,5 +1,10 @@
 import Link from 'next/link'
-import { dispatchCompletedProductionWork, getPackagingDashboardData } from '@/app/actions/packaging'
+import {
+  dispatchCompletedProductionWork,
+  getPackagingDashboardData,
+  markCompletedProductionReadyForDispatch,
+  startCompletedProductionPackaging,
+} from '@/app/actions/packaging'
 import { formatKES } from '@/lib/sales-utils'
 import { PackagingQueue } from '@/components/PackagingQueue'
 
@@ -55,24 +60,57 @@ export default async function PackagingDashboard() {
           {data.completedProductionWork.map((work) => (
             <div className="packaging-row" key={work.id}>
               <div>
-                <div className="pack-order">{work.orderNumber} · {new Date(work.completedAt).toLocaleDateString()}</div>
+                <div className="pack-order">
+                  {work.orderNumber} · {new Date(work.completedAt).toLocaleDateString()}
+                </div>
                 <div className="pack-product">{work.productName}</div>
                 <div className="pack-detail">
                   {work.department} · {work.operatorName}
                   {work.customerName ? ` · ${work.customerName}` : ''}
                 </div>
               </div>
+              <span className={`badge ${
+                work.packagingStatus === 'READY_FOR_DISPATCH'
+                  ? 'badge-amber'
+                  : work.packagingStatus === 'IN_PACKAGING'
+                    ? 'badge-blue'
+                    : 'badge-muted'
+              }`}>
+                {work.packagingStatus === 'READY_FOR_DISPATCH'
+                  ? 'Ready for dispatch'
+                  : work.packagingStatus === 'IN_PACKAGING'
+                    ? 'In packaging'
+                    : 'Awaiting packaging'}
+              </span>
               <span className="job-kg">
                 {work.piecesOut.toLocaleString()} pcs/sets · {work.kgOut.toFixed(1)} kg
               </span>
               <div className="pack-actions">
                 <Link href={`/jobs/${work.id}`} className="btn btn-ghost btn-sm">View</Link>
-                <form action={async () => {
-                  'use server'
-                  await dispatchCompletedProductionWork(work.id)
-                }}>
-                  <button type="submit" className="btn btn-teal btn-sm">Dispatch</button>
-                </form>
+                {work.packagingStatus === 'AWAITING_PACKAGING' && (
+                  <form action={async () => {
+                    'use server'
+                    await startCompletedProductionPackaging(work.id)
+                  }}>
+                    <button type="submit" className="btn btn-blue btn-sm">Start packaging</button>
+                  </form>
+                )}
+                {work.packagingStatus === 'IN_PACKAGING' && (
+                  <form action={async () => {
+                    'use server'
+                    await markCompletedProductionReadyForDispatch(work.id)
+                  }}>
+                    <button type="submit" className="btn btn-primary btn-sm">Mark ready</button>
+                  </form>
+                )}
+                {work.packagingStatus === 'READY_FOR_DISPATCH' && (
+                  <form action={async () => {
+                    'use server'
+                    await dispatchCompletedProductionWork(work.id)
+                  }}>
+                    <button type="submit" className="btn btn-teal btn-sm">Dispatch</button>
+                  </form>
+                )}
               </div>
             </div>
           ))}
