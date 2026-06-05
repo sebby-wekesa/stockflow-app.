@@ -167,25 +167,15 @@ export async function getOperatorQueue(role?: string, department?: string) {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
   void role;
-  const effectiveRole = user.role;
-  const operatorDepartments = getOperatorDepartments(user);
   const effectiveDept = department?.trim() || undefined;
-  if (user.role === 'OPERATOR' && effectiveDept) assertOperatorDepartment(user, effectiveDept);
 
-  // If user is ADMIN or MANAGER, they see all queues.
-  // If OPERATOR, they see their department's queue.
+  // Operators can work on any production job. Department is only a UI filter.
   let orders: any[] = []
   try {
     orders = await db.productionOrder.findMany({
       where: {
         status: "IN_PRODUCTION",
-        ...(effectiveDept
-          ? { currentDept: effectiveDept }
-          : effectiveRole === "OPERATOR"
-            ? operatorDepartments.length > 0
-              ? { currentDept: { in: operatorDepartments } }
-              : {}
-            : {}),
+        ...(effectiveDept ? { currentDept: effectiveDept } : {}),
       },
       include: {
         design: {
@@ -354,11 +344,6 @@ export async function getActiveDepartments() {
       .map(d => d.currentDept)
       .filter((d): d is string => !!d);
 
-    if (user.role === 'OPERATOR') {
-      const operatorDepartments = getOperatorDepartments(user);
-      if (operatorDepartments.length === 0) return active;
-      return operatorDepartments.filter(department => active.includes(department));
-    }
     return active;
   } catch (error) {
     console.warn("Failed to fetch active departments:", error);

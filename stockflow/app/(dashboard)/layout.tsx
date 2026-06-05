@@ -18,7 +18,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     sidebarCounts.operatorQueue = await db.productionOrder.count({
       where: {
         status: 'IN_PRODUCTION',
-        ...(user.departments.length > 0 ? { currentDept: { in: user.departments } } : {}),
       },
     });
   }
