@@ -31,7 +31,7 @@ interface AdminStats {
   completed: number;
   designs: number;
   users: number;
-  inventory: any[];
+  rawMaterialItems: number;
   rawMaterialStock: number;
   totalFree: number;
   activeOrdersCount: number;
@@ -43,46 +43,64 @@ interface AdminStats {
   recentOrders: RecentOrder[];
 }
 
+function toNumber(value: any) {
+  return value?.toNumber?.() ?? Number(value ?? 0);
+}
+
+async function safeQuery<T>(label: string, operation: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await withRetry(operation);
+  } catch (error) {
+    console.error(`[AdminDashboard] Failed to fetch ${label}`, error);
+    return fallback;
+  }
+}
+
 async function getAdminStats(db: any, organizationId: string): Promise<AdminStats> {
   try {
-    const totalOrders = await withRetry(() => db.productionOrder.count(), undefined);
-    const pendingOrders = await withRetry(() => db.productionOrder.count({ where: { status: "PENDING" } }), undefined);
-    const inProduction = await withRetry(() => db.productionOrder.count({ where: { status: "IN_PRODUCTION" } }), undefined);
-    const completed = await withRetry(() => db.productionOrder.count({ where: { status: "COMPLETED" } }), undefined);
-    const designs = await withRetry(() => db.design.count(), undefined);
+    const [
+      totalOrders,
+      pendingOrders,
+      inProduction,
+      completed,
+      designs,
+      users,
+      rawMaterialItems,
+      rawMaterialAgg,
+      activeOrdersCount,
+      finishedGoodsAgg,
+    ] = await Promise.all([
+      safeQuery('total production orders', () => db.productionOrder.count(), 0),
+      safeQuery('pending production orders', () => db.productionOrder.count({ where: { status: "PENDING" } }), 0),
+      safeQuery('in-production orders', () => db.productionOrder.count({ where: { status: "IN_PRODUCTION" } }), 0),
+      safeQuery('completed production orders', () => db.productionOrder.count({ where: { status: "COMPLETED" } }), 0),
+      safeQuery('design count', () => db.design.count(), 0),
+      safeQuery('user count', () => db.user.count(), 0),
+      safeQuery('raw material count', () => db.rawMaterial.count(), 0),
+      safeQuery('raw material stock summary', () => db.rawMaterial.aggregate({
+        _sum: {
+          availableKg: true,
+          reservedKg: true,
+        },
+      }), { _sum: { availableKg: 0, reservedKg: 0 } }),
+      safeQuery('active production orders', () => db.productionOrder.count({
+        where: { status: { in: ["APPROVED", "IN_PRODUCTION"] } },
+      }), 0),
+      safeQuery('finished goods summary', () => db.finishedGoods.aggregate({
+        _sum: {
+          kgProduced: true,
+          quantity: true,
+        },
+      }), { _sum: { kgProduced: 0, quantity: 0 } }),
+    ]);
 
-    // Count users from Prisma User table
-    const users = await withRetry(() => db.user.count(), undefined);
-
-
-    const inventory = await withRetry<any[]>(() => db.rawMaterial.findMany(), undefined);
-  
-  // Calculate dashboard stats continued below...
-
-  // Calculate dashboard stats
-  const rawMaterialStock = (inventory as any[]).reduce(
-    (sum: number, m: any) => sum + (m.availableKg?.toNumber() ?? 0) + (m.reservedKg?.toNumber() ?? 0),
-    0
-  );
-  const totalFree = (inventory as any[]).reduce(
-    (sum: number, m: any) => sum + (m.availableKg?.toNumber() ?? 0),
-    0
-  );
-
-    const activeOrdersCount = await withRetry<number>(() => db.productionOrder.count({
-      where: { status: { in: ["APPROVED", "IN_PRODUCTION"] } },
-    }), undefined);
+    const totalFree = toNumber(rawMaterialAgg._sum.availableKg);
+    const rawMaterialStock = totalFree + toNumber(rawMaterialAgg._sum.reservedKg);
     const pendingApprovalsCount = pendingOrders;
 
-    const finishedGoodsAgg = await withRetry<any>(() => db.finishedGoods.aggregate({
-      _sum: {
-        kgProduced: true,
-        quantity: true,
-      },
-    }), undefined);
     const finishedGoods = {
       _sum: {
-        kgProduced: finishedGoodsAgg._sum.kgProduced?.toNumber() ?? 0,
+        kgProduced: toNumber(finishedGoodsAgg._sum.kgProduced),
         quantity: finishedGoodsAgg._sum.quantity ?? 0,
       }
     };
@@ -97,14 +115,14 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
   todayStart.setHours(0, 0, 0, 0);
 
   // Scrap this week (from StageLog)
-  const scrapWeekAgg = await withRetry<any>(() => db.stageLog.aggregate({
+  const scrapWeekAgg = await safeQuery<any>('weekly scrap summary', () => db.stageLog.aggregate({
     _sum: { kgScrap: true },
     where: { completedAt: { gte: oneWeekAgo } },
-  }), undefined);
-  const scrapThisWeek = scrapWeekAgg._sum.kgScrap?.toNumber() ?? 0;
+  }), { _sum: { kgScrap: 0 } });
+  const scrapThisWeek = toNumber(scrapWeekAgg._sum.kgScrap);
 
   // Scrap by department this week
-  const scrapDeptRaw = await withRetry<any[]>(() => db.stageLog.groupBy({
+  const scrapDeptRaw = await safeQuery<any[]>('scrap by department', () => db.stageLog.groupBy({
     by: ['department'],
     _sum: { kgScrap: true },
     where: {
@@ -112,10 +130,10 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
       department: { not: null },
     },
     orderBy: { _sum: { kgScrap: 'desc' } },
-  }), undefined);
-  const totalScrapForPct = (scrapDeptRaw as any[]).reduce((s: number, r: any) => s + (r._sum.kgScrap?.toNumber() ?? 0), 0) || 1;
+  }), []);
+  const totalScrapForPct = (scrapDeptRaw as any[]).reduce((s: number, r: any) => s + toNumber(r._sum.kgScrap), 0) || 1;
   const scrapByDept = (scrapDeptRaw as any[]).map((r: any) => {
-    const kg = r._sum.kgScrap?.toNumber() ?? 0;
+    const kg = toNumber(r._sum.kgScrap);
     const pct = Math.round((kg / totalScrapForPct) * 100);
     return { dept: r.department!, kg, pct };
   });
@@ -125,27 +143,27 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
   const { getDepartmentsForOrg } = await import('@/lib/department-settings')
   const knownDepts = getDepartmentsForOrg(organizationId);
 
-  const activeByDeptRaw = await withRetry<any[]>(() => db.productionOrder.groupBy({
+  const activeByDeptRaw = await safeQuery<any[]>('active jobs by department', () => db.productionOrder.groupBy({
     by: ['currentDept'],
     _count: { _all: true },
     where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] }, currentDept: { not: null } },
-  }), undefined);
+  }), []);
   const activeMap = new Map((activeByDeptRaw as any[]).map((a: any) => [ (a.currentDept || '').toLowerCase(), a._count._all ]));
 
   // Fetch today's logs to compute distinct operators + aggregates per dept
-  const todayLogs = await withRetry<any[]>(() => db.stageLog.findMany({
+  const todayLogs = await safeQuery<any[]>('today stage logs', () => db.stageLog.findMany({
     where: { completedAt: { gte: todayStart }, department: { not: null } },
     select: { department: true, operatorId: true, kgIn: true, kgOut: true, kgScrap: true },
-  }), undefined);
+  }), []);
 
     const deptToday = new Map<string, { kgIn: number; kgOut: number; kgScrap: number; ops: Set<string> }>();
    for (const log of todayLogs) {
      const d = log.department!;
      if (!deptToday.has(d)) deptToday.set(d, { kgIn: 0, kgOut: 0, kgScrap: 0, ops: new Set() });
      const s = deptToday.get(d)!;
-     s.kgIn += log.kgIn?.toNumber?.() ?? Number(log.kgIn) ?? 0;
-     s.kgOut += log.kgOut?.toNumber?.() ?? Number(log.kgOut) ?? 0;
-     s.kgScrap += log.kgScrap?.toNumber?.() ?? Number(log.kgScrap) ?? 0;
+     s.kgIn += toNumber(log.kgIn);
+     s.kgOut += toNumber(log.kgOut);
+     s.kgScrap += toNumber(log.kgScrap);
      s.ops.add(log.operatorId);
    }
 
@@ -177,11 +195,11 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
    });
 
   // Recent orders (tenant-scoped via db)
-  const recentOrders = await db.productionOrder.findMany({
+  const recentOrders = await safeQuery<any[]>('recent production orders', () => db.productionOrder.findMany({
     take: 4,
     orderBy: { createdAt: "desc" },
     include: { design: true },
-  });
+  }), []);
 
     return {
       totalOrders: Number(totalOrders ?? 0),
@@ -190,7 +208,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
       completed: Number(completed ?? 0),
       designs: Number(designs ?? 0),
       users: Number(users ?? 0),
-      inventory: (inventory as any[]) ?? [],
+      rawMaterialItems: Number(rawMaterialItems ?? 0),
       rawMaterialStock: Number(rawMaterialStock ?? 0),
       totalFree: Number(totalFree ?? 0),
       activeOrdersCount: Number(activeOrdersCount ?? 0),
@@ -202,7 +220,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
       recentOrders: (recentOrders as any[]).map((o: any) => ({
         id: o.orderNumber,
         design: o.design?.name ?? '—',
-        kg: o.targetKg?.toNumber?.() ?? Number(o.targetKg) ?? 0,
+        kg: toNumber(o.targetKg),
         status: o.status === "PENDING" ? "Pending approval" :
                 o.status === "APPROVED" || o.status === "IN_PRODUCTION" ? "In production" : "Complete",
         dept: o.currentDept,
@@ -218,7 +236,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
       completed: 0,
       designs: 0,
       users: 0,
-      inventory: [],
+      rawMaterialItems: 0,
       rawMaterialStock: 0,
       totalFree: 0,
       activeOrdersCount: 0,
@@ -255,7 +273,7 @@ export default async function AdminDashboard({ user }: AdminDashboardProps) {
         <div className="stat-card amber">
           <div className="stat-label">Raw material stock</div>
           <div className="stat-value">{stats.rawMaterialStock.toFixed(0)}<span style={{fontSize:'14px',color:'var(--muted)'}}> kg</span></div>
-            <div className="stat-sub">{stats.inventory.length} materials · {stats.totalFree.toFixed(0)} kg free</div>
+            <div className="stat-sub">{stats.rawMaterialItems} materials · {stats.totalFree.toFixed(0)} kg free</div>
 
         </div>
         <div className="stat-card teal">

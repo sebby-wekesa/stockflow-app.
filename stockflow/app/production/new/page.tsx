@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ProductionOrderTabs } from '@/components/ProductionOrderTabs'
 import { ToastProvider } from '@/components/Toast'
-import { Package } from 'lucide-react'
+import { Package, Plus } from 'lucide-react'
 
 export const dynamic = 'force-dynamic';
 
@@ -40,111 +40,59 @@ export default function ProductionNewPage() {
   }
 
   return (
-    <div className="dashboard-content">
+    <div className="dashboard-content production-new-page">
       <ToastProvider>
-        <div className="section-header">
-          <div>
+        <div className="production-new-hero">
+          <div className="production-new-hero-copy">
+            <div className="production-new-kicker">Production control</div>
             <h1>Production Orders</h1>
-            <div className="section-sub">Manage and create new manufacturing orders</div>
+            <div className="section-sub">Create manufacturing jobs, reserve material, and review recent work.</div>
+          </div>
+          <div className="production-new-hero-stat">
+            <Package size={18} />
+            <div>
+              <div className="production-new-stat-value">{orders.length}</div>
+              <div className="production-new-stat-label">Recent jobs</div>
+            </div>
           </div>
         </div>
 
-        <div className="mb-6">
+        <div className="production-new-create">
           <ProductionOrderTabs onSuccess={refreshOrders} />
         </div>
 
-        <div className="card">
+        <div className="card production-new-recent">
           <div className="section-header">
             <div>
               <div className="section-title">Recent Orders</div>
               <div className="section-sub">Latest production orders in the system</div>
             </div>
-            <span style={{
-              fontSize: '12px',
-              color: 'var(--muted)',
-              background: 'var(--surface2)',
-              padding: '4px 8px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border2)'
-            }}>
+            <span className="production-count-pill">
               {orders.length} orders
             </span>
           </div>
 
           {isLoading ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px 20px',
-              color: 'var(--muted)'
-            }}>
-              <div style={{
-                display: 'inline-block',
-                marginBottom: '12px'
-              }}>
-                <div style={{
-                  padding: '16px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border2)',
-                  borderRadius: 'var(--radius)',
-                  display: 'inline-block'
-                }}>
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    border: '2px solid var(--border2)',
-                    borderTop: '2px solid var(--accent)',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }}></div>
-                </div>
+            <div className="production-empty-state">
+              <div className="production-empty-icon">
+                <div className="production-spinner" />
               </div>
-              <p style={{
-                fontSize: '14px',
-                color: 'var(--muted)'
-              }}>
-                Loading orders...
-              </p>
+              <p>Loading orders...</p>
             </div>
           ) : orders.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px 20px',
-              color: 'var(--muted)'
-            }}>
-              <div style={{
-                display: 'inline-block',
-                marginBottom: '12px'
-              }}>
-                <div style={{
-                  padding: '16px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border2)',
-                  borderRadius: 'var(--radius)',
-                  display: 'inline-block'
-                }}>
-                  <Package size={24} style={{ color: 'var(--muted)' }} />
-                </div>
+            <div className="production-empty-state">
+              <div className="production-empty-icon">
+                <Plus size={22} />
               </div>
-              <p style={{
-                fontSize: '14px',
-                color: 'var(--muted)',
-                marginBottom: '4px'
-              }}>
-                No production orders yet
-              </p>
-              <p style={{
-                fontSize: '12px',
-                color: 'var(--muted)'
-              }}>
-                Create your first order to get started
-              </p>
+              <p>No production orders yet</p>
+              <span>Create your first order to get started</span>
             </div>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="production-orders-table">
                 <thead>
                   <tr>
-                    <th>Order ID</th>
+                    <th>Job Number</th>
                     <th>Design</th>
                     <th>Weight (kg)</th>
                     <th>Priority</th>
@@ -156,32 +104,18 @@ export default function ProductionNewPage() {
                   {orders.map((order) => (
                     <tr key={order.id}>
                       <td>
-                        <code style={{
-                          fontSize: '11px',
-                          fontFamily: 'var(--font-mono)',
-                          color: 'var(--blue)',
-                          background: 'rgba(74,158,255,0.1)',
-                          padding: '2px 6px',
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid rgba(74,158,255,0.2)'
-                        }}>
-                          {order.id.slice(0, 8)}...
+                        <code className="production-job-code">
+                          {order.orderNumber || `${order.id.slice(0, 8)}...`}
                         </code>
                       </td>
-                      <td style={{ fontWeight: 500, color: 'var(--text)' }}>
+                      <td className="production-order-name">
                         {order.designName || order.design?.name || 'Unknown'}
                       </td>
-                      <td style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontWeight: 500,
-                        color: 'var(--green)'
-                      }}>
+                      <td className="production-order-weight">
                         {order.targetKg} kg
                       </td>
                       <td>
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 600,
+                        <span className="production-priority" style={{
                           color: priorityColors[order.priority] === 'text-emerald-400' ? 'var(--green)' :
                                  priorityColors[order.priority] === 'text-amber-400' ? 'var(--accent)' :
                                  priorityColors[order.priority] === 'text-red-400' ? 'var(--red)' : 'var(--muted)'
@@ -199,7 +133,7 @@ export default function ProductionNewPage() {
                           {order.status || 'PENDING'}
                         </span>
                       </td>
-                      <td style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                      <td className="production-order-date">
                         {order.createdAt
                           ? new Date(order.createdAt).toLocaleDateString(
                               'en-US',

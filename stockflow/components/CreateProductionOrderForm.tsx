@@ -76,12 +76,14 @@ export function CreateProductionOrderForm({
         body: JSON.stringify(payload),
       })
 
+      const result = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error('Failed to create production order')
+        throw new Error(result?.error || 'Failed to create production order')
       }
 
+      const createdOrderNumber = result?.order?.orderNumber || orderNumber
       showToast(
-        `Production order ${orderNumber} created successfully!`,
+        `Production order ${createdOrderNumber} created successfully!`,
         'success'
       )
 
@@ -112,7 +114,7 @@ export function CreateProductionOrderForm({
   } as const
 
   return (
-    <div className="card">
+    <div className="production-template-form">
       <div className="section-header">
         <div>
           <div className="section-title">Create Production Order</div>
@@ -120,159 +122,77 @@ export function CreateProductionOrderForm({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{
-            fontSize: '12px',
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            fontWeight: 600
-          }}>
-            Order Number
+      <form onSubmit={handleSubmit(onSubmit)} className="production-order-form">
+        <div className="form-group">
+          <label className="form-label">
+            Job Number
           </label>
           <input
             type="text"
             value={orderNumber}
-            disabled
-            style={{
-              width: '100%',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border2)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '8px 12px',
-              color: 'var(--muted)',
-              fontSize: '14px',
-              cursor: 'not-allowed',
-              opacity: 0.6
-            }}
+            onChange={(event) => setOrderNumber(event.target.value)}
+            placeholder="Enter job number"
+            className="form-input production-input"
           />
-          <p style={{
-            fontSize: '11px',
-            color: 'var(--muted)',
-            marginTop: '4px'
-          }}>
-            Auto-generated - Read-only
+          <p className="production-field-help">
+            Auto-filled, but editable before creating the order
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{
-            fontSize: '12px',
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            fontWeight: 600
-          }}>
+        <div className="production-form-grid two">
+          <div className="form-group">
+            <label className="form-label">
             Design Selection *
-          </label>
-          <select
-            {...register('designId')}
-            style={{
-              width: '100%',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border2)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '8px 12px',
-              color: 'var(--text)',
-              fontSize: '14px',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">Select a design...</option>
-            {designs.map((design) => (
-              <option key={design.id} value={design.id}>
-                {design.name} ({design.kgPerUnit} kg)
-              </option>
-            ))}
-          </select>
+            </label>
+            <select
+              {...register('designId')}
+              className="form-input production-input"
+            >
+              <option value="">Select a design...</option>
+              {designs.map((design) => (
+                <option key={design.id} value={design.id}>
+                  {design.name} ({design.kgPerUnit} kg)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Initial Weight (kg) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Enter weight in kilograms"
+              {...register('initialWeight', { valueAsNumber: true })}
+              className="form-input production-input"
+            />
+          </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{
-            fontSize: '12px',
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            fontWeight: 600
-          }}>
-            Initial Weight (kg) *
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Enter weight in kilograms"
-            {...register('initialWeight', { valueAsNumber: true })}
-            style={{
-              width: '100%',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border2)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '8px 12px',
-              color: 'var(--text)',
-              fontSize: '14px',
-              outline: 'none'
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{
-            fontSize: '12px',
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            fontWeight: 600,
-            marginBottom: '8px'
-          }}>
+        <div className="form-group">
+          <label className="form-label">
             Priority Level *
           </label>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '8px'
-          }}>
+          <div className="production-priority-control">
             {(Object.keys(priorityConfig) as (keyof typeof priorityConfig)[]).map((level) => {
               const config = priorityConfig[level]
               const isSelected = priority === level
               return (
                 <label
                   key={level}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border2)'}`,
-                    background: isSelected ? 'rgba(240,192,64,0.1)' : 'var(--surface2)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s'
-                  }}
+                  className={`production-priority-option ${isSelected ? 'active' : ''}`}
                 >
                   <input
                     type="radio"
                     value={level}
                     {...register('priority')}
-                    style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+                    className="production-priority-radio"
                   />
-                  <span
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '50%',
-                      border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--muted)'}`,
-                      background: isSelected ? 'var(--accent)' : 'transparent',
-                      transition: 'all 0.15s'
-                    }}
-                  />
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: config.color === 'text-emerald-400' ? 'var(--green)' : config.color === 'text-amber-400' ? 'var(--accent)' : 'var(--red)'
-                  }}>
+                  <span className="production-priority-dot" />
+                  <span className={`production-priority-label production-priority-${level.toLowerCase()}`}>
                     {config.label}
                   </span>
                 </label>
@@ -284,17 +204,7 @@ export function CreateProductionOrderForm({
         <button
           type="submit"
           disabled={isLoading || !isValid}
-          className="btn-primary"
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '12px',
-            opacity: (isLoading || !isValid) ? 0.6 : 1,
-            cursor: (isLoading || !isValid) ? 'not-allowed' : 'pointer'
-          }}
+          className="btn btn-primary production-submit"
         >
           {isLoading ? (
             <>

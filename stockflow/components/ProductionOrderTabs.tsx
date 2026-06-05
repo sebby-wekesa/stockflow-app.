@@ -33,6 +33,13 @@ const emptyLine = (): MaterialLine => ({
   weightKg: "",
 });
 
+function generateOrderNumber() {
+  const timestamp = new Date();
+  const year = timestamp.getFullYear();
+  const randomNum = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+  return `ORD-${year}-${randomNum}`;
+}
+
 function materialLabel(material: RawMaterialOption) {
   const size = [material.width, material.height, material.diameter, material.length]
     .filter(Boolean)
@@ -47,6 +54,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
   const [materials, setMaterials] = useState<RawMaterialOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderNumber, setOrderNumber] = useState(generateOrderNumber);
   const [productName, setProductName] = useState("");
   const [expectedPieces, setExpectedPieces] = useState("15");
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH">("MEDIUM");
@@ -117,6 +125,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderType: "direct",
+          orderNumber,
           productName,
           expectedPieces: Number(expectedPieces),
           priority,
@@ -137,6 +146,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
       }
 
       showToast(payload?.message || "Quick production order created", "success");
+      setOrderNumber(generateOrderNumber());
       setProductName("");
       setExpectedPieces("15");
       setPriority("MEDIUM");
@@ -150,18 +160,18 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
   }
 
   return (
-    <div className="card">
-      <div className="flex gap-2 mb-16">
+    <div className="card production-order-panel">
+      <div className="production-tabs">
         <button
           type="button"
-          className={`btn ${activeTab === "quick" ? "btn-primary" : "btn-ghost"}`}
+          className={`production-tab ${activeTab === "quick" ? "active" : ""}`}
           onClick={() => setActiveTab("quick")}
         >
           Quick order
         </button>
         <button
           type="button"
-          className={`btn ${activeTab === "template" ? "btn-primary" : "btn-ghost"}`}
+          className={`production-tab ${activeTab === "template" ? "active" : ""}`}
           onClick={() => setActiveTab("template")}
         >
           From saved template
@@ -169,21 +179,33 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
       </div>
 
       {activeTab === "quick" ? (
-        <form onSubmit={submitQuickOrder} className="space-y-4">
-          <div className="grid-2">
+        <form onSubmit={submitQuickOrder} className="production-order-form">
+          <div className="production-form-grid two">
+            <div className="form-group">
+              <label className="form-label">Job number</label>
+              <input
+                className="form-input production-input"
+                value={orderNumber}
+                onChange={(event) => setOrderNumber(event.target.value)}
+                placeholder="Enter job number"
+              />
+            </div>
             <div className="form-group">
               <label className="form-label">Product name</label>
               <input
-                className="form-input"
+                className="form-input production-input"
                 value={productName}
                 onChange={(event) => setProductName(event.target.value)}
                 placeholder="Hilux rear spring leaf"
               />
             </div>
+          </div>
+
+          <div className="production-form-grid two">
             <div className="form-group">
               <label className="form-label">Expected finished pieces</label>
               <input
-                className="form-input"
+                className="form-input production-input"
                 type="number"
                 min="1"
                 step="1"
@@ -195,12 +217,12 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
 
           <div className="form-group">
             <label className="form-label">Priority</label>
-            <div className="flex gap-2">
+            <div className="production-priority-control">
               {(["LOW", "MEDIUM", "HIGH"] as const).map((level) => (
                 <button
                   key={level}
                   type="button"
-                  className={`btn ${priority === level ? "btn-primary" : "btn-ghost"}`}
+                  className={`production-priority-option ${priority === level ? "active" : ""}`}
                   onClick={() => setPriority(level)}
                 >
                   {level.charAt(0) + level.slice(1).toLowerCase()}
@@ -209,28 +231,28 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
             </div>
           </div>
 
-          <div className="section-header mb-16">
+          <div className="section-header production-material-header">
             <div>
               <div className="section-title">Material lines</div>
               <div className="section-sub">Pick stock, enter cut length, pieces/sets, and planned kg used</div>
             </div>
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm production-add-material"
               onClick={() => setLines((current) => [...current, emptyLine()])}
             >
               <Plus size={14} /> Add material
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div className="production-material-list">
             {lines.map((line, index) => (
-              <div key={index} className="card-sm">
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1.8fr) repeat(4, minmax(100px, 1fr)) auto", gap: "10px", alignItems: "end" }}>
+              <div key={index} className="production-material-row">
+                <div className="production-material-grid">
                   <div className="form-group">
                     <label className="form-label">Raw material</label>
                     <select
-                      className="form-input"
+                      className="form-input production-input"
                       value={line.rawMaterialId}
                       onChange={(event) => updateLine(index, { rawMaterialId: event.target.value })}
                     >
@@ -245,7 +267,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                   <div className="form-group">
                     <label className="form-label">Cut length</label>
                     <input
-                      className="form-input"
+                      className="form-input production-input"
                       type="number"
                       min="0"
                       step="0.01"
@@ -257,7 +279,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                   <div className="form-group">
                     <label className="form-label">Pieces / sets</label>
                     <input
-                      className="form-input"
+                      className="form-input production-input"
                       type="number"
                       min="1"
                       step="1"
@@ -267,9 +289,9 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Total length</label>
-                    <div className="flex gap-2">
+                    <div className="production-total-line">
                       <input
-                        className="form-input"
+                        className="form-input production-input"
                         type="number"
                         min="0"
                         step="0.01"
@@ -279,7 +301,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                       />
                       <button
                         type="button"
-                        className="btn btn-ghost btn-sm"
+                        className="icon-btn danger"
                         onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
                         disabled={lines.length === 1}
                         aria-label="Remove material line"
@@ -291,7 +313,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                   <div className="form-group">
                     <label className="form-label">Weight used (kg)</label>
                     <input
-                      className="form-input"
+                      className="form-input production-input"
                       type="number"
                       min="0"
                       step="0.01"
@@ -307,7 +329,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
 
           <button
             type="submit"
-            className="btn btn-primary"
+            className="btn btn-primary production-submit"
             disabled={!canSubmit || isSubmitting || isLoading}
           >
             {isSubmitting ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Package size={16} />}

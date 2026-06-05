@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
       initialWeight,
       priority,
       orderType,
+      orderNumber,
+      jobNumber,
       productName,
       expectedPieces,
       materialLines,
@@ -66,7 +68,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const generatedOrderNumber = `PO-${Date.now().toString().slice(-6)}`;
+    const requestedOrderNumber = String(jobNumber ?? orderNumber ?? '').trim()
+    if (requestedOrderNumber.length > 64) {
+      return NextResponse.json({ error: 'Job number cannot exceed 64 characters' }, { status: 400 })
+    }
+
+    const finalOrderNumber = requestedOrderNumber || `PO-${Date.now().toString().slice(-6)}`
+    const existingOrder = await db.productionOrder.findFirst({
+      where: { orderNumber: finalOrderNumber },
+      select: { id: true },
+    })
+    if (existingOrder) {
+      return NextResponse.json({ error: 'Job number already exists' }, { status: 409 })
+    }
 
     if (orderType === 'direct') {
       if (!productName || typeof productName !== 'string' || productName.trim().length < 2) {
@@ -136,7 +150,7 @@ export async function POST(request: NextRequest) {
       const targetKg = normalizedLines.reduce((sum, line) => sum + (line.weightKg ?? 0), 0)
       const productionOrder = await db.productionOrder.create({
         data: {
-          orderNumber: generatedOrderNumber,
+          orderNumber: finalOrderNumber,
           productName: productName.trim(),
           expectedPieces: Number(expectedPieces),
           quantity: Number(expectedPieces),
@@ -237,7 +251,7 @@ export async function POST(request: NextRequest) {
     // Create production order (organizationId injected automatically by tenant client)
     const productionOrder = await db.productionOrder.create({
       data: {
-        orderNumber: generatedOrderNumber,
+        orderNumber: finalOrderNumber,
         designId,
         quantity: 1,
         targetKg: initialWeight,
