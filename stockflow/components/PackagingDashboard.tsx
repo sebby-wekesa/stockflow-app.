@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getPackagingDashboardData } from '@/app/actions/packaging'
+import { dispatchCompletedProductionWork, getPackagingDashboardData } from '@/app/actions/packaging'
 import { formatKES } from '@/lib/sales-utils'
 import { PackagingQueue } from '@/components/PackagingQueue'
 
@@ -53,7 +53,7 @@ export default async function PackagingDashboard() {
         </div>
         <div className="packaging-list">
           {data.completedProductionWork.map((work) => (
-            <Link href={`/jobs/${work.id}`} className="packaging-row" key={work.id}>
+            <div className="packaging-row" key={work.id}>
               <div>
                 <div className="pack-order">{work.orderNumber} · {new Date(work.completedAt).toLocaleDateString()}</div>
                 <div className="pack-product">{work.productName}</div>
@@ -65,7 +65,16 @@ export default async function PackagingDashboard() {
               <span className="job-kg">
                 {work.piecesOut.toLocaleString()} pcs/sets · {work.kgOut.toFixed(1)} kg
               </span>
-            </Link>
+              <div className="pack-actions">
+                <Link href={`/jobs/${work.id}`} className="btn btn-ghost btn-sm">View</Link>
+                <form action={async () => {
+                  'use server'
+                  await dispatchCompletedProductionWork(work.id)
+                }}>
+                  <button type="submit" className="btn btn-teal btn-sm">Dispatch</button>
+                </form>
+              </div>
+            </div>
           ))}
           {data.completedProductionWork.length === 0 && (
             <div className="packaging-empty">No completed operator work is available.</div>

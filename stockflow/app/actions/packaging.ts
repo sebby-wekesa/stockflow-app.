@@ -96,6 +96,37 @@ function toCompletedProductionWork(order: CompletedProductionOrder) {
   }
 }
 
+export async function dispatchCompletedProductionWork(orderId: string) {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+  assertPackagingAccess(user)
+
+  const updated = await db.productionOrder.updateMany({
+    where: {
+      id: orderId,
+      status: 'COMPLETED',
+      OR: [
+        { currentDept: null },
+        { currentDept: { not: 'Dispatched' } },
+      ],
+    },
+    data: {
+      currentDept: 'Dispatched',
+    },
+  });
+
+  if (updated.count === 0) {
+    throw new Error('Production work is not available for dispatch');
+  }
+
+  revalidatePath('/packaging');
+  revalidatePath('/pack_done');
+  revalidatePath('/jobs');
+  revalidatePath('/dashboard');
+
+  return { success: true };
+}
+
 export async function getPackagingQueue() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
@@ -303,7 +334,13 @@ export async function getPackagingDashboardData() {
       _sum: { totalAmount: true },
     }),
     db.productionOrder.findMany({
-      where: { status: 'COMPLETED' },
+      where: {
+        status: 'COMPLETED',
+        OR: [
+          { currentDept: null },
+          { currentDept: { not: 'Dispatched' } },
+        ],
+      },
       include: completedProductionInclude,
       orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
     }),
