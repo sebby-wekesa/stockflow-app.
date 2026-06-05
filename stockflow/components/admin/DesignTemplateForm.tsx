@@ -1,7 +1,7 @@
 "use client";
 
-import { Settings, Layers, Anchor, Save, Plus, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Settings, Layers, Anchor, Save } from "lucide-react";
+import { useState } from "react";
 import { BOMSection } from "./BOMSection";
 
 interface BOMItem {
@@ -13,17 +13,11 @@ interface BOMItem {
 export function DesignTemplateForm() {
   const [stages, setStages] = useState([{ dept: "Cutting", order: 1 }]);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
-
-  useEffect(() => {
-    // Load raw materials - for now using mock data
-    // In production, this would call an API
-    setRawMaterials([
-      { id: "1", materialName: "High-Tensile Steel", diameter: "M12" },
-      { id: "2", materialName: "Stainless Steel", diameter: "M10" },
-      { id: "3", materialName: "Carbon Steel", diameter: "M8" }
-    ]);
-  }, []);
+  const rawMaterials = [
+    { id: "1", materialName: "High-Tensile Steel", diameter: "M12" },
+    { id: "2", materialName: "Stainless Steel", diameter: "M10" },
+    { id: "3", materialName: "Carbon Steel", diameter: "M8" }
+  ];
 
   const addBomItem = () => {
     setBomItems([...bomItems, { rawMaterialId: "", quantity: 0, unitOfMeasure: "kg" }]);

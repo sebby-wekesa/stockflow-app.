@@ -1,10 +1,10 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState, useEffect } from 'react'
-import { Loader2, Package, Zap, AlertCircle } from 'lucide-react'
+import { useState } from 'react'
+import { Loader2, Package } from 'lucide-react'
 import { useToast } from './Toast'
 import { Design } from '@/types'
 
@@ -21,6 +21,13 @@ const createProductionOrderSchema = z.object({
 
 type ProductionOrderFormData = z.infer<typeof createProductionOrderSchema>
 
+function generateOrderNumber() {
+  const timestamp = new Date()
+  const year = timestamp.getFullYear()
+  const randomNum = String(Math.floor(Math.random() * 10000)).padStart(4, '0')
+  return `ORD-${year}-${randomNum}`
+}
+
 interface CreateProductionOrderFormProps {
   designs: Design[]
   onSuccess?: () => void
@@ -32,34 +39,22 @@ export function CreateProductionOrderForm({
 }: CreateProductionOrderFormProps) {
   const { showToast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [orderNumber, setOrderNumber] = useState('')
-  const [selectedDesign, setSelectedDesign] = useState<Design | null>(null)
+  const [orderNumber, setOrderNumber] = useState(generateOrderNumber)
 
   const {
     register,
     handleSubmit,
     formState: { isValid },
-    watch,
     reset,
+    control,
   } = useForm<ProductionOrderFormData>({
     resolver: zodResolver(createProductionOrderSchema),
     mode: 'onChange',
   })
 
-  const designId = watch('designId')
-  const priority = watch('priority')
-
-  useEffect(() => {
-    const timestamp = new Date()
-    const year = timestamp.getFullYear()
-    const randomNum = String(Math.floor(Math.random() * 10000)).padStart(4, '0')
-    setOrderNumber(`ORD-${year}-${randomNum}`)
-  }, [])
-
-  useEffect(() => {
-    const design = designs.find((d) => d.id === designId)
-    setSelectedDesign(design || null)
-  }, [designId, designs])
+  const designId = useWatch({ control, name: 'designId' })
+  const priority = useWatch({ control, name: 'priority' })
+  const selectedDesign = designs.find((d) => d.id === designId) || null
 
   const onSubmit = async (data: ProductionOrderFormData) => {
     setIsLoading(true)
@@ -91,10 +86,7 @@ export function CreateProductionOrderForm({
       )
 
       reset()
-      setOrderNumber(
-        `ORD-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
-      )
-      setSelectedDesign(null)
+      setOrderNumber(generateOrderNumber())
 
       onSuccess?.()
     } catch (error) {

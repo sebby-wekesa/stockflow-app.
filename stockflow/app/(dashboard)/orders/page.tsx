@@ -3,12 +3,7 @@
 import { useState, useEffect } from 'react'
 import { CreateProductionOrderForm } from '@/components/CreateProductionOrderForm'
 import { ToastProvider } from '@/components/Toast'
-import { Package, TrendingUp } from 'lucide-react'
-
-interface OrdersPageProps {
-  orders?: any[]
-  designs?: any[]
-}
+import { Package } from 'lucide-react'
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
@@ -41,14 +36,6 @@ export default function OrdersPage() {
 
     fetchData()
   }, [])
-
-  const statusColors: Record<string, string> = {
-    PENDING: 'bg-amber-900/20 border-amber-500/30 text-amber-100',
-    APPROVED: 'bg-blue-900/20 border-blue-500/30 text-blue-100',
-    IN_PRODUCTION: 'bg-purple-900/20 border-purple-500/30 text-purple-100',
-    COMPLETED: 'bg-emerald-900/20 border-emerald-500/30 text-emerald-100',
-    CANCELLED: 'bg-red-900/20 border-red-500/30 text-red-100',
-  }
 
   const priorityColors: Record<string, string> = {
     LOW: 'text-emerald-400',

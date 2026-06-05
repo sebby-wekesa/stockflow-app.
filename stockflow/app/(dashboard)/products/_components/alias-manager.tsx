@@ -4,8 +4,6 @@ import { useState, useTransition } from 'react'
 import type { ProductAlias } from '@prisma/client'
 import { addAlias, removeAlias } from '@/actions/products'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export function AliasManager({
   productId,
   aliases,

@@ -1,16 +1,11 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { ProductCategory } from '@prisma/client'
 
 export function StockSearch({
   initialQuery,
-  category,
-  branch,
 }: {
   initialQuery: string
-  category?: ProductCategory
-  branch?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()

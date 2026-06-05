@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import Link from "next/link";
 import { withRetry } from '@/lib/prisma'
 

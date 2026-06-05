@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import React, { useState } from 'react'
+import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -14,7 +14,7 @@ const stageLogSchema = z.object({
   orderId: z.string().min(1, 'Please select an order'),
   outputWeight: z.number().min(0, 'Output weight must be positive'),
   scrapWeight: z.number().min(0, 'Scrap weight must be positive'),
-}).refine((data) => {
+}).refine(() => {
   // This will be validated in real-time with input weight
   return true
 }, 'Validation error')
@@ -41,7 +41,7 @@ const containerVariants = {
     y: 0,
     transition: {
       duration: 0.4,
-      ease: 'ease-in-out' as any,
+      ease: [0.42, 0, 0.58, 1] as const,
     },
   },
 }
@@ -60,14 +60,11 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
   onSuccess,
 }) => {
   const { showToast } = useToast()
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [balanceOffset, setBalanceOffset] = useState<number | null>(null)
 
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors },
     reset,
   } = useForm<StageLogForm>({
@@ -79,24 +76,11 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
     },
   })
 
-  const outputWeight = watch('outputWeight')
-  const scrapWeight = watch('scrapWeight')
-  const orderId = watch('orderId')
-
-  // Update selected order when orderId changes
-  useEffect(() => {
-    const order = activeOrders.find((o) => o.id === orderId)
-    setSelectedOrder(order || null)
-  }, [orderId, activeOrders])
-
-  // Real-time balance validation
-  useEffect(() => {
-    if (selectedOrder) {
-      const sum = outputWeight + scrapWeight
-      const offset = selectedOrder.weight - sum
-      setBalanceOffset(offset)
-    }
-  }, [outputWeight, scrapWeight, selectedOrder])
+  const outputWeight = useWatch({ control, name: 'outputWeight' })
+  const scrapWeight = useWatch({ control, name: 'scrapWeight' })
+  const orderId = useWatch({ control, name: 'orderId' })
+  const selectedOrder = activeOrders.find((o) => o.id === orderId) || null
+  const balanceOffset = selectedOrder ? selectedOrder.weight - (outputWeight + scrapWeight) : null
 
   const isBalanceValid = balanceOffset !== null && Math.abs(balanceOffset) < 0.01
   const isSubmitDisabled = !isBalanceValid || isLoading
@@ -143,8 +127,6 @@ export const StageLoggingForm: React.FC<StageLoggingProps> = ({
 
       // Reset form
       reset()
-      setSelectedOrder(null)
-      setBalanceOffset(null)
 
       // Call callback
       onSuccess?.()

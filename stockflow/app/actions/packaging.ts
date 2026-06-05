@@ -4,61 +4,48 @@ import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
 import { consumeSaleOrderReservation } from '@/lib/order-lifecycle';
+import { Prisma } from '@prisma/client';
 
-export async function getPackagingQueue() {
-  const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
+type PackagingUser = Awaited<ReturnType<typeof requireActiveAuth>>
 
-  // Only packaging staff, admins, and managers can access packaging queue
+const packagingOrderInclude = Prisma.validator<Prisma.SaleOrderInclude>()({
+  Customer: true,
+  SaleItem: {
+    include: {
+      FinishedGoods: {
+        include: { design: true },
+      },
+    },
+  },
+})
+
+type PackagingSaleOrder = Prisma.SaleOrderGetPayload<{ include: typeof packagingOrderInclude }>
+type PackagingSaleItem = PackagingSaleOrder['SaleItem'][number]
+
+function assertPackagingAccess(user: PackagingUser) {
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only packaging staff can access this queue');
   }
+}
 
-  // Get confirmed sales orders that have items ready for packaging
-  const salesOrders = await db.saleOrder.findMany({
-    where: {
-      status: 'CONFIRMED'
-    },
-    include: {
-      Customer: true,
-      SaleItem: {
-        include: {
-          FinishedGoods: {
-            include: {
-              design: true
-            }
-          }
-        }
-      }
-    },
-    orderBy: {
-      createdAt: 'asc' // FIFO - oldest orders first
-    }
-  });
-
-  // Confirmed orders have stock reserved specifically for packaging.
-  const packableOrders = salesOrders.filter(order => {
-    return order.SaleItem.every(item => {
-      const finishedGoods = item.FinishedGoods;
-      return finishedGoods && finishedGoods.reservedQuantity >= item.quantity;
-    });
-  });
-
-  return packableOrders.map(order => ({
+function toPackagingOrder(order: PackagingSaleOrder) {
+  return {
     id: order.id,
     orderNumber: order.id,
     customerName: order.Customer?.name || order.customerName,
     totalItems: order.SaleItem.length,
-    totalQuantity: order.SaleItem.reduce((sum, item) => sum + item.quantity, 0),
-    totalKg: order.SaleItem.reduce((sum, item) => {
+    totalQuantity: order.SaleItem.reduce((sum: number, item: PackagingSaleItem) => sum + item.quantity, 0),
+    totalKg: order.SaleItem.reduce((sum: number, item: PackagingSaleItem) => {
       const finishedGoods = item.FinishedGoods
       const kgPerUnit = finishedGoods.quantity > 0
         ? Number(finishedGoods.kgProduced) / finishedGoods.quantity
         : 0
       return sum + (item.quantity * kgPerUnit)
     }, 0),
+    totalAmount: Number(order.totalAmount),
     createdAt: order.createdAt,
-    items: order.SaleItem.map(item => ({
+    updatedAt: order.updatedAt,
+    items: order.SaleItem.map((item: PackagingSaleItem) => ({
       id: item.id,
       designName: item.FinishedGoods?.design?.name || 'Unknown',
       designCode: item.FinishedGoods?.design?.code || 'N/A',
@@ -67,7 +54,38 @@ export async function getPackagingQueue() {
       totalPrice: Number(item.totalPrice),
       availableStock: item.FinishedGoods?.reservedQuantity || 0
     }))
-  }));
+  }
+}
+
+function isPackableOrder(order: PackagingSaleOrder) {
+  return order.SaleItem.every((item: PackagingSaleItem) => {
+    const finishedGoods = item.FinishedGoods;
+    return finishedGoods && finishedGoods.reservedQuantity >= item.quantity;
+  });
+}
+
+export async function getPackagingQueue() {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+
+  // Only packaging staff, admins, and managers can access packaging queue
+  assertPackagingAccess(user)
+
+  // Get confirmed sales orders that have items ready for packaging
+  const salesOrders = await db.saleOrder.findMany({
+    where: {
+      status: 'CONFIRMED'
+    },
+    include: packagingOrderInclude,
+    orderBy: {
+      createdAt: 'asc' // FIFO - oldest orders first
+    }
+  });
+
+  // Confirmed orders have stock reserved specifically for packaging.
+  const packableOrders = salesOrders.filter(isPackableOrder);
+
+  return packableOrders.map(toPackagingOrder);
 }
 
 export async function fulfillOrder(orderId: string) {
@@ -75,9 +93,7 @@ export async function fulfillOrder(orderId: string) {
   const db = getTenantPrisma(user.organizationId);
 
   // Only packaging staff, admins, and managers can fulfill orders
-  if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
-    throw new Error('Unauthorized: Only packaging staff can fulfill orders');
-  }
+  assertPackagingAccess(user)
 
   // Use transaction for atomic fulfillment
   return await db.$transaction(async (tx) => {
@@ -182,6 +198,7 @@ export async function markOrderShipped(orderId: string) {
 export async function getPackagingStats() {
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
+  assertPackagingAccess(user)
 
   const [
     pendingOrders,
@@ -217,4 +234,59 @@ export async function getPackagingStats() {
     shippedToday: readyForDispatch,
     weeklyRevenue: Number(totalPackagedThisWeek._sum.totalAmount || 0)
   };
+}
+
+export async function getPackagingDashboardData() {
+  const user = await requireActiveAuth();
+  const db = getTenantPrisma(user.organizationId);
+  assertPackagingAccess(user)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  const [confirmedOrders, readyForDispatch, recentShipments, shippedToday, shippedWeek] = await Promise.all([
+    db.saleOrder.findMany({
+      where: { status: 'CONFIRMED' },
+      include: packagingOrderInclude,
+      orderBy: { createdAt: 'asc' },
+    }),
+    db.saleOrder.findMany({
+      where: { status: 'READY_FOR_DISPATCH' },
+      include: packagingOrderInclude,
+      orderBy: { updatedAt: 'desc' },
+      take: 6,
+    }),
+    db.saleOrder.findMany({
+      where: { status: 'SHIPPED' },
+      include: packagingOrderInclude,
+      orderBy: { updatedAt: 'desc' },
+      take: 6,
+    }),
+    db.saleOrder.count({
+      where: { status: 'SHIPPED', updatedAt: { gte: today } },
+    }),
+    db.saleOrder.aggregate({
+      where: { status: 'SHIPPED', updatedAt: { gte: weekStart } },
+      _sum: { totalAmount: true },
+    }),
+  ])
+
+  const queue = confirmedOrders.filter(isPackableOrder).map(toPackagingOrder)
+  const blockedOrders = confirmedOrders.length - queue.length
+  const readyOrders = readyForDispatch.map(toPackagingOrder)
+  const shippedOrders = recentShipments.map(toPackagingOrder)
+
+  return {
+    queue,
+    readyForDispatch: readyOrders,
+    recentShipments: shippedOrders,
+    stats: {
+      pendingOrders: queue.length,
+      shippedToday,
+      weeklyRevenue: Number(shippedWeek._sum.totalAmount || 0),
+      readyForDispatch: readyOrders.length,
+      blockedOrders,
+    },
+  }
 }

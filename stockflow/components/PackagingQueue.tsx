@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import { fulfillOrder, getPackagingStats } from '@/app/actions/packaging'
+import { useRouter } from 'next/navigation'
+import { fulfillOrder } from '@/app/actions/packaging'
 
 import { Loader2, Package, AlertTriangle } from 'lucide-react'
 
@@ -22,7 +23,9 @@ interface PackagingOrder {
   totalItems: number
   totalQuantity: number
   totalKg: number
+  totalAmount: number
   createdAt: Date
+  updatedAt: Date
   items: PackagingItem[]
 }
 
@@ -35,13 +38,16 @@ interface PackagingStats {
   pendingOrders: number
   shippedToday: number
   weeklyRevenue: number
+  readyForDispatch?: number
+  blockedOrders?: number
 }
 
 export function PackagingQueue({ orders: initialOrders, initialStats }: PackagingQueueProps) {
+  const router = useRouter()
   const [orders, setOrders] = useState(initialOrders)
   const [fulfilling, setFulfilling] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [stats, setStats] = useState<PackagingStats>(initialStats)
+  const readyCount = initialStats.pendingOrders
 
   const handleFulfillOrder = async (orderId: string) => {
     setFulfilling(orderId)
@@ -51,21 +57,11 @@ export function PackagingQueue({ orders: initialOrders, initialStats }: Packagin
       await fulfillOrder(orderId)
       // Remove the fulfilled order from the list
       setOrders(prev => prev.filter(order => order.id !== orderId))
-      // Refresh stats
-      loadStats()
+      router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to fulfill order')
     } finally {
       setFulfilling(null)
-    }
-  }
-
-  const loadStats = async () => {
-    try {
-      const statsData = await getPackagingStats()
-      setStats(statsData)
-    } catch (err) {
-      console.error('Failed to load packaging stats:', err)
     }
   }
 
@@ -87,74 +83,41 @@ export function PackagingQueue({ orders: initialOrders, initialStats }: Packagin
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="stats-grid">
-        <div className="stat-card blue">
-          <div className="stat-label">Pending orders</div>
-          <div className="stat-value">{stats.pendingOrders}</div>
-          <div className="stat-sub">Ready for fulfillment</div>
-        </div>
-        <div className="stat-card teal">
-          <div className="stat-label">Fulfilled today</div>
-          <div className="stat-value">{stats.shippedToday}</div>
-          <div className="stat-sub">Awaiting dispatch</div>
-        </div>
-        <div className="stat-card amber">
-          <div className="stat-label">Packaged this week</div>
-          <div className="stat-value">KES {stats.weeklyRevenue.toLocaleString()}</div>
-          <div className="stat-sub">Value of shipped orders</div>
-        </div>
-      </div>
-
-      {/* Orders Queue */}
       <div className="card">
-        <div className="section-header mb-16"><div className="section-title">Pending orders</div><div className="section-sub">Sales orders awaiting fulfilment</div></div>
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Packaging Queue</div>
+            <div className="section-sub">Confirmed sales orders with reserved finished goods</div>
+          </div>
+          <span className="badge badge-blue">{readyCount.toLocaleString()} ready</span>
+        </div>
 
         <div>
           {orders.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px 20px',
-              color: 'var(--muted)'
-            }}>
-              <div style={{
-                display: 'inline-block',
-                marginBottom: '16px'
-              }}>
-                <div style={{
-                  padding: '20px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border2)',
-                  borderRadius: 'var(--radius)',
-                  display: 'inline-block'
-                }}>
-                  <Package size={36} style={{ color: 'var(--muted)' }} />
-                </div>
-              </div>
-              <p style={{
-                fontSize: '16px',
-                color: 'var(--muted)',
-                marginBottom: '4px'
-              }}>
-                No orders ready for packaging
-              </p>
-              <p style={{
-                fontSize: '12px',
-                color: 'var(--muted)'
-              }}>
-                Orders will appear here when all items are available
-              </p>
+            <div className="packaging-empty packaging-empty-large">
+              <Package size={36} />
+              <strong>No orders ready for packaging</strong>
+              <span>Orders appear here when all items have reserved finished goods.</span>
             </div>
           ) : (
             <div>
               {orders.map((order) => (
                 <div key={order.id} className="pack-card">
-                  <div className="pack-priority" style={{background:'var(--border2)'}}></div>
+                  <div className="pack-priority"></div>
                   <div className="pack-info">
                     <div className="pack-order">{order.orderNumber} · {new Date(order.createdAt).toLocaleDateString()}</div>
-                    <div className="pack-product">{order.items[0]?.designName || 'Multiple items'}</div>
-                    <div className="pack-detail">{order.totalQuantity} units · {order.totalKg.toFixed(0)} kg · {order.customerName}</div>
+                    <div className="pack-product">{order.customerName}</div>
+                    <div className="pack-detail">
+                      {order.totalItems.toLocaleString()} item lines · {order.totalQuantity.toLocaleString()} units · {order.totalKg.toFixed(0)} kg
+                    </div>
+                    <div className="packaging-items">
+                      {order.items.slice(0, 3).map((item) => (
+                        <span key={item.id}>{item.designName} x {item.quantity.toLocaleString()}</span>
+                      ))}
+                      {order.items.length > 3 && <span>+{order.items.length - 3} more</span>}
+                    </div>
                   </div>
+                  <div className="packaging-value">KES {order.totalAmount.toLocaleString()}</div>
                   <div className="pack-actions">
                     <button
                       onClick={() => handleFulfillOrder(order.id)}

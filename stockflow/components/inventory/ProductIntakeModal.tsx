@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, ShoppingCart, Ship, Package, DollarSign, Hash, Truck, FileText, CheckCircle, AlertCircle } from "lucide-react";
 
 type Origin = "LOCAL_PURCHASE" | "IMPORTED";
@@ -26,12 +26,6 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // Auto-compute landing cost for imported
-  // Reset when origin changes
-  useEffect(() => {
-    if (origin === "LOCAL_PURCHASE") setLandingCost("");
-  }, [origin]);
-
   function resetForm() {
     setName(""); setUom("KG"); setQuantity("");
     setUnitCost(""); setLandingCost(""); setVendor(""); setReference("");
@@ -55,7 +49,9 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
           uom,
           quantity: parseFloat(quantity),
           unitCost: unitCost ? parseFloat(unitCost) : undefined,
-          landingCost: origin === "IMPORTED" && landingCost ? parseFloat(landingCost) : undefined,
+          landingCost: origin === "IMPORTED"
+            ? parseFloat(landingCost || String((parseFloat(unitCost || "0") * MULTIPLIER).toFixed(2)))
+            : undefined,
           vendor: vendor.trim() || undefined,
           reference: reference.trim() || undefined,
         }),
@@ -122,7 +118,10 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
             <button
               key={val}
               type="button"
-              onClick={() => setOrigin(val)}
+              onClick={() => {
+                setOrigin(val);
+                if (val === "LOCAL_PURCHASE") setLandingCost("");
+              }}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer",

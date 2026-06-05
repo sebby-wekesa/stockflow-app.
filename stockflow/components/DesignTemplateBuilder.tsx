@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createDesign } from '@/app/actions/designs';
 import { getRawMaterials } from '@/app/actions/materials';
@@ -10,6 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Plus, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { designSchema } from '@/lib/schemas';
+
+type RawMaterialOption = Awaited<ReturnType<typeof getRawMaterials>>[number];
+type CreatedDesign = Awaited<ReturnType<typeof createDesign>>;
 
 interface Stage {
   id: string;
@@ -21,7 +24,7 @@ interface Stage {
 }
 
 interface DesignTemplateBuilderProps {
-  onComplete?: (design: any) => void;
+  onComplete?: (design: CreatedDesign) => void;
   initialData?: Partial<{
     name: string;
     code: string;
@@ -56,10 +59,10 @@ const NO_RAW_MATERIAL_VALUE = 'none';
 
 export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplateBuilderProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterialOption[]>([]);
 
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -79,21 +82,21 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
     stages: initialData?.stages || [] as Stage[]
   });
 
-  const loadRawMaterials = async () => {
+  const loadRawMaterials = useCallback(async () => {
     try {
-      setLoading(true);
       const materials = await getRawMaterials();
       setRawMaterials(materials);
-    } catch (err: any) {
+    } catch {
       setError('Failed to load raw materials');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadRawMaterials();
-  }, []);
+    const timer = window.setTimeout(() => void loadRawMaterials(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadRawMaterials]);
 
   const addStage = (stageTemplate: { name: string; department: string }) => {
     const newStage: Stage = {
@@ -210,8 +213,8 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
       } else {
         router.push('/designs');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create design template');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create design template');
     } finally {
       setSaving(false);
     }

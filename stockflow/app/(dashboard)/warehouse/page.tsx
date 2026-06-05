@@ -92,7 +92,7 @@ export default function WarehousePage() {
     };
 
     fetchWarehouseData();
-  }, []);
+  }, [router]);
 
   return (
     <div>

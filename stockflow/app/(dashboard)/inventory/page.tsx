@@ -87,8 +87,8 @@ export default function InventoryPage() {
 
   // ── Fetchers ──────────────────────────────────────────────────────────────
 
-  const fetchRaw = useCallback(async () => {
-    setLoadingRaw(true);
+  const fetchRaw = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoadingRaw(true);
     try {
       const res = await fetch("/api/inventory/materials");
       if (res.ok) {
@@ -100,8 +100,8 @@ export default function InventoryPage() {
     finally { setLoadingRaw(false); }
   }, []);
 
-  const fetchProducts = useCallback(async (origin: StockOrigin, setter: (p: Product[]) => void, setLoading: (b: boolean) => void) => {
-    setLoading(true);
+  const fetchProducts = useCallback(async (origin: StockOrigin, setter: (p: Product[]) => void, setLoading: (b: boolean) => void, showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await fetch(`/api/inventory/products?origin=${origin}`);
       if (res.ok) {
@@ -112,9 +112,18 @@ export default function InventoryPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchRaw(); }, [fetchRaw]);
-  useEffect(() => { fetchProducts("LOCAL_PURCHASE", setLocalProducts, setLoadingLocal); }, [fetchProducts]);
-  useEffect(() => { fetchProducts("IMPORTED", setImportedProducts, setLoadingImp); }, [fetchProducts]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchRaw(false), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchRaw]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchProducts("LOCAL_PURCHASE", setLocalProducts, setLoadingLocal, false), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchProducts]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchProducts("IMPORTED", setImportedProducts, setLoadingImp, false), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchProducts]);
 
   function handleSuccess() {
     fetchProducts("LOCAL_PURCHASE", setLocalProducts, setLoadingLocal);

@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation'
 import { ProductForm } from '@/app/(dashboard)/products/_components/product-form'
 import { updateProduct } from '@/actions/products'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 interface Props {
   product: any
   initialForForm?: any

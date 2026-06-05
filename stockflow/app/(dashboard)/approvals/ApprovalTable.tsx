@@ -1,7 +1,7 @@
 "use client";
 
 import { updateOrderStatus } from "@/app/actions/orders";
-import { Check, X, Eye, Package } from "lucide-react";
+import { Check, X, Package } from "lucide-react";
 import { useState } from "react";
 
 export default function ApprovalTable({ orders }: { orders: any[] }) {
@@ -24,7 +24,7 @@ export default function ApprovalTable({ orders }: { orders: any[] }) {
       if (!result.success) {
         alert(result.error);
       }
-    } catch (err) {
+    } catch {
       alert("An unexpected error occurred.");
     } finally {
       setLoadingId(null);
@@ -67,7 +67,7 @@ export default function ApprovalTable({ orders }: { orders: any[] }) {
               </td>
               <td>
                 <span className="badge badge-blue">
-                  'Mombasa'
+                  Mombasa
                 </span>
               </td>
               <td style={{

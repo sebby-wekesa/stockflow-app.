@@ -13,9 +13,9 @@ export function LowStockAlerts() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadAlerts = useCallback(async () => {
+  const loadAlerts = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       setError(null)
       const data = await getLowStockAlerts()
       setAlerts(data)
@@ -27,8 +27,9 @@ export function LowStockAlerts() {
   }, [])
 
   useEffect(() => {
-    void loadAlerts()
-  }, [])
+    const timer = window.setTimeout(() => void loadAlerts(false), 0)
+    return () => window.clearTimeout(timer)
+  }, [loadAlerts])
 
   const getAlertIcon = (level: string) => {
     switch (level) {

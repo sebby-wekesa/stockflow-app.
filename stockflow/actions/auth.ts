@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import type { CookieOptions } from "@supabase/ssr";
 import { redirect } from "next/navigation";
 import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -13,17 +12,6 @@ import { clearAuthCookies } from "@/lib/auth-session";
 import { prisma, withRetry } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
 import { checkRateLimitAsync, getClientIp } from "@/lib/rate-limit";
-
-const ROLE_PATHS = {
-  ADMIN: "/admin/dashboard",
-  MANAGER: "/dashboard",
-  WAREHOUSE: "/dashboard",
-  SALES: "/dashboard",
-  ACCOUNTANT: "/reports",
-  OPERATOR: "/dashboard",
-  PACKAGING: "/dashboard",
-  PENDING: "/dashboard/setup",
-};
 
 async function createSupabaseClient() {
   const cookieStore = await cookies();
@@ -182,7 +170,7 @@ export async function signOut() {
   redirect("/login");
 }
 
-export async function signUp(formData: FormData) {
+export async function signUp() {
   // Stage 2+: Old signup flow is disabled.
   // New multitenant signup will be implemented in Stage 4.
   return {

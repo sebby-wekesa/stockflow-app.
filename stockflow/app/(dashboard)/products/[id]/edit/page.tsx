@@ -4,8 +4,6 @@ import { notFound, redirect } from 'next/navigation'
 import EditProductClient from './EditProductClient'
 import { normalizeBranchCode } from '@/lib/branches'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const user = await getUser()

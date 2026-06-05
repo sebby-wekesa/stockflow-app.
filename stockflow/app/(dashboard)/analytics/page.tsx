@@ -11,7 +11,7 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ bra
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
 
-  const { branchId } = await props.searchParams;
+  await props.searchParams;
   
   // Note: Branch filtering disabled until ProductionOrder.branchId is uncommented in schema
   // const whereFilter = branchId ? {

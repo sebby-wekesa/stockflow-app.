@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
-import { getDateRange, toCSV, type DateRangeKey } from '@/lib/reports'
+import { toCSV } from '@/lib/reports'
 
-export async function GET(request: Request) {
+export async function GET() {
   const user = await requireActiveAuth()
   if (!['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(user.role)) {
     return new NextResponse('Forbidden', { status: 403 })
   }
   const db = getTenantPrisma(user.organizationId)
-
-  const { searchParams } = new URL(request.url)
-  const range = (searchParams.get('range') as DateRangeKey) || '30d'
-  const { start } = getDateRange(range)
 
   // Get raw materials inventory (tenant scoped)
   const rawMaterials = await db.rawMaterial.findMany({
@@ -25,17 +21,17 @@ export async function GET(request: Request) {
     },
   })
 
-   // Get finished goods inventory
-   const finishedGoods = await db.finishedGoods.findMany({
-     include: {
-       InventoryFinishedGoods: {
-         include: {
-           Branch: true,
-         },
-       },
-       design: true,
-     },
-   })
+  // Get finished goods inventory
+  const finishedGoods = await db.finishedGoods.findMany({
+    include: {
+      InventoryFinishedGoods: {
+        include: {
+          Branch: true,
+        },
+      },
+      design: true,
+    },
+  })
 
   // Flatten raw materials data
   const rawRows = rawMaterials.flatMap((material) =>
@@ -44,9 +40,9 @@ export async function GET(request: Request) {
       sku: material.sku,
       name: material.materialName,
       branch: inv.Branch?.name || 'Unknown',
-       available_qty: inv.availableKg?.toNumber() ?? 0,
-       reserved_qty: inv.reservedKg?.toNumber() ?? 0,
-       total_qty: (inv.availableKg?.toNumber() ?? 0) + (inv.reservedKg?.toNumber() ?? 0),
+      available_qty: inv.availableKg?.toNumber() ?? 0,
+      reserved_qty: inv.reservedKg?.toNumber() ?? 0,
+      total_qty: (inv.availableKg?.toNumber() ?? 0) + (inv.reservedKg?.toNumber() ?? 0),
       uom: 'kg',
       last_updated: inv.updatedAt.toISOString().slice(0, 10),
     }))
@@ -57,7 +53,7 @@ export async function GET(request: Request) {
     product.InventoryFinishedGoods.map((inv) => ({
       type: 'Finished Goods',
       sku: product.sku,
-       name: product.design?.name || 'Unknown Design',
+      name: product.design?.name || 'Unknown Design',
       branch: inv.Branch?.name || 'Unknown',
       available_qty: inv.availableQty,
       reserved_qty: 0, // Not tracked yet
@@ -86,7 +82,7 @@ export async function GET(request: Request) {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="stock-report-${range}-${today}.csv"`,
+      'Content-Disposition': `attachment; filename="stock-report-${today}.csv"`,
     },
   })
 }

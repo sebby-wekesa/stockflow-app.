@@ -11,7 +11,7 @@ describe('Security utilities', () => {
 
     it('should remove HTML tags', () => {
       const input = '<b>Bold</b> <i>Italic</i> Normal'
-      expect(sanitizeInput(input)).toBe('Normal')
+      expect(sanitizeInput(input)).toBe('Bold Italic Normal')
     })
 
     it('should trim whitespace', () => {

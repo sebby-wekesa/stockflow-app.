@@ -1,9 +1,9 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Loader2, Package, AlertCircle } from 'lucide-react'
 import { useToast } from './Toast'
 import { Design } from '@/types'
@@ -29,28 +29,22 @@ interface CreateOrderFormProps {
 export function CreateOrderForm({ designs }: CreateOrderFormProps) {
   const { showToast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedDesign, setSelectedDesign] = useState<Design | null>(null)
 
   const {
     register,
     handleSubmit,
     formState: { errors, isValid },
-    watch,
     reset,
+    control,
   } = useForm<OrderFormData>({
     resolver: zodResolver(createOrderSchema),
     mode: 'onChange',
   })
 
-  const designId = watch('designId')
-  const quantity = watch('quantity')
-  const priority = watch('priority')
-
-  // Update selected design when designId changes
-  useEffect(() => {
-    const design = designs.find((d) => d.id === designId)
-    setSelectedDesign(design || null)
-  }, [designId, designs])
+  const designId = useWatch({ control, name: 'designId' })
+  const quantity = useWatch({ control, name: 'quantity' })
+  const priority = useWatch({ control, name: 'priority' })
+  const selectedDesign = designs.find((d) => d.id === designId) || null
 
   const onSubmit = async (data: OrderFormData) => {
     setIsLoading(true)
@@ -83,7 +77,6 @@ export function CreateOrderForm({ designs }: CreateOrderFormProps) {
       )
 
       reset()
-      setSelectedDesign(null)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to create production order'

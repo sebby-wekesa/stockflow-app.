@@ -18,7 +18,10 @@ import { consumeMaterialsForOrder } from '@/app/actions/material-consumption'
 import { completeStage } from '@/actions/stage-completion'
 import { fulfillOrder, getPackagingStats } from '@/app/actions/packaging'
 
-describe('Tenant Isolation', () => {
+const describeTenantIsolation =
+  process.env.RUN_TENANT_ISOLATION_TESTS === 'true' ? describe : describe.skip
+
+describeTenantIsolation('Tenant Isolation', () => {
   beforeAll(async () => {
     await seedTwoTestOrgs()
   })

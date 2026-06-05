@@ -1,5 +1,4 @@
 import { getTenantPrisma } from "@/lib/tenant-prisma";
-import { redirect } from "next/navigation";
 import { requireActiveAuth } from "@/lib/auth";
 import { StageCompletionForm } from "@/components/StageCompletionForm";
 

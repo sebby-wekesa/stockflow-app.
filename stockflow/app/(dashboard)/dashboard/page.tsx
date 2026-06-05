@@ -2,12 +2,12 @@ import { requireAuth } from '@/lib/auth'
 import { Role } from '@/lib/auth'
 
 import { TeamRole } from '@/lib/proxy'
-import Link from 'next/link'
 import OperatorDashboard from '../operator/OperatorDashboard'
 import WarehousePage from '../warehouse/page'
 import AdminDashboard from '@/components/AdminDashboard'
 import ManagerDashboard from '@/components/ManagerDashboard'
 import SalesDashboard from '@/components/SalesDashboard'
+import PackagingDashboard from '@/components/PackagingDashboard'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +62,7 @@ async function TeamDashboard({ role, user }: { role: TeamRole; user: any }) {
     case 'sales':
       return <SalesDashboard user={user} />;
     case 'packaging':
-      return <PackagingView user={user} role={role} />;
+      return <PackagingDashboard />;
     case 'warehouse':
       return <WarehousePage />;
     case 'manager':
@@ -74,66 +74,4 @@ async function TeamDashboard({ role, user }: { role: TeamRole; user: any }) {
     default:
       return <AdminDashboard user={user} />;
   }
-}
-
-// Packaging Dashboard - Shows packaging operations overview
-async function PackagingView({ user, role }: { user: any; role: TeamRole }) {
-  // For now, show basic packaging-focused stats
-  // TODO: Implement proper packaging dashboard data
-  const dashboardModule = await import('@/app/actions/dashboard');
-  const data = await dashboardModule.getDashboardStats(user, role.toUpperCase() as Role);
-  const { stats } = data
-
-  return (
-    <div>
-      <div className="section-header mb-16">
-        <div>
-          <div className="section-title">Packaging Operations</div>
-          <div className="section-sub">Manage order fulfillment and shipping</div>
-        </div>
-        <div style={{display: 'flex', gap: '8px'}}>
-          <a href="/packaging" className="btn btn-primary">View Packaging Queue</a>
-          <Link href="/packaging" className="btn btn-ghost">+ New shipment</Link>
-        </div>
-      </div>
-
-      <div className="stats-grid">
-        {stats.map((stat: any, i: number) => (
-          <div key={i} className={`stat-card ${stat.color}`}>
-            <div className="stat-label">{stat.label}</div>
-            <div className="stat-value">
-              {stat.value}{stat.suffix && <span style={{fontSize:'14px',color:'var(--muted)'}}> {stat.suffix}</span>}
-            </div>
-            <div className="stat-sub">{stat.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid-2 mb-16">
-        <div className="card">
-          <div className="section-header mb-16">
-            <div className="section-title">Packaging Status</div>
-            <div style={{fontSize:'11px',color:'var(--muted)'}}>Current queue overview</div>
-          </div>
-          <div style={{padding: '20px', textAlign: 'center', color: 'var(--muted)'}}>
-            Packaging queue and shipment tracking will be displayed here.
-            <br />
-            <a href="/packaging" className="btn btn-primary" style={{marginTop: '16px', display: 'inline-block'}}>
-              Go to Packaging Queue
-            </a>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="section-header mb-16">
-            <div className="section-title">Recent Shipments</div>
-            <div style={{fontSize:'11px',color:'var(--muted)'}}>Orders marked as shipped</div>
-          </div>
-          <div style={{padding: '20px', textAlign: 'center', color: 'var(--muted)'}}>
-            Recent shipment history will be displayed here.
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 }

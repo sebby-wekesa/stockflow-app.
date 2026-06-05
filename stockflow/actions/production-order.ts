@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requireRole, getUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { productionOrderSchema, ProductionOrderInput } from "@/lib/validations";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { updateOrderStatus } from "@/app/actions/orders";
@@ -54,7 +54,7 @@ export async function createProductionOrder(formData: FormData) {
   }
   const initialStage = design.stages[0];
 
-  const order = await db.productionOrder.create({
+  await db.productionOrder.create({
     data: {
       orderNumber: input.orderNumber,
       designId: input.designId,

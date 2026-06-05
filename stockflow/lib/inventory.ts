@@ -35,7 +35,7 @@ export function processStockArrivals(items: string[]): ProcessedItem[] {
     // 2. Determine Origin Logic
     let originType: OriginType = 'LOCAL_PURCHASE'; // Default
     let branch = 'Nairobi'; // Default
-    let uom: UOM = 'KG';
+    const uom: UOM = 'KG';
 
     const upperDesc = description.toUpperCase();
 
