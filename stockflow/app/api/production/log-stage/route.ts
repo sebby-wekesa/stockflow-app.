@@ -58,6 +58,8 @@ export async function POST(req: Request) {
       kgIn: Number(body.kgIn),
       kgOut: Number(body.kgOut),
       kgScrap: Number(body.kgScrap || 0),
+      piecesIn: body.piecesIn === undefined || body.piecesIn === null || body.piecesIn === "" ? undefined : Number(body.piecesIn),
+      piecesOut: body.piecesOut === undefined || body.piecesOut === null || body.piecesOut === "" ? undefined : Number(body.piecesOut),
       scrapReason: body.scrapReason,
       notes: body.notes,
     });
@@ -70,6 +72,8 @@ export async function POST(req: Request) {
         kgIn: Number(result.stageLog.kgIn),
         kgOut: Number(result.stageLog.kgOut),
         kgScrap: Number(result.stageLog.kgScrap),
+        piecesIn: result.stageLog.piecesIn,
+        piecesOut: result.stageLog.piecesOut,
         completedAt: result.stageLog.completedAt.toISOString(),
       },
       isCompleted: result.orderCompleted

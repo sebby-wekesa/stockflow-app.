@@ -4,6 +4,7 @@ import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
 import { STATUS_BADGE_CLASS, STATUS_LABELS, formatKES } from '@/lib/sales-utils'
 import { OrderActions } from '@/components/sales/OrderActions'
+import { DraftSalesOrderEditor } from '@/components/sales/DraftSalesOrderEditor'
 
 export default async function SalesOrderDetailPage({
   params,
@@ -67,6 +68,24 @@ export default async function SalesOrderDetailPage({
           orderNumber={order.id}
         />
       </div>
+
+      {order.status === 'PENDING' && (
+        <DraftSalesOrderEditor
+          orderId={order.id}
+          customerName={order.customerName}
+          lines={order.SaleItem.map((item) => {
+            const unitPrice = Number(item.unitPrice)
+            return {
+              id: item.id,
+              sku: item.FinishedGoods.sku,
+              description: item.FinishedGoods.design?.name ?? item.FinishedGoods.sku,
+              quantity: item.quantity,
+              unitPrice,
+              piecesSets: unitPrice > 0 ? Number(item.totalPrice) / unitPrice : 0,
+            }
+          })}
+        />
+      )}
 
       <div className="card p-8 mb-6 print:shadow-none">
         <div className="flex items-start justify-between mb-8 pb-6 border-b border-border">

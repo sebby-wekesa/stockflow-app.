@@ -42,7 +42,7 @@ export default function OperatorDashboard() {
       try {
         const depts = await getActiveDepartments();
         setDepartments(depts);
-        setSelectedDept(depts[0] || "");
+        setSelectedDept("");
       } catch {
         setDepartments([]);
         setSelectedDept("");
@@ -53,11 +53,10 @@ export default function OperatorDashboard() {
 
   // Load queue when dept changes
   useEffect(() => {
-    if (!selectedDept) return;
     const loadJobs = async () => {
       setLoading(true);
       try {
-        const result = await getOperatorQueue(undefined, selectedDept);
+        const result = await getOperatorQueue(undefined, selectedDept || undefined);
         setJobs(result || []);
       } catch {
         setJobs([]);
@@ -98,7 +97,7 @@ export default function OperatorDashboard() {
         <div className="stat-card purple">
           <div className="stat-label">Current queue</div>
           <div className="stat-value">{jobs.length}</div>
-          <div className="stat-sub">{selectedDept || "No active station"}</div>
+          <div className="stat-sub">{selectedDept || "All available work"}</div>
         </div>
         <div className="stat-card amber">
           <div className="stat-label">Urgent work</div>
@@ -119,10 +118,16 @@ export default function OperatorDashboard() {
         <div className="section-header mb-16">
           <div>
             <div className="section-title">Current Station</div>
-            <div className="section-sub">Choose a station to view its live queue</div>
+            <div className="section-sub">View all available work or filter by station</div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedDept("")}
+            className={`btn ${selectedDept === "" ? "btn-primary" : "btn-ghost"}`}
+          >
+            All available
+          </button>
           {departments.map((dept) => (
             <button
               key={dept}
@@ -141,7 +146,7 @@ export default function OperatorDashboard() {
       <div className="card mb-16">
         <div className="section-header mb-16">
           <div>
-            <div className="section-title">{selectedDept || "Station"} Queue</div>
+            <div className="section-title">{selectedDept || "Available Work"} Queue</div>
             <div className="section-sub">Open a job to record production for its current stage</div>
           </div>
           <Link href="/operator_queue" className="btn btn-ghost btn-sm">View full queue →</Link>

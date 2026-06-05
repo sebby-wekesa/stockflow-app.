@@ -15,6 +15,8 @@ export async function completeStage(data: {
   kgIn: number;
   kgOut: number;
   kgScrap: number;
+  piecesIn?: number;
+  piecesOut?: number;
   scrapReason?: string;
   department?: string;
   notes?: string;
@@ -87,6 +89,8 @@ export async function completeStage(data: {
         kgIn: validatedData.kgIn,
         kgOut: validatedData.kgOut,
         kgScrap: validatedData.kgScrap,
+        piecesIn: validatedData.piecesIn ?? null,
+        piecesOut: validatedData.piecesOut ?? null,
         scrapReason: validatedData.scrapReason,
         department: validatedData.department || user.department,
         operatorId: user.id,

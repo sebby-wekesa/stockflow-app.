@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const db = getTenantPrisma(user.organizationId)
 
     const body = await request.json()
-    const { orderId, department, inputWeight, outputWeight, scrapWeight } = body
+    const { orderId, department, inputWeight, outputWeight, scrapWeight, piecesIn, piecesOut } = body
 
     // Validate input
     if (!orderId || !department || inputWeight === undefined || outputWeight === undefined || scrapWeight === undefined) {
@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
       kgIn: Number(inputWeight),
       kgOut: Number(outputWeight),
       kgScrap: Number(scrapWeight),
+      piecesIn: piecesIn === undefined || piecesIn === null || piecesIn === "" ? undefined : Number(piecesIn),
+      piecesOut: piecesOut === undefined || piecesOut === null || piecesOut === "" ? undefined : Number(piecesOut),
     })
 
     return NextResponse.json(
@@ -82,6 +84,8 @@ export async function POST(request: NextRequest) {
           kgIn: Number(result.stageLog.kgIn),
           kgOut: Number(result.stageLog.kgOut),
           kgScrap: Number(result.stageLog.kgScrap),
+          piecesIn: result.stageLog.piecesIn,
+          piecesOut: result.stageLog.piecesOut,
           completedAt: result.stageLog.completedAt.toISOString(),
         },
       },

@@ -1,0 +1,3 @@
+ALTER TABLE "StageLog"
+ADD COLUMN "piecesIn" INTEGER,
+ADD COLUMN "piecesOut" INTEGER;

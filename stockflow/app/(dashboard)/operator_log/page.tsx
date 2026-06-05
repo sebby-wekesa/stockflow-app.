@@ -19,11 +19,7 @@ export default function OperatorLogIndexPage() {
       try {
         const activeDepartments = await getActiveDepartments();
         setDepartments(activeDepartments);
-        setSelectedDept(activeDepartments[0] || "");
-        if (activeDepartments.length === 0) {
-          setOrders([]);
-          setLoading(false);
-        }
+        setSelectedDept("");
       } catch {
         setDepartments([]);
         setSelectedDept("");
@@ -36,14 +32,10 @@ export default function OperatorLogIndexPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedDept) {
-      return;
-    }
-
     async function loadJobs() {
       setLoading(true);
       try {
-        const result = await getOperatorQueue(undefined, selectedDept);
+        const result = await getOperatorQueue(undefined, selectedDept || undefined);
         setOrders(result);
       } catch {
         setOrders([]);
@@ -69,10 +61,17 @@ export default function OperatorLogIndexPage() {
         <div className="section-header mb-16">
           <div>
             <div className="section-title">Department</div>
-            <div className="section-sub">Only active departments with jobs are shown</div>
+            <div className="section-sub">Show all available work or filter to one department</div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedDept("")}
+            className={`btn ${selectedDept === "" ? "btn-primary" : "btn-ghost"}`}
+          >
+            All available
+          </button>
           {departments.map((dept) => (
             <button
               key={dept}
@@ -92,10 +91,10 @@ export default function OperatorLogIndexPage() {
       <div className="card">
         <div className="section-header mb-16">
           <div>
-            <div className="section-title">{selectedDept || "Department"} Jobs</div>
+            <div className="section-title">{selectedDept || "Available Work"} Jobs</div>
             <div className="section-sub">Open a job to complete its current production stage</div>
           </div>
-          {selectedDept && <span className="badge badge-muted">{selectedDept}</span>}
+          <span className="badge badge-muted">{selectedDept || "All available"}</span>
         </div>
 
         {loading && <div className="p-6 text-center text-muted">Loading jobs...</div>}

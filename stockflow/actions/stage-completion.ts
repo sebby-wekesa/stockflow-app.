@@ -16,6 +16,8 @@ export async function completeStage(input: StageCompletionInput) {
     kgIn: validated.kgIn,
     kgOut: validated.kgOut,
     kgScrap: validated.kgScrap,
+    piecesIn: validated.piecesIn,
+    piecesOut: validated.piecesOut,
     scrapReason: validated.scrapReason,
     department: validated.department,
     notes: validated.notes,

@@ -13,6 +13,8 @@ export async function POST(req: Request) {
       kgIn, 
       kgOut, 
       kgScrap, 
+      piecesIn,
+      piecesOut,
       scrapReason, 
       notes, 
       currentSequence, 
@@ -36,6 +38,8 @@ export async function POST(req: Request) {
       kgIn: Number(kgIn),
       kgOut: Number(kgOut),
       kgScrap: Number(kgScrap || 0),
+      piecesIn: piecesIn === undefined || piecesIn === null || piecesIn === "" ? undefined : Number(piecesIn),
+      piecesOut: piecesOut === undefined || piecesOut === null || piecesOut === "" ? undefined : Number(piecesOut),
       scrapReason,
       notes,
     });
@@ -47,6 +51,8 @@ export async function POST(req: Request) {
         kgIn: Number(result.stageLog.kgIn),
         kgOut: Number(result.stageLog.kgOut),
         kgScrap: Number(result.stageLog.kgScrap),
+        piecesIn: result.stageLog.piecesIn,
+        piecesOut: result.stageLog.piecesOut,
         completedAt: result.stageLog.completedAt.toISOString(),
       },
       transition: {

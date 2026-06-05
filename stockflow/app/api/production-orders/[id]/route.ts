@@ -38,6 +38,8 @@ export async function GET(
         kgIn: Number(log.kgIn),
         kgOut: Number(log.kgOut),
         kgScrap: Number(log.kgScrap),
+        piecesIn: log.piecesIn,
+        piecesOut: log.piecesOut,
         completedAt: log.completedAt.toISOString(),
       })),
       materials: order.materials.map((line) => ({

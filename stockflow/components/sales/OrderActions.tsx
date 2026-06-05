@@ -33,7 +33,7 @@ export function OrderActions({
   return (
     <>
       <div className="flex gap-2">
-        {status === 'draft' && (
+        {status === 'PENDING' && (
           <button
             type="button"
             onClick={handleConfirm}
@@ -52,7 +52,7 @@ export function OrderActions({
           Print
         </button>
 
-        {(status === 'draft' || status === 'invoiced') && (
+        {(status === 'PENDING' || status === 'CONFIRMED') && (
           <button
             type="button"
             onClick={() => setShowCancelDialog(true)}
@@ -122,7 +122,7 @@ function CancelDialog({
       <div className="bg-surface border border-border rounded-lg p-6 max-w-md w-full">
         <div className="font-head text-lg font-bold mb-2">Cancel order {orderNumber}?</div>
         <p className="text-sm text-muted mb-4">
-          {status === 'invoiced'
+          {status === 'CONFIRMED'
             ? 'Stock will be returned automatically. The cancellation will be logged in the audit trail.'
             : 'This draft will be marked as cancelled.'}
         </p>

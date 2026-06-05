@@ -24,6 +24,8 @@ export const stageLogSchema = z.object({
   kgIn: z.number().min(0).max(999999.9999),
   kgOut: z.number().min(0).max(999999.9999),
   kgScrap: z.number().min(0).max(999999.9999),
+  piecesIn: z.number().int().min(0).optional(),
+  piecesOut: z.number().int().min(0).optional(),
   scrapReason: z.string().optional(),
   department: z.string().optional(),
   operatorId: z.string().min(1),

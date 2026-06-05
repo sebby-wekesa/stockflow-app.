@@ -16,6 +16,7 @@ export default function OperatorLogPage() {
   const [loading, setLoading] = useState(true);
   const [kgOut, setKgOut] = useState<number>(0);
   const [kgScrap, setKgScrap] = useState<number>(0);
+  const [piecesOut, setPiecesOut] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [materialLineId, setMaterialLineId] = useState("");
   const [weightIn, setWeightIn] = useState("");
@@ -43,11 +44,17 @@ export default function OperatorLogPage() {
   }, [id, router, showToast]);
 
   const inheritedKg = order?.inheritedKg || 0;
+  const inheritedPieces = order?.StageLog?.[0]?.piecesOut ?? order?.quantity ?? 0;
   
   const isValid = useMemo(() => {
     const total = Number(kgOut) + Number(kgScrap);
-    return Math.abs(total - inheritedKg) < 0.01 && kgOut > 0;
-  }, [kgOut, kgScrap, inheritedKg]);
+    const parsedPiecesOut = Number(piecesOut);
+    const hasValidPiecesOut =
+      piecesOut.trim() !== "" &&
+      Number.isInteger(parsedPiecesOut) &&
+      parsedPiecesOut >= 0;
+    return Math.abs(total - inheritedKg) < 0.01 && kgOut > 0 && hasValidPiecesOut;
+  }, [kgOut, kgScrap, inheritedKg, piecesOut]);
 
   const submitStage = async () => {
     if (!isValid || isSubmitting) return;
@@ -63,6 +70,8 @@ export default function OperatorLogPage() {
           kgIn: inheritedKg,
           kgOut,
           kgScrap,
+          piecesIn: inheritedPieces,
+          piecesOut: Number(piecesOut),
           department: order.currentDept,
         }),
       });
@@ -275,9 +284,16 @@ export default function OperatorLogPage() {
             <div style={{fontFamily:'var(--font-mono)',fontSize:'18px',color:'var(--accent)',marginTop:'4px'}}>{inheritedKg} kg</div>
           </div>
           <div className="card-sm">
+            <div style={{fontSize:'10px',color:'var(--muted)'}}>PIECES/SETS IN</div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:'18px',color:'var(--teal)',marginTop:'4px'}}>{inheritedPieces}</div>
+          </div>
+          <div className="card-sm">
             <div style={{fontSize:'10px',color:'var(--muted)'}}>TARGET DIMS</div>
             <div style={{fontSize:'13px',marginTop:'4px'}}>{order.design.targetDimensions || order.design.targetDim || "Standard"}</div>
           </div>
+        </div>
+
+        <div className="grid-3" style={{gap:'10px',marginBottom:'14px'}}>
           <div className="card-sm">
             <div style={{fontSize:'10px',color:'var(--muted)'}}>NEXT DEPT</div>
             <div style={{fontSize:'13px',marginTop:'4px',color:'var(--purple)'}}>{nextStageInfo?.department || "Finished Goods"}</div>
@@ -288,12 +304,12 @@ export default function OperatorLogPage() {
         <div className="kg-trail">
           <div className="kg-stage done">
             <div className="kg-stage-name">Received</div>
-            <div className="kg-stage-val">{inheritedKg} kg</div>
+            <div className="kg-stage-val">{inheritedKg} kg · {inheritedPieces} pcs/sets</div>
           </div>
           <div className="kg-arrow">→</div>
           <div className="kg-stage active">
             <div className="kg-stage-name">{currentStageInfo?.name}</div>
-            <div className="kg-stage-val">{kgOut || "—"} kg</div>
+            <div className="kg-stage-val">{kgOut || "—"} kg · {piecesOut || "—"} pcs/sets</div>
           </div>
           <div className="kg-arrow">→</div>
           <div className="kg-stage">
@@ -305,7 +321,7 @@ export default function OperatorLogPage() {
 
       <div className="log-form">
         <div style={{fontSize:'13px',fontWeight:'600',marginBottom:'4px'}}>Record {currentStageInfo?.name?.toLowerCase()} output</div>
-        <div style={{fontSize:'12px',color:'var(--muted)',marginBottom:'14px'}}>Kg in must equal kg passed forward + kg scrap</div>
+        <div style={{fontSize:'12px',color:'var(--muted)',marginBottom:'14px'}}>Kg in must equal kg passed forward + kg scrap. Pieces/sets are saved for traceability.</div>
         
         <div className="kg-inputs">
           <div className="kg-input-group">
@@ -332,10 +348,37 @@ export default function OperatorLogPage() {
           </div>
         </div>
 
+        <div className="kg-inputs" style={{marginTop:'12px'}}>
+          <div className="kg-input-group">
+            <label>Pieces/sets in</label>
+            <input type="number" value={inheritedPieces} readOnly style={{opacity:'0.6'}}/>
+          </div>
+          <div className="kg-input-group output">
+            <label>Pieces/sets out (to {nextStageInfo?.department || "Next"})</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="0"
+              value={piecesOut}
+              onChange={(e) => setPiecesOut(e.target.value)}
+            />
+          </div>
+          <div className="kg-input-group">
+            <label>Pieces/sets difference</label>
+            <input
+              type="text"
+              value={piecesOut.trim() === "" ? "—" : String(inheritedPieces - Number(piecesOut))}
+              readOnly
+              style={{opacity:'0.6'}}
+            />
+          </div>
+        </div>
+
         <div className={`kg-balance ${!kgOut && !kgScrap ? "" : isValid ? "valid" : "invalid"}`}>
-          {!kgOut && !kgScrap ? "Enter kg out and scrap to verify balance" : 
-           isValid ? `✓ Balanced — ${kgOut} kg forward + ${kgScrap} kg scrap = ${inheritedKg} kg` : 
-           `✗ Mismatch — ${kgOut} + ${kgScrap} = ${parseFloat((kgOut + kgScrap).toFixed(2))} kg (expected ${inheritedKg} kg)`}
+          {!kgOut && !kgScrap ? "Enter kg out, kg scrap, and pieces/sets out to verify balance" : 
+           isValid ? `Balanced - ${kgOut} kg forward + ${kgScrap} kg scrap = ${inheritedKg} kg` : 
+           `Mismatch - ${kgOut} + ${kgScrap} = ${parseFloat((kgOut + kgScrap).toFixed(2))} kg (expected ${inheritedKg} kg), and pieces/sets out is required`}
         </div>
 
         <div style={{marginTop:'14px',display:'flex',gap:'10px'}}>

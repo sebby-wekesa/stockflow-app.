@@ -12,7 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { checkRateLimitAsync, getClientIp } from '@/lib/rate-limit'
 import { validatePassword } from '@/lib/security'
-import { ALL_BRANCHES } from '@/lib/branches'
+import { ALL_BRANCHES, normalizeBranchCode } from '@/lib/branches'
 
 const signUpSchema = z.object({
   organizationId: z.string().trim().min(1, 'Select a valid organization'),
@@ -74,14 +74,16 @@ export async function signUpOrganization(formData: FormData) {
     return { error: 'Select a valid active organization.' }
   }
 
-  // Find the branch by code and organization
-  const branch = await prisma.branch.findFirst({
-    where: {
-      organizationId: data.organizationId,
-      code: data.branchCode,
-    },
-    select: { id: true },
+  // Branch rows can use business codes like MSA/NBO/BNJ while the signup UI
+  // submits canonical app codes like mombasa/nairobi/bonje.
+  const branches = await prisma.branch.findMany({
+    where: { organizationId: data.organizationId },
+    select: { id: true, code: true, name: true, location: true },
   })
+  const branch = branches.find(
+    (candidate) =>
+      normalizeBranchCode(candidate.code, candidate.name, candidate.location) === data.branchCode
+  )
   if (!branch) {
     return { error: 'Select a valid branch.' }
   }

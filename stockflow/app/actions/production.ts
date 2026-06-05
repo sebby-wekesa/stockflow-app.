@@ -169,7 +169,7 @@ export async function getOperatorQueue(role?: string, department?: string) {
   void role;
   const effectiveRole = user.role;
   const operatorDepartments = getOperatorDepartments(user);
-  const effectiveDept = department || operatorDepartments[0];
+  const effectiveDept = department?.trim() || undefined;
   if (user.role === 'OPERATOR' && effectiveDept) assertOperatorDepartment(user, effectiveDept);
 
   // If user is ADMIN or MANAGER, they see all queues.
@@ -182,7 +182,9 @@ export async function getOperatorQueue(role?: string, department?: string) {
         ...(effectiveDept
           ? { currentDept: effectiveDept }
           : effectiveRole === "OPERATOR"
-            ? { currentDept: { in: operatorDepartments } }
+            ? operatorDepartments.length > 0
+              ? { currentDept: { in: operatorDepartments } }
+              : {}
             : {}),
       },
       include: {
@@ -353,7 +355,9 @@ export async function getActiveDepartments() {
       .filter((d): d is string => !!d);
 
     if (user.role === 'OPERATOR') {
-      return getOperatorDepartments(user).filter(department => active.includes(department));
+      const operatorDepartments = getOperatorDepartments(user);
+      if (operatorDepartments.length === 0) return active;
+      return operatorDepartments.filter(department => active.includes(department));
     }
     return active;
   } catch (error) {

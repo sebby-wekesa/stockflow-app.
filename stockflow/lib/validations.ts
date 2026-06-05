@@ -15,6 +15,8 @@ export const stageCompletionSchema = z.object({
   kgIn: z.number().min(0, "kgIn cannot be negative"),
   kgOut: z.number().min(0, "kgOut cannot be negative"),
   kgScrap: z.number().min(0, "kgScrap cannot be negative"),
+  piecesIn: z.number().int().min(0, "piecesIn cannot be negative").optional(),
+  piecesOut: z.number().int().min(0, "piecesOut cannot be negative").optional(),
   operatorId: z.string().min(1, "Operator ID is required"),
   department: z.string().optional(),
   scrapReason: z.string().optional(),

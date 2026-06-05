@@ -694,6 +694,8 @@ model StageLog {
   kgIn            Decimal         @db.Decimal(10, 4)
   kgOut           Decimal         @db.Decimal(10, 4)
   kgScrap         Decimal         @db.Decimal(10, 4)
+  piecesIn        Int?
+  piecesOut       Int?
   scrapReason     String?
   department      String?
   operatorId      String

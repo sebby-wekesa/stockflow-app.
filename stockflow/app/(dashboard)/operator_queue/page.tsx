@@ -19,21 +19,17 @@ export default function OperatorQueuePage() {
     const loadDepts = async () => {
       const depts = await getActiveDepartments();
       setDepartments(depts);
-      // Default to first one (usually user's dept or most active)
-      const initial = depts[0] || "";
-      setSelectedDept(initial);
+      setSelectedDept("");
     };
     loadDepts();
   }, []);
 
   // Reload jobs when department changes
   useEffect(() => {
-    if (!selectedDept) return;
-
     const loadJobs = async () => {
       setLoading(true);
       try {
-        const result = await getOperatorQueue(undefined, selectedDept);
+        const result = await getOperatorQueue(undefined, selectedDept || undefined);
         setOrders(result);
       } catch {
         setOrders([]);
@@ -59,7 +55,7 @@ export default function OperatorQueuePage() {
         <div className="stat-card purple">
           <div className="stat-label">Jobs at station</div>
           <div className="stat-value">{orders.length}</div>
-          <div className="stat-sub">{selectedDept || "No station selected"}</div>
+          <div className="stat-sub">{selectedDept || "All available work"}</div>
         </div>
         <div className="stat-card amber">
           <div className="stat-label">Urgent jobs</div>
@@ -82,10 +78,16 @@ export default function OperatorQueuePage() {
         <div className="section-header mb-16">
           <div>
             <div className="section-title">Select Station</div>
-            <div className="section-sub">Your queue refreshes when you change stations</div>
+            <div className="section-sub">Show all available work or filter to one station</div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedDept("")}
+            className={`btn ${selectedDept === "" ? "btn-primary" : "btn-ghost"}`}
+          >
+            All available
+          </button>
           {departments.map((dept) => (
             <button
               key={dept}
@@ -104,10 +106,10 @@ export default function OperatorQueuePage() {
       <div className="card">
         <div className="section-header mb-16">
           <div>
-            <div className="section-title">{selectedDept || "Station"} Queue</div>
+            <div className="section-title">{selectedDept || "Available Work"} Queue</div>
             <div className="section-sub">Open a job to record production for its current stage</div>
           </div>
-          {selectedDept && <span className="badge badge-muted">{selectedDept}</span>}
+          <span className="badge badge-muted">{selectedDept || "All available"}</span>
         </div>
 
         {loading && <div className="p-6 text-center text-muted">Loading jobs...</div>}

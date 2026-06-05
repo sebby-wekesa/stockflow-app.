@@ -1,282 +1,235 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { SalesOrderForm } from "@/components/SalesOrderForm";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { ArrowUpDown, Package, Search, ShoppingCart, X } from "lucide-react";
 import { formatKES } from "@/lib/sales-utils";
 
-type SortOption = 'name' | 'code' | 'price' | 'quantity' | 'date';
+type SortOption = "name" | "code" | "price" | "quantity" | "date";
+type SourceFilter = "all" | "manufactured" | "product";
 
-interface Product {
+type CatalogueProduct = {
   id: string;
-  designId?: string;
   name: string;
   code: string;
-  availableQty: number;
-  kgProduced: number;
-  price: number;
-  createdAt: string;
-  source?: 'manufactured' | 'product' | 'design';
-}
-
-interface CatalogueProduct {
-  id: string;
-  design: {
-    name: string;
-    code: string;
-    description?: string;
-  };
+  description: string;
   quantity: number;
+  reservedQuantity?: number;
   kgProduced: number;
+  piecesSets: number;
+  uom: string;
+  category: string;
+  origin: string;
   price: number | null;
   createdAt: string;
-  source?: 'manufactured' | 'product' | 'design';
-  designId?: string;
+  branchName: string | null;
+  source: "manufactured" | "product";
+};
+
+function sourceLabel(source: CatalogueProduct["source"]) {
+  return source === "manufactured" ? "Finished goods" : "Product stock";
+}
+
+function stockBadgeClass(quantity: number) {
+  if (quantity <= 0) return "badge-red";
+  if (quantity < 10) return "badge-amber";
+  return "badge-teal";
 }
 
 export default function CatalogueClient({ products }: { products: CatalogueProduct[] }) {
-  const [showOrderForm, setShowOrderForm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [showOnlyInStock, setShowOnlyInStock] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [showOnlyInStock, setShowOnlyInStock] = useState(true);
 
-  const formattedProducts = products.map(p => ({
-    id: p.id,
-    designId: p.designId,
-    name: p.design.name,
-    code: p.design.code,
-    availableQty: p.quantity,
-    kgProduced: p.kgProduced,
-    price: p.price || 0, // Default price if not set
-    createdAt: p.createdAt,
-    source: p.source,
-  }));
+  const stats = useMemo(() => {
+    const totalQty = products.reduce((sum, product) => sum + product.quantity, 0);
+    const totalValue = products.reduce(
+      (sum, product) => sum + product.quantity * (product.price ?? 0),
+      0
+    );
+    const manufactured = products.filter((product) => product.source === "manufactured").length;
+    return { totalQty, totalValue, manufactured };
+  }, [products]);
 
-  const filteredAndSortedProducts = useMemo(() => {
-    let filtered = formattedProducts;
+  const filteredProducts = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    const filtered = products.filter((product) => {
+      const matchesSearch =
+        !query ||
+        product.name.toLowerCase().includes(query) ||
+        product.code.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query) ||
+        product.origin.toLowerCase().includes(query);
 
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+      const matchesSource = sourceFilter === "all" || product.source === sourceFilter;
+      const matchesStock = !showOnlyInStock || product.quantity > 0;
+      return matchesSearch && matchesSource && matchesStock;
+    });
 
-    // Filter by availability
-    if (showOnlyInStock) {
-      filtered = filtered.filter(product => product.availableQty > 0);
-    }
-
-    // Sort products
-    filtered.sort((a: Product, b: Product) => {
-      let aValue: string | number | Date;
-      let bValue: string | number | Date;
+    return filtered.toSorted((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
 
       switch (sortBy) {
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'code':
+        case "code":
           aValue = a.code.toLowerCase();
           bValue = b.code.toLowerCase();
           break;
-        case 'price':
-          aValue = a.price;
-          bValue = b.price;
+        case "price":
+          aValue = a.price ?? 0;
+          bValue = b.price ?? 0;
           break;
-        case 'quantity':
-          aValue = a.availableQty;
-          bValue = b.availableQty;
+        case "quantity":
+          aValue = a.quantity;
+          bValue = b.quantity;
           break;
-        case 'date':
-          aValue = new Date(a.createdAt);
-          bValue = new Date(b.createdAt);
+        case "date":
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
           break;
+        case "name":
         default:
-          return 0;
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
       }
 
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
-
-    return filtered;
-  }, [formattedProducts, searchTerm, sortBy, sortOrder, showOnlyInStock]);
-
-  if (showOrderForm) {
-    return (
-      <div className="dashboard-content">
-        <div className="section-header">
-          <div>
-            <h1>Place Sales Order</h1>
-            <div className="section-sub">Create a new sales order from available products</div>
-          </div>
-          <button
-            onClick={() => setShowOrderForm(false)}
-            className="btn btn-secondary"
-          >
-            ← Back to Catalogue
-          </button>
-        </div>
-        <div className="card">
-          <SalesOrderForm
-            products={formattedProducts}
-            onOrderPlaced={() => setShowOrderForm(false)}
-          />
-        </div>
-      </div>
-    );
-  }
+  }, [products, searchTerm, showOnlyInStock, sortBy, sortOrder, sourceFilter]);
 
   return (
     <div className="dashboard-content">
       <div className="section-header">
         <div>
-          <h1>Product Catalogue</h1>
-          <div className="section-sub">Browse and order finished goods from available stock</div>
+          <h1>Sales Catalogue</h1>
+          <div className="section-sub">Live sellable stock from finished goods and product inventory</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowOrderForm(true)}>
-          Place Sales Order
-        </button>
+        <Link href="/sales/new" className="btn btn-primary">
+          <ShoppingCart size={16} /> New sales order
+        </Link>
       </div>
 
-      {/* Search and Filter Controls */}
-      <div className="card">
-        <div style={{
-          display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: 1, minWidth: '250px' }}>
-            <input
-              type="text"
-              placeholder="Search by name or code..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--surface2)',
-                border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '8px 12px',
-                color: 'var(--text)',
-                fontSize: '14px',
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
-              onBlur={(e) => e.target.style.borderColor = 'var(--border2)'}
-            />
+      <div className="stats-grid">
+        <div className="stat-card teal">
+          <div className="stat-label">Catalogue items</div>
+          <div className="stat-value">{products.length.toLocaleString()}</div>
+          <div className="stat-sub">Records available from the database</div>
+        </div>
+        <div className="stat-card amber">
+          <div className="stat-label">Available quantity</div>
+          <div className="stat-value">{stats.totalQty.toLocaleString()}</div>
+          <div className="stat-sub">Finished goods plus product stock</div>
+        </div>
+        <div className="stat-card purple">
+          <div className="stat-label">Finished goods</div>
+          <div className="stat-value">{stats.manufactured.toLocaleString()}</div>
+          <div className="stat-sub">Manufactured stock lines</div>
+        </div>
+        <div className="stat-card blue">
+          <div className="stat-label">Stock value</div>
+          <div className="stat-value sales-money">{formatKES(stats.totalValue)}</div>
+          <div className="stat-sub">Based on configured unit costs</div>
+        </div>
+      </div>
+
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Filter Catalogue</div>
+            <div className="section-sub">Search by product, SKU, category, or stock source</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              fontSize: '13px'
-            }}>
+          <span className="badge badge-muted">{filteredProducts.length.toLocaleString()} shown</span>
+        </div>
+
+        <div className="sales-search-form">
+          <div className="form-group">
+            <label className="form-label">Search</label>
+            <div style={{ position: "relative" }}>
+              <Search size={16} style={{ position: "absolute", left: 12, top: 12, color: "var(--muted)" }} />
               <input
-                type="checkbox"
-                checked={showOnlyInStock}
-                onChange={(e) => setShowOnlyInStock(e.target.checked)}
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  accentColor: 'var(--accent)'
-                }}
+                type="search"
+                className="form-input"
+                style={{ paddingLeft: 36, paddingRight: searchTerm ? 36 : undefined }}
+                placeholder="Search name, SKU, category..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
               />
-              <span style={{ color: 'var(--text)' }}>In stock only</span>
-            </label>
+              {searchTerm && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setSearchTerm("")}
+                  style={{ position: "absolute", right: 10, top: 10, color: "var(--muted)", background: "transparent", border: 0 }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label style={{
-              fontSize: '13px',
-              fontWeight: 500,
-              color: 'var(--text)'
-            }}>
-              Sort by:
-            </label>
+
+          <div className="form-group">
+            <label className="form-label">Source</label>
             <select
+              className="form-input"
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
+            >
+              <option value="all">All sources</option>
+              <option value="manufactured">Finished goods</option>
+              <option value="product">Product stock</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Sort by</label>
+            <select
+              className="form-input"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              style={{
-                background: 'var(--surface2)',
-                border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '6px 10px',
-                color: 'var(--text)',
-                fontSize: '13px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
+              onChange={(event) => setSortBy(event.target.value as SortOption)}
             >
               <option value="name">Name</option>
-              <option value="code">Code</option>
-              <option value="price">Price</option>
+              <option value="code">SKU/code</option>
               <option value="quantity">Quantity</option>
-              <option value="date">Date Added</option>
+              <option value="price">Unit cost</option>
+              <option value="date">Date added</option>
             </select>
-            <button
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="btn btn-secondary"
-              style={{ padding: '6px 10px', fontSize: '12px' }}
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </button>
           </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setSortOrder((current) => (current === "asc" ? "desc" : "asc"))}
+          >
+            <ArrowUpDown size={16} /> {sortOrder === "asc" ? "Ascending" : "Descending"}
+          </button>
+
+          <label className="btn btn-ghost" style={{ cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={showOnlyInStock}
+              onChange={(event) => setShowOnlyInStock(event.target.checked)}
+            />
+            In stock
+          </label>
         </div>
       </div>
 
-      {/* Products Table */}
       <div className="card">
-        <div className="section-header">
+        <div className="section-header mb-16">
           <div>
-            <div className="section-title">Available Products</div>
-            <div className="section-sub">
-              {filteredAndSortedProducts.length} product{filteredAndSortedProducts.length !== 1 ? 's' : ''} available
-            </div>
+            <div className="section-title">Catalogue Stock</div>
+            <div className="section-sub">All rows are fetched from tenant-scoped database records</div>
           </div>
         </div>
 
-        {filteredAndSortedProducts.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px 20px',
-            color: 'var(--muted)'
-          }}>
-            <div style={{
-              display: 'inline-block',
-              marginBottom: '12px'
-            }}>
-              <div style={{
-                padding: '16px',
-                background: 'var(--surface2)',
-                border: '1px solid var(--border2)',
-                borderRadius: 'var(--radius)',
-                display: 'inline-block'
-              }}>
-                📦
-              </div>
-            </div>
-            <p style={{
-              fontSize: '14px',
-              color: 'var(--muted)',
-              marginBottom: '4px'
-            }}>
-              No products found
-            </p>
-            <p style={{
-              fontSize: '12px',
-              color: 'var(--muted)'
-            }}>
-              {products.length === 0
-                ? "No finished goods available in catalogue."
-                : "Try adjusting your search or filter criteria."}
-            </p>
+        {filteredProducts.length === 0 ? (
+          <div className="p-8 text-center text-muted">
+            <Package size={28} style={{ margin: "0 auto 10px" }} />
+            <div>No catalogue items match the current filters.</div>
           </div>
         ) : (
           <div className="table-wrap">
@@ -284,57 +237,42 @@ export default function CatalogueClient({ products }: { products: CatalogueProdu
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>Code</th>
-                  <th>Description</th>
-                  <th>Weight</th>
-                  <th>Stock</th>
-                  <th>Price</th>
+                  <th>Source</th>
+                  <th>Category</th>
+                  <th className="text-right">Available</th>
+                  <th className="text-right">Pieces/sets</th>
+                  <th className="text-right">Weight</th>
+                  <th className="text-right">Unit cost</th>
+                  <th>Branch</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredAndSortedProducts.map(p => (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight: 500, color: 'var(--text)' }}>
-                      {p.name}
+                {filteredProducts.map((product) => (
+                  <tr key={`${product.source}-${product.id}`}>
+                    <td>
+                      <div className="font-medium text-text">{product.name}</div>
+                      <div className="section-sub font-mono">{product.code}</div>
+                      {product.description && <div className="section-sub">{product.description}</div>}
                     </td>
                     <td>
-                      <code style={{
-                        fontSize: '11px',
-                        fontFamily: 'var(--font-mono)',
-                        color: 'var(--blue)',
-                        background: 'rgba(74,158,255,0.1)',
-                        padding: '2px 6px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid rgba(74,158,255,0.2)'
-                      }}>
-                        {p.code}
-                      </code>
-                    </td>
-                    <td style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                      {products.find(prod => prod.id === p.id)?.design?.description || 'Standard finish'}
-                    </td>
-                    <td style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 500,
-                      color: 'var(--green)'
-                    }}>
-                      {p.kgProduced.toFixed(2)} kg
-                    </td>
-                    <td>
-                      <span style={{
-                        fontWeight: 500,
-                        color: p.availableQty > 0 ? 'var(--green)' : 'var(--red)'
-                      }}>
-                        {p.availableQty} kg
+                      <span className={`badge ${product.source === "manufactured" ? "badge-purple" : "badge-blue"}`}>
+                        {sourceLabel(product.source)}
                       </span>
                     </td>
-                    <td style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 500,
-                      color: 'var(--accent)'
-                    }}>
-                      {p.price > 0 ? formatKES(p.price) : 'TBD'}
+                    <td>{product.category}</td>
+                    <td className="text-right">
+                      <span className={`badge ${stockBadgeClass(product.quantity)}`}>
+                        {product.quantity.toLocaleString()} {product.uom}
+                      </span>
                     </td>
+                    <td className="text-right font-mono">{product.piecesSets.toLocaleString()}</td>
+                    <td className="text-right font-mono">
+                      {product.kgProduced > 0 ? `${product.kgProduced.toLocaleString()} kg` : "-"}
+                    </td>
+                    <td className="text-right font-mono">
+                      {product.price != null ? formatKES(product.price) : "TBD"}
+                    </td>
+                    <td className="section-sub">{product.branchName ?? "Main stock"}</td>
                   </tr>
                 ))}
               </tbody>

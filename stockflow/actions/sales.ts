@@ -268,6 +268,134 @@ export async function confirmDraft(orderId: string) {
   revalidatePath('/stock')
 }
 
+export async function updateDraftSalesOrder(formData: FormData) {
+  const orderId = String(formData.get('order_id') || '')
+  const customerName = String(formData.get('customer_name') || '').trim()
+  const confirmAfterSave = formData.get('confirm_after_save') === 'true'
+
+  if (!orderId) return { error: 'Order is required' }
+  if (!customerName) return { error: 'Customer name is required' }
+
+  const lines: Array<{
+    id: string
+    quantity: number
+    unitPrice: number
+    piecesSets: number
+  }> = []
+  let i = 0
+  while (formData.has(`line_${i}_id`)) {
+    const id = String(formData.get(`line_${i}_id`) || '')
+    const quantity = Number(formData.get(`line_${i}_quantity`))
+    const unitPrice = Number(formData.get(`line_${i}_unit_price`))
+    const piecesSets = Number(formData.get(`line_${i}_pieces_sets`))
+    if (!id) return { error: 'Invalid line item' }
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      return { error: 'Quantity must be a positive whole number' }
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return { error: 'Unit price cannot be negative' }
+    }
+    if (!Number.isFinite(piecesSets) || piecesSets < 0) {
+      return { error: 'Sets/pcs cannot be negative' }
+    }
+    lines.push({ id, quantity, unitPrice, piecesSets })
+    i++
+  }
+
+  if (lines.length === 0) return { error: 'Add at least one line item' }
+
+  try {
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const existing = await db.saleOrder.findFirst({
+      where: { id: orderId },
+      include: { SaleItem: { select: { id: true } } },
+    })
+    if (!existing) return { error: 'Order not found' }
+    if (existing.status !== 'PENDING') return { error: 'Only draft orders can be edited' }
+
+    const existingLineIds = new Set(existing.SaleItem.map((line) => line.id))
+    if (lines.some((line) => !existingLineIds.has(line.id))) {
+      return { error: 'One or more line items do not belong to this order' }
+    }
+
+    await withTenantTransaction(user.organizationId, async (tx) => {
+      const current = await tx.saleOrder.findFirst({
+        where: { id: orderId },
+        include: { SaleItem: { include: { FinishedGoods: true } } },
+      })
+      if (!current) throw new Error('Order not found')
+      if (current.status !== 'PENDING') throw new Error('Only draft orders can be edited')
+
+      const totalAmount = lines.reduce((sum, line) => sum + line.unitPrice * line.piecesSets, 0)
+
+      await tx.saleOrder.update({
+        where: { id: orderId },
+        data: { customerName, totalAmount },
+      })
+
+      for (const line of lines) {
+        await tx.saleItem.update({
+          where: { id: line.id },
+          data: {
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            totalPrice: line.unitPrice * line.piecesSets,
+          },
+        })
+      }
+
+      if (confirmAfterSave) {
+        const updated = await tx.saleOrder.findFirst({
+          where: { id: orderId },
+          include: { SaleItem: { include: { FinishedGoods: true } } },
+        })
+        if (!updated) throw new Error('Order not found after update')
+        await reserveSaleOrder(tx, updated)
+      }
+    }, { maxWait: 10000, timeout: 30000 })
+
+    revalidatePath('/sales')
+    revalidatePath(`/sales/${orderId}`)
+    revalidatePath('/stock')
+    return { success: true }
+  } catch (error) {
+    console.error('updateDraftSalesOrder failed:', error)
+    return {
+      error: error instanceof Error ? error.message : 'Failed to update draft order',
+    }
+  }
+}
+
+export async function deleteDraftSalesOrder(orderId: string) {
+  try {
+    const user = await requireActiveAuth()
+    const db = getTenantPrisma(user.organizationId)
+
+    const order = await db.saleOrder.findFirst({
+      where: { id: orderId },
+      select: { id: true, status: true },
+    })
+    if (!order) return { error: 'Order not found' }
+    if (order.status !== 'PENDING') {
+      return { error: 'Only draft invoices can be deleted' }
+    }
+
+    await db.saleOrder.delete({
+      where: { id: orderId },
+    })
+
+    revalidatePath('/sales')
+    return { success: true }
+  } catch (error) {
+    console.error('deleteDraftSalesOrder failed:', error)
+    return {
+      error: error instanceof Error ? error.message : 'Failed to delete draft invoice',
+    }
+  }
+}
+
 export async function cancelOrder(orderId: string, reason: string) {
   if (!reason || reason.trim().length < 3) {
     throw new Error('Cancellation reason is required (at least 3 characters)')

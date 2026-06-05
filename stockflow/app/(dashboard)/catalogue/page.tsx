@@ -16,7 +16,20 @@ export default async function CataloguePage() {
     }),
     db.product.findMany({
       where: { currentStock: { gt: 0 } },
-      select: { id: true, name: true, sku: true, currentStock: true, uom: true, origin: true, unitCost: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        category: true,
+        currentStock: true,
+        piecesSets: true,
+        uom: true,
+        origin: true,
+        unitCost: true,
+        createdAt: true,
+        Branch: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
     }),
   ]);
   const availableBySku = new Map(finishedGoods.map(item => [item.sku, item.quantity]));
@@ -24,32 +37,39 @@ export default async function CataloguePage() {
    // Manufactured items
    const manufactured = finishedGoods.map(p => ({
      id: p.id,
-     design: {
-       name: p.design.name,
-       code: p.design.code,
-       description: p.design.description ?? undefined,
-     },
+     name: p.design.name,
+     code: p.sku || p.design.code,
+     description: p.design.description ?? '',
      quantity: p.quantity,
+     reservedQuantity: p.reservedQuantity,
      kgProduced: Number(p.kgProduced),
+     piecesSets: p.quantity,
+     uom: 'pcs',
+     category: 'Finished goods',
+     origin: 'FACTORY_MADE',
      price: p.unitCost ?? null,
      createdAt: p.createdAt.toISOString(),
+     branchName: null,
      source: 'manufactured' as const,
    }));
 
    // Other sellable products from the main catalog
    const others = generalProducts.map(p => ({
      id: p.id,
-     design: {
-       name: p.name,
-       code: p.sku || p.id.slice(0, 8),
-       description: undefined,
-     },
+     name: p.name,
+     code: p.sku || p.id.slice(0, 8),
+     description: '',
      quantity: p.sku && availableBySku.has(p.sku)
        ? availableBySku.get(p.sku)!
        : Math.floor(p.currentStock),
      kgProduced: 0,
+     piecesSets: p.piecesSets,
+     uom: p.uom,
+     category: p.category,
+     origin: p.origin,
      price: p.unitCost ?? null,
      createdAt: p.createdAt.toISOString(),
+     branchName: p.Branch?.name ?? null,
      source: 'product' as const,
    }));
 
