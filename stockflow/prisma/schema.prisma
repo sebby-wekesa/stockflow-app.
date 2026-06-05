@@ -543,6 +543,7 @@ model ProductionOrderMaterial {
   cutLength         Decimal?        @db.Decimal(10, 4)
   pieces            Int
   totalLength       Decimal?        @db.Decimal(10, 4)
+  weightKg          Decimal?        @db.Decimal(10, 4)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)

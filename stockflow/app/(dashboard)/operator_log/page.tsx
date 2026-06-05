@@ -20,9 +20,14 @@ export default function OperatorLogIndexPage() {
         const activeDepartments = await getActiveDepartments();
         setDepartments(activeDepartments);
         setSelectedDept(activeDepartments[0] || "");
+        if (activeDepartments.length === 0) {
+          setOrders([]);
+          setLoading(false);
+        }
       } catch {
         setDepartments([]);
         setSelectedDept("");
+        setOrders([]);
         setLoading(false);
       }
     }
@@ -32,8 +37,6 @@ export default function OperatorLogIndexPage() {
 
   useEffect(() => {
     if (!selectedDept) {
-      setOrders([]);
-      setLoading(false);
       return;
     }
 

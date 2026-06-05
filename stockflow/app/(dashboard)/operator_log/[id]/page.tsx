@@ -171,7 +171,7 @@ export default function OperatorLogPage() {
                 <option value="">Choose material...</option>
                 {order.materials.map((line: any) => (
                   <option key={line.id} value={line.id}>
-                    {line.RawMaterial.materialName} {line.RawMaterial.width || line.RawMaterial.diameter || ""}x{line.RawMaterial.height || line.RawMaterial.length || ""} · {line.pieces} pcs
+                    {line.RawMaterial.materialName} {line.RawMaterial.width || line.RawMaterial.diameter || ""}x{line.RawMaterial.height || line.RawMaterial.length || ""} · {line.pieces} pcs · {line.weightKg ?? "no"} kg planned
                   </option>
                 ))}
               </select>
@@ -182,7 +182,7 @@ export default function OperatorLogPage() {
             <div className="card-sm mb-16">
               <strong>{selectedMaterial.RawMaterial.materialName}</strong>
               <div className="section-sub">
-                {selectedMaterial.pieces} pcs planned · {selectedMaterial.totalLength ?? "no"} total length · {selectedMaterial.RawMaterial.availableKg.toFixed(2)} kg available
+                {selectedMaterial.pieces} pcs planned · {selectedMaterial.weightKg ?? "no"} kg planned · {selectedMaterial.totalLength ?? "no"} total length · {selectedMaterial.RawMaterial.availableKg.toFixed(2)} kg and {selectedMaterial.RawMaterial.availablePieces} pcs available
               </div>
             </div>
           )}

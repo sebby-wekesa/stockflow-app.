@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
         cutLength: line.cutLength === '' || line.cutLength == null ? null : Number(line.cutLength),
         pieces: Number(line.pieces),
         totalLength: line.totalLength === '' || line.totalLength == null ? null : Number(line.totalLength),
+        weightKg: line.weightKg === '' || line.weightKg == null ? null : Number(line.weightKg),
       }))
 
       for (const line of normalizedLines) {
@@ -99,18 +100,40 @@ export async function POST(request: NextRequest) {
         if (line.totalLength != null && line.totalLength < 0) {
           return NextResponse.json({ error: 'Total length cannot be negative' }, { status: 400 })
         }
+        if (line.weightKg == null || !Number.isFinite(line.weightKg) || line.weightKg <= 0) {
+          return NextResponse.json({ error: 'Each material line needs positive weight used in kg' }, { status: 400 })
+        }
       }
 
       const materialIds = [...new Set(normalizedLines.map((line) => line.rawMaterialId))]
       const materials = await db.rawMaterial.findMany({
         where: { id: { in: materialIds } },
-        select: { id: true },
+        select: { id: true, materialName: true, availableKg: true, availablePieces: true },
       })
       if (materials.length !== materialIds.length) {
         return NextResponse.json({ error: 'One or more raw materials were not found' }, { status: 400 })
       }
 
-      const targetKg = Number(initialWeight) > 0 ? Number(initialWeight) : 0.0001
+      const materialById = new Map(materials.map((material) => [material.id, material]))
+      for (const line of normalizedLines) {
+        const material = materialById.get(line.rawMaterialId)
+        if (!material) continue
+        const weightKg = line.weightKg ?? 0
+        if (Number(material.availableKg) < weightKg) {
+          return NextResponse.json(
+            { error: `Insufficient kg for ${material.materialName}. Available: ${Number(material.availableKg).toFixed(2)}kg, requested: ${weightKg.toFixed(2)}kg` },
+            { status: 400 }
+          )
+        }
+        if (material.availablePieces < line.pieces) {
+          return NextResponse.json(
+            { error: `Insufficient pieces for ${material.materialName}. Available: ${material.availablePieces}, requested: ${line.pieces}` },
+            { status: 400 }
+          )
+        }
+      }
+
+      const targetKg = normalizedLines.reduce((sum, line) => sum + (line.weightKg ?? 0), 0)
       const productionOrder = await db.productionOrder.create({
         data: {
           orderNumber: generatedOrderNumber,
@@ -128,6 +151,7 @@ export async function POST(request: NextRequest) {
               cutLength: line.cutLength,
               pieces: line.pieces,
               totalLength: line.totalLength,
+              weightKg: line.weightKg,
             })),
           },
         } as any,
@@ -165,6 +189,7 @@ export async function POST(request: NextRequest) {
               ...line,
               cutLength: line.cutLength == null ? null : Number(line.cutLength),
               totalLength: line.totalLength == null ? null : Number(line.totalLength),
+              weightKg: line.weightKg == null ? null : Number(line.weightKg),
             })),
           },
         },

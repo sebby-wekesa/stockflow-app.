@@ -1,32 +1,26 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CreateProductionOrderForm } from '@/components/CreateProductionOrderForm'
+import { ProductionOrderTabs } from '@/components/ProductionOrderTabs'
 import { ToastProvider } from '@/components/Toast'
 import { Package } from 'lucide-react'
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
-  const [designs, setDesigns] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+
+  async function refreshOrders() {
+    const ordersRes = await fetch('/api/production-orders')
+    if (ordersRes.ok) {
+      const ordersData = await ordersRes.json()
+      setOrders(Array.isArray(ordersData) ? ordersData : Array.isArray(ordersData.data) ? ordersData.data : [])
+    }
+  }
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [ordersRes, designsRes] = await Promise.all([
-          fetch('/api/production-orders'),
-          fetch('/api/designs'),
-        ])
-
-        if (ordersRes.ok) {
-          const ordersData = await ordersRes.json()
-          setOrders(Array.isArray(ordersData) ? ordersData : [])
-        }
-
-        if (designsRes.ok) {
-          const designsData = await designsRes.json()
-          setDesigns(Array.isArray(designsData) ? designsData : [])
-        }
+        await refreshOrders()
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -55,15 +49,7 @@ export default function OrdersPage() {
 
         {/* Create Order Form */}
         <div className="mb-6">
-          <CreateProductionOrderForm
-            designs={designs}
-            onSuccess={() => {
-              // Refresh orders list
-              fetch('/api/production-orders')
-                .then((res) => res.json())
-                .then((data) => setOrders(Array.isArray(data) ? data : []))
-            }}
-          />
+          <ProductionOrderTabs onSuccess={refreshOrders} />
         </div>
 
         {/* Orders List */}
@@ -183,7 +169,7 @@ export default function OrdersPage() {
                         </code>
                       </td>
                       <td style={{ fontWeight: 500, color: 'var(--text)' }}>
-                        {order.design?.name || 'Unknown'}
+                        {order.designName || order.design?.name || 'Unknown'}
                       </td>
                       <td style={{
                         fontFamily: 'var(--font-mono)',

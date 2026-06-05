@@ -36,6 +36,7 @@ export type ProductionOutputResult = {
   actualPieces: number;
   expectedPieces: number;
   materialConsumedKg: number;
+  materialConsumedPieces: number;
 };
 
 export async function recordProductionOutput(data: {
@@ -103,9 +104,15 @@ export async function recordProductionOutput(data: {
     }
 
     const availableKg = Number(selectedLine.RawMaterial.availableKg);
+    const piecesUsed = Number(selectedLine.pieces);
     if (availableKg < weightIn) {
       throw new Error(
         `Insufficient stock for ${selectedLine.RawMaterial.materialName}. Available: ${availableKg.toFixed(2)}kg, requested: ${weightIn.toFixed(2)}kg`
+      );
+    }
+    if (selectedLine.RawMaterial.availablePieces < piecesUsed) {
+      throw new Error(
+        `Insufficient pieces for ${selectedLine.RawMaterial.materialName}. Available: ${selectedLine.RawMaterial.availablePieces}, requested: ${piecesUsed}`
       );
     }
 
@@ -113,6 +120,7 @@ export async function recordProductionOutput(data: {
       where: { id: selectedLine.rawMaterialId },
       data: {
         availableKg: { decrement: weightIn },
+        availablePieces: { decrement: piecesUsed },
       },
     });
 
@@ -121,7 +129,7 @@ export async function recordProductionOutput(data: {
         productionOrderId: order.id,
         rawMaterialId: selectedLine.rawMaterialId,
         quantityConsumed: weightIn,
-        notes: data.notes?.trim() || "Consumed when direct order output was recorded",
+        notes: data.notes?.trim() || `Consumed ${weightIn}kg and ${piecesUsed} pieces/sets when direct order output was recorded`,
       },
     });
 
@@ -150,6 +158,7 @@ export async function recordProductionOutput(data: {
       actualPieces,
       expectedPieces: order.expectedPieces,
       materialConsumedKg: weightIn,
+      materialConsumedPieces: piecesUsed,
     };
   });
 }
