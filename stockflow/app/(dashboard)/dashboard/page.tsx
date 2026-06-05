@@ -1,5 +1,4 @@
 import { requireAuth } from '@/lib/auth'
-import { Role } from '@/lib/auth'
 
 import { TeamRole } from '@/lib/proxy'
 import OperatorDashboard from '../operator/OperatorDashboard'
@@ -11,17 +10,9 @@ import PackagingDashboard from '@/components/PackagingDashboard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ previewRole?: string }>
-}) {
-  const params = await searchParams;
+export default async function DashboardPage() {
   const user = await requireAuth();
-
-  // Use previewRole from URL if present, else user role
-  const effectiveRole = (params.previewRole || user.role).toUpperCase() as Role;
-  const role = effectiveRole.toLowerCase() as TeamRole;
+  const role = user.role.toLowerCase() as TeamRole;
   return await TeamDashboard({ role, user });
 }
 

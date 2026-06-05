@@ -17,5 +17,18 @@ export default async function DesignsPage() {
     orderBy: { createdAt: 'desc' }
   });
 
-  return <DesignsClient designs={designs} />;
+  const plainDesigns = designs.map((design) => ({
+    ...design,
+    targetWeight: design.targetWeight == null ? null : Number(design.targetWeight),
+    createdAt: design.createdAt.toISOString(),
+    updatedAt: design.updatedAt.toISOString(),
+    lastSeenAt: design.lastSeenAt?.toISOString() ?? null,
+    stages: design.stages.map((stage) => ({
+      ...stage,
+      createdAt: stage.createdAt.toISOString(),
+      updatedAt: stage.updatedAt.toISOString(),
+    })),
+  }));
+
+  return <DesignsClient designs={plainDesigns} />;
 }

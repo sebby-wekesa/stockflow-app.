@@ -41,40 +41,42 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
       return [
         { section: "Overview" },
         { label: "Dashboard", href: "/dashboard" },
-        { section: "Production" },
-        { label: "Approvals", href: "/approvals" },
-        { label: "Job cards", href: "/jobs" },
-        { label: "Design", href: "/designs" },
-        { label: "Raw materials", href: "/rawmaterials" },
-        { section: "Inventory" },
-        { label: "Stock overview", href: "/stock" },
+        { section: "System" },
+        { label: "User management", href: "/users" },
+        { label: "Departments", href: "/departments" },
+        { label: "System settings", href: "/admin/settings" },
+        { section: "Templates" },
+        { label: "Design templates", href: "/designs" },
         { label: "Products", href: "/products" },
-        { section: "Sales" },
-        { label: "Sales orders", href: "/sales" },
-        { label: "Customers", href: "/customers" },
+        { section: "Inventory" },
+        { label: "Raw material receipts", href: "/receive" },
+        { label: "Raw materials", href: "/rawmaterials" },
+        { label: "Inventory overview", href: "/stock" },
+        { section: "Production" },
+        { label: "Production approvals", href: "/approvals" },
+        { label: "Production orders", href: "/jobs" },
         { section: "Data" },
         { label: "Import centre", href: "/import" },
+        { section: "Reports" },
         { label: "Reports", href: "/reports" },
-        { section: "Settings" },
-        { label: "Users", href: "/users" },
+        { label: "Scrap and yield", href: "/admin/yield" },
       ];
 
     case 'MANAGER':
       return [
-        { section: "Overview" },
-        { label: "Dashboard", href: "/dashboard" },
-        { section: "Production" },
-        { label: "Approvals", href: "/approvals" },
-        { label: "Job cards", href: "/jobs" },
-        { label: "Design", href: "/designs" },
-        { label: "Raw materials", href: "/rawmaterials" },
-        { section: "Inventory" },
-        { label: "Stock overview", href: "/stock" },
-        { section: "Sales" },
-        { label: "New order", href: "/sales/new" },
-        { label: "Sales orders", href: "/sales" },
-        { section: "Reports" },
+        { section: "Production Control" },
+        { label: "Production dashboard", href: "/dashboard" },
+        { label: "Approval queue", href: "/approvals" },
+        { label: "Department monitoring", href: "/jobs" },
+        { label: "Production orders", href: "/orders" },
+        { section: "Investigation" },
+        { label: "Scrap reports", href: "/scrap" },
         { label: "Reports", href: "/reports" },
+        { section: "Reference" },
+        { label: "Design templates", href: "/designs" },
+        { label: "Inventory overview", href: "/stock" },
+        { section: "Data" },
+        { label: "Import centre", href: "/import" },
       ];
 
     case 'OPERATOR':
@@ -82,35 +84,36 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { section: "My Work" },
         { label: "Dashboard", href: "/dashboard" },
         {
-          label: "Job queue",
+          label: "My queue",
           href: "/operator_queue",
           badge: counts.operatorQueue && counts.operatorQueue > 0 ? String(counts.operatorQueue) : undefined,
           badgeColor: "purple",
         },
+        { label: "Stage logging", href: "/operator_log" },
         { section: "History" },
-        { label: "Completed jobs", href: "/operator_history" },
+        { label: "Job history", href: "/operator_history" },
       ];
 
     case 'SALES':
       return [
         { section: "Sales" },
         { label: "Dashboard", href: "/dashboard" },
-        { label: "New order", href: "/sales/new" },
-        { label: "Order history", href: "/sales" },
-        { section: "Catalogue" },
-        { label: "Available stock", href: "/catalogue" },
+        { label: "Sales catalogue", href: "/catalogue" },
+        { label: "New sale order", href: "/sales/new" },
+        { label: "Customer orders", href: "/sales" },
       ];
 
     case 'PACKAGING':
       return [
         { section: "Fulfilment" },
         {
-          label: "Pending orders",
+          label: "Packaging queue",
           href: "/packaging",
           badge: counts.packagingQueue && counts.packagingQueue > 0 ? String(counts.packagingQueue) : undefined,
           badgeColor: "purple",
         },
-        { label: "Ready for dispatch", href: "/pack_done" },
+        { label: "Fulfillment screen", href: "/pack_queue" },
+        { label: "Daily summary", href: "/pack_done" },
       ];
 
     case 'WAREHOUSE':
