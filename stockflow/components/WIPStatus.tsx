@@ -9,8 +9,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const DEPARTMENTS = ["Cutting", "Forging", "Threading", "Quality Control", "Packaging"];
-
 interface WIPOrder {
   currentDept: string;
   targetKg: number;
@@ -21,6 +19,8 @@ interface WIPStatusProps {
 }
 
 export default function WIPStatus({ orders }: WIPStatusProps) {
+  const departments = Array.from(new Set((orders || []).map((order) => order.currentDept).filter(Boolean)));
+
   return (
     <div className="bg-[#161719] border border-[#2a2d32] rounded-2xl p-6 shadow-2xl relative overflow-hidden backdrop-blur-sm">
       
@@ -47,7 +47,7 @@ export default function WIPStatus({ orders }: WIPStatusProps) {
       </div>
 
       <div className="flex justify-between items-start gap-4 overflow-x-auto pb-4 custom-scrollbar">
-        {DEPARTMENTS.map((dept, index) => {
+        {departments.map((dept, index) => {
           const deptOrders = (orders || []).filter(o => o.currentDept === dept);
           const totalKg = deptOrders.reduce((sum, o) => sum + o.targetKg, 0);
           const hasOrders = deptOrders.length > 0;
@@ -107,7 +107,7 @@ export default function WIPStatus({ orders }: WIPStatusProps) {
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
               </div>
 
-              {index < DEPARTMENTS.length - 1 && (
+              {index < departments.length - 1 && (
                 <div className="mt-6 hidden md:block opacity-20">
                   <ArrowRight size={18} className="text-[#7a8090]" />
                 </div>
@@ -115,6 +115,9 @@ export default function WIPStatus({ orders }: WIPStatusProps) {
             </motion.div>
           );
         })}
+        {departments.length === 0 && (
+          <div className="text-sm text-[#7a8090]">No active production departments.</div>
+        )}
       </div>
     </div>
   );

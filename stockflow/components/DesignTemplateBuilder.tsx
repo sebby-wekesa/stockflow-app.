@@ -40,21 +40,6 @@ interface DesignTemplateBuilderProps {
   }>;
 }
 
-const AVAILABLE_STAGES = [
-  { name: 'Cutting', department: 'Cutting' },
-  { name: 'Chamfering', department: 'Cutting' },
-  { name: 'Forging', department: 'Forging' },
-  { name: 'Skimming', department: 'Forging' },
-  { name: 'Threading', department: 'Threading' },
-  { name: 'Locking', department: 'Threading' },
-  { name: 'Electroplating', department: 'Electroplating' },
-  { name: 'Drilling', department: 'Drilling' },
-  { name: 'Grinding', department: 'Grinding' },
-  { name: 'Heat Treatment', department: 'Heat Treatment' },
-  { name: 'Quality Control', department: 'Quality Control' },
-  { name: 'Packaging', department: 'Packaging' }
-];
-
 const NO_RAW_MATERIAL_VALUE = 'none';
 
 export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplateBuilderProps) {
@@ -63,6 +48,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rawMaterials, setRawMaterials] = useState<RawMaterialOption[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -86,8 +72,13 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
     try {
       const materials = await getRawMaterials();
       setRawMaterials(materials);
+      const departmentsResponse = await fetch('/api/admin/departments');
+      if (departmentsResponse.ok) {
+        const departmentsJson = await departmentsResponse.json();
+        setDepartments(Array.isArray(departmentsJson.departments) ? departmentsJson.departments : []);
+      }
     } catch {
-      setError('Failed to load raw materials');
+      setError('Failed to load design options');
     } finally {
       setLoading(false);
     }
@@ -220,9 +211,11 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
     }
   };
 
-  const availableStages = AVAILABLE_STAGES.filter(
-    template => !formData.stages.some(s => s.name === template.name && s.department === template.department)
-  );
+  const availableStages = departments
+    .map((department) => ({ name: department, department }))
+    .filter(
+      template => !formData.stages.some(s => s.name === template.name && s.department === template.department)
+    );
 
   return (
     <form onSubmit={handleSubmit} className="design-builder">
@@ -248,7 +241,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                 className="form-input"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g. Hex Bolt M12"
+                placeholder="Design name"
                 required
               />
           </div>
@@ -259,7 +252,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                 className="form-input"
                 value={formData.code}
                 onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                placeholder="e.g. HB-M12"
+                placeholder="Design code"
                 required
               />
           </div>
@@ -270,7 +263,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                 className="form-input"
                 value={formData.category}
                 onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g. Bolt"
+                placeholder="Category"
               />
           </div>
           <div className="form-group">
@@ -317,7 +310,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                 className="form-input"
                 value={formData.targetDimensions}
                 onChange={(e) => setFormData(prev => ({ ...prev, targetDimensions: e.target.value }))}
-                placeholder="e.g. M12 × 70mm"
+                placeholder="Target dimensions"
               />
           </div>
           <div className="form-group">
@@ -364,7 +357,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
               className="form-input"
               value={formData.rodDiameter}
               onChange={(e) => setFormData(prev => ({ ...prev, rodDiameter: e.target.value }))}
-              placeholder="e.g. 12 mm"
+              placeholder="Rod diameter"
             />
           </div>
           <div className="form-group">
@@ -374,7 +367,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
               className="form-input"
               value={formData.length}
               onChange={(e) => setFormData(prev => ({ ...prev, length: e.target.value }))}
-              placeholder="e.g. 70 mm"
+              placeholder="Length"
             />
           </div>
           <div className="form-group">
@@ -384,7 +377,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
               className="form-input"
               value={formData.threadSize}
               onChange={(e) => setFormData(prev => ({ ...prev, threadSize: e.target.value }))}
-              placeholder="e.g. M12"
+              placeholder="Thread size"
             />
           </div>
           <div className="form-group">
@@ -394,7 +387,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
               className="form-input"
               value={formData.headType}
               onChange={(e) => setFormData(prev => ({ ...prev, headType: e.target.value }))}
-              placeholder="e.g. Hex"
+              placeholder="Head type"
             />
           </div>
           <div className="form-group">
@@ -404,7 +397,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
               className="form-input"
               value={formData.finish}
               onChange={(e) => setFormData(prev => ({ ...prev, finish: e.target.value }))}
-              placeholder="e.g. Hot Dip Galvanized"
+              placeholder="Finish"
             />
           </div>
           <div className="form-group">
@@ -479,7 +472,7 @@ export function DesignTemplateBuilder({ onComplete, initialData }: DesignTemplat
                   className="form-input design-textarea"
                   value={stage.specificationText || ''}
                   onChange={(e) => updateStageSpecificationText(stage.id, e.target.value)}
-                  placeholder={`Stage specifications, one per line. Example:\nInput Diameter: 12 mm\nOutput Length: 70 mm`}
+                  placeholder="Stage specifications, one per line"
                   rows={2}
                 />
               </div>

@@ -22,6 +22,18 @@ const packagingOrderInclude = Prisma.validator<Prisma.SaleOrderInclude>()({
 type PackagingSaleOrder = Prisma.SaleOrderGetPayload<{ include: typeof packagingOrderInclude }>
 type PackagingSaleItem = PackagingSaleOrder['SaleItem'][number]
 
+const completedProductionInclude = Prisma.validator<Prisma.ProductionOrderInclude>()({
+  design: { select: { name: true, code: true } },
+  saleOrder: { select: { id: true, customerName: true } },
+  StageLog: {
+    orderBy: { completedAt: 'desc' },
+    take: 1,
+    include: { User: { select: { name: true, email: true } } },
+  },
+})
+
+type CompletedProductionOrder = Prisma.ProductionOrderGetPayload<{ include: typeof completedProductionInclude }>
+
 function assertPackagingAccess(user: PackagingUser) {
   if (user.role !== 'PACKAGING' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only packaging staff can access this queue');
@@ -62,6 +74,26 @@ function isPackableOrder(order: PackagingSaleOrder) {
     const finishedGoods = item.FinishedGoods;
     return finishedGoods && finishedGoods.reservedQuantity >= item.quantity;
   });
+}
+
+function toCompletedProductionWork(order: CompletedProductionOrder) {
+  const lastLog = order.StageLog[0]
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    productName: order.design?.name ?? order.productName ?? 'Direct order',
+    productCode: order.design?.code ?? null,
+    customerName: order.saleOrder?.customerName ?? null,
+    completedAt: order.completedAt ?? order.updatedAt,
+    operatorName: lastLog?.User?.name ?? lastLog?.User?.email ?? 'Unknown operator',
+    department: lastLog?.department ?? order.currentDept ?? 'Completed',
+    kgOut: lastLog?.kgOut == null
+      ? order.actualWeightOut == null
+        ? Number(order.targetKg)
+        : Number(order.actualWeightOut)
+      : Number(lastLog.kgOut),
+    piecesOut: lastLog?.piecesOut ?? order.actualPieces ?? order.expectedPieces ?? order.quantity,
+  }
 }
 
 export async function getPackagingQueue() {
@@ -245,7 +277,7 @@ export async function getPackagingDashboardData() {
   today.setHours(0, 0, 0, 0)
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const [confirmedOrders, readyForDispatch, recentShipments, shippedToday, shippedWeek] = await Promise.all([
+  const [confirmedOrders, readyForDispatch, recentShipments, shippedToday, shippedWeek, completedProduction] = await Promise.all([
     db.saleOrder.findMany({
       where: { status: 'CONFIRMED' },
       include: packagingOrderInclude,
@@ -270,6 +302,11 @@ export async function getPackagingDashboardData() {
       where: { status: 'SHIPPED', updatedAt: { gte: weekStart } },
       _sum: { totalAmount: true },
     }),
+    db.productionOrder.findMany({
+      where: { status: 'COMPLETED' },
+      include: completedProductionInclude,
+      orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
+    }),
   ])
 
   const queue = confirmedOrders.filter(isPackableOrder).map(toPackagingOrder)
@@ -279,10 +316,12 @@ export async function getPackagingDashboardData() {
 
   return {
     queue,
+    completedProductionWork: completedProduction.map(toCompletedProductionWork),
     readyForDispatch: readyOrders,
     recentShipments: shippedOrders,
     stats: {
       pendingOrders: queue.length,
+      completedOperatorWork: completedProduction.length,
       shippedToday,
       weeklyRevenue: Number(shippedWeek._sum.totalAmount || 0),
       readyForDispatch: readyOrders.length,

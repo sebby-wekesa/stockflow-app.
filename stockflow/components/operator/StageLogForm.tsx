@@ -14,16 +14,11 @@ export function StageLogForm({ order, onComplete }: { order: any, onComplete: ()
   const [kgScrap, setKgScrap] = useState<number>(0);
   const [scrapReason, setScrapReason] = useState('');
 
-  // Enforce department-specific rules [cite: 55, 56]
   const isValid = useMemo(() => {
-    if (department === 'Electroplating') {
-      return (Number(kgOut) + Number(kgScrap)) >= kgIn && (kgScrap === 0 || scrapReason);
-    } else {
-      const totalAccounted = Number(kgOut) + Number(kgScrap);
-      const difference = Math.abs(kgIn - totalAccounted);
-      return difference < 0.01 && kgOut > 0 && (kgScrap === 0 || scrapReason);
-    }
-  }, [kgOut, kgScrap, kgIn, scrapReason, department]);
+    const totalAccounted = Number(kgOut) + Number(kgScrap);
+    const difference = Math.abs(kgIn - totalAccounted);
+    return difference < 0.01 && kgOut > 0 && (kgScrap === 0 || scrapReason);
+  }, [kgOut, kgScrap, kgIn, scrapReason]);
 
   const handleSubmit = async () => {
     if (!isValid || isSending) return;
@@ -111,35 +106,20 @@ export function StageLogForm({ order, onComplete }: { order: any, onComplete: ()
         {/* Scrap Reason - Select */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-[#e05555] uppercase">Scrap Reason</label>
-          <select
+          <input
+            type="text"
             value={scrapReason}
             onChange={(e) => setScrapReason(e.target.value)}
+            placeholder="Enter reason"
             className="w-full bg-[#1e2023] border border-[#353a40] focus:border-[#e05555] outline-none rounded-xl p-3 text-white"
-          >
-            <option value="">Select Reason</option>
-            {department === 'Cutting' || department === 'Drilling' ? (
-              <>
-                <option value="Swarf">Swarf</option>
-                <option value="Off-cuts">Off-cuts</option>
-              </>
-            ) : department === 'Forging' ? (
-              <>
-                <option value="Scale">Scale</option>
-                <option value="Flash">Flash</option>
-              </>
-            ) : department === 'Electroplating' ? (
-              <option value="Coating Defects">Coating Defects</option>
-            ) : (
-              <option value="General Scrap">General Scrap</option>
-            )}
-          </select>
+          />
         </div>
       </div>
 
       {/* Logic Validation UI [cite: 56, 78] */}
       <div className={`p-4 rounded-xl border flex items-center justify-between ${isValid ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}>
         <p className="text-sm font-medium">
-          {isValid ? "✓ Entry Validated" : (department === 'Electroplating' ? "⚠ Error: Output must be >= Input" : "⚠ Error: Total (Out + Scrap) must equal Received (In)")}
+          {isValid ? "Entry validated" : "Error: Total (Out + Scrap) must equal Received (In)"}
         </p>
         <button 
           disabled={!isValid || isSending}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export function StageInput({ 
-  initialStages = ["Cutting", "Forging", "Threading", "Quality Check"] 
+  initialStages = [""] 
 }: { initialStages?: string[] }) {
   const [stages, setStages] = useState<string[]>(initialStages);
 

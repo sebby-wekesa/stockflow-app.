@@ -23,12 +23,6 @@ export const stageCompletionSchema = z.object({
   notes: z.string().optional(),
 }).refine(
   (data) => {
-    // Special rule for Electroplating: Output can be HIGHER than Input due to coatings
-    if (data.department === 'Electroplating') {
-      return (Number(data.kgOut) + Number(data.kgScrap)) >= Number(data.kgIn);
-    }
-    
-    // Standard rule: In = Out + Scrap
     const total = Number(data.kgOut) + Number(data.kgScrap);
     const balance = Math.abs(total - data.kgIn);
     return balance < 0.01; // Allow for slight rounding

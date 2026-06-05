@@ -85,7 +85,7 @@ export function ProductForm({
               required
               defaultValue={initial?.product_code ?? ''}
               className="form-input w-full font-mono"
-              placeholder="e.g. FH215/FSML"
+              placeholder="Product code"
             />
             <p className="text-xs text-muted mt-1">
               Unique permanent identifier. Cannot be reused if deleted.
@@ -101,7 +101,7 @@ export function ProductForm({
               required
               defaultValue={initial?.canonical_name ?? ''}
               className="form-input w-full"
-              placeholder="e.g. Mitsubishi FH215 Front Spring Main Leaf"
+              placeholder="Canonical product name"
             />
           </div>
 
@@ -228,7 +228,7 @@ export function ProductForm({
                 name="vehicle_make"
                 defaultValue={initial?.vehicle_make ?? ''}
                 className="form-input w-full"
-                placeholder="e.g. Mitsubishi FH 215"
+                placeholder="Vehicle make"
               />
             </div>
 
@@ -240,7 +240,7 @@ export function ProductForm({
                 name="vehicle_model"
                 defaultValue={initial?.vehicle_model ?? ''}
                 className="form-input w-full"
-                placeholder="e.g. FH215"
+                placeholder="Vehicle model"
               />
             </div>
 
@@ -294,7 +294,7 @@ export function ProductForm({
                     min="0"
                     defaultValue={initial?.shaft_size_mm ?? ''}
                     className="form-input w-full"
-                    placeholder="e.g. 24"
+                    placeholder="Shaft size"
                   />
                 </div>
 
@@ -306,7 +306,7 @@ export function ProductForm({
                     name="leg_length_inch"
                     defaultValue={initial?.leg_length_inch ?? ''}
                     className="form-input w-full"
-                    placeholder='e.g. 8"'
+                    placeholder="Leg length"
                   />
                 </div>
               </>

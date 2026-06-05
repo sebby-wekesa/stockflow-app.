@@ -182,7 +182,7 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
               minLength={2}
               maxLength={120}
               className="form-input"
-              placeholder="Jane Doe"
+              placeholder="Full name"
               disabled={isPending}
             />
           </div>

@@ -22,9 +22,9 @@ export default async function PackagingDashboard() {
 
       <div className="stats-grid packaging-stats">
         <div className="stat-card blue">
-          <div className="stat-label">Ready to pack</div>
-          <div className="stat-value">{data.stats.pendingOrders.toLocaleString()}</div>
-          <div className="stat-sub">{data.stats.blockedOrders.toLocaleString()} confirmed waiting on stock</div>
+          <div className="stat-label">Operator work complete</div>
+          <div className="stat-value">{data.stats.completedOperatorWork.toLocaleString()}</div>
+          <div className="stat-sub">Completed production orders from all operators</div>
         </div>
         <div className="stat-card amber">
           <div className="stat-label">Ready for dispatch</div>
@@ -40,6 +40,36 @@ export default async function PackagingDashboard() {
           <div className="stat-label">Shipped this week</div>
           <div className="stat-value packaging-money">{formatKES(data.stats.weeklyRevenue)}</div>
           <div className="stat-sub">Value of completed dispatches</div>
+        </div>
+      </div>
+
+      <div className="card mb-16">
+        <div className="section-header mb-16">
+          <div>
+            <div className="section-title">Completed Operator Work</div>
+            <div className="section-sub">All completed production jobs available to packaging</div>
+          </div>
+          <Link href="/jobs?status=COMPLETED" className="btn btn-ghost btn-sm">View production list</Link>
+        </div>
+        <div className="packaging-list">
+          {data.completedProductionWork.map((work) => (
+            <Link href={`/jobs/${work.id}`} className="packaging-row" key={work.id}>
+              <div>
+                <div className="pack-order">{work.orderNumber} · {new Date(work.completedAt).toLocaleDateString()}</div>
+                <div className="pack-product">{work.productName}</div>
+                <div className="pack-detail">
+                  {work.department} · {work.operatorName}
+                  {work.customerName ? ` · ${work.customerName}` : ''}
+                </div>
+              </div>
+              <span className="job-kg">
+                {work.piecesOut.toLocaleString()} pcs/sets · {work.kgOut.toFixed(1)} kg
+              </span>
+            </Link>
+          ))}
+          {data.completedProductionWork.length === 0 && (
+            <div className="packaging-empty">No completed operator work is available.</div>
+          )}
         </div>
       </div>
 

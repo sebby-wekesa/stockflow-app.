@@ -123,7 +123,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
   // Department throughput for today (from StageLog + active ProductionOrders)
   // Load department list from tenant settings if present
   const { getDepartmentsForOrg } = await import('@/lib/department-settings')
-  const knownDepts = (getDepartmentsForOrg(organizationId) || ['Cutting', 'Forging / chamfer', 'Threading / locking', 'Electroplating', 'Drilling / grinding']);
+  const knownDepts = getDepartmentsForOrg(organizationId);
 
   const activeByDeptRaw = await withRetry<any[]>(() => db.productionOrder.groupBy({
     by: ['currentDept'],
@@ -152,7 +152,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
    const departmentThroughput = knownDepts.map(dept => {
      let s = deptToday.get(dept);
      if (!s) {
-       // fuzzy match (e.g. stored as "Forging" vs "Forging / chamfer")
+       // Fuzzy match configured department variants.
        const lower = dept.toLowerCase();
        for (const [key, val] of deptToday) {
          if (key.toLowerCase().includes(lower.split('/')[0].trim()) || lower.includes(key.toLowerCase().split('/')[0].trim())) {

@@ -116,23 +116,9 @@ export default function LoginPage() {
                    type="text"
                    name="name"
                    className="form-input"
-                   placeholder="e.g. Jane Doe"
+                   placeholder="Full name"
                    required
                  />
-               </div>
-
-               <div className="form-group" style={{ marginBottom: '16px' }}>
-                 <label className="form-label">Branch</label>
-                 <select
-                   name="branch"
-                   className="form-input"
-                   required
-                 >
-                   <option value="">Select a branch</option>
-                   <option value="mombasa">Mombasa HQ — Production + main store</option>
-                   <option value="nairobi">Nairobi — Retail branch</option>
-                   <option value="bonje">Bonje — Retail branch</option>
-                 </select>
                </div>
              </>
            )}

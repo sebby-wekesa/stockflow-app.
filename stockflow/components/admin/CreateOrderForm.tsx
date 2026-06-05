@@ -130,7 +130,7 @@ export function CreateOrderForm({ designs }: { designs: Design[] }) {
             <div className="space-y-2">
               <label className="text-xs font-bold text-[#7a8090] uppercase">Customer Reference</label>
               <input
-                placeholder="e.g. PO-882"
+                placeholder="Customer reference"
                 value={customerRef}
                 onChange={(e) => setCustomerRef(e.target.value)}
                 className="w-full bg-[#1e2023] border border-[#2c2d33] rounded-xl p-3 text-white outline-none focus:border-[#4caf7d]"

@@ -24,14 +24,14 @@ export default function NewCustomerPage() {
               type="text"
               name="name"
               className="form-input w-full"
-              placeholder="e.g. ABC Hardware Ltd"
+              placeholder="Customer name"
               required
             />
           </div>
 
           <div>
             <label className="form-label">Contact person</label>
-            <input type="text" name="contactName" className="form-input w-full" placeholder="e.g. Jane Doe" />
+            <input type="text" name="contactName" className="form-input w-full" placeholder="Contact person" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -41,7 +41,7 @@ export default function NewCustomerPage() {
                 type="tel"
                 name="phone"
                 className="form-input w-full"
-                placeholder="e.g. +254 712 345 678"
+                placeholder="Phone number"
               />
             </div>
 
@@ -51,7 +51,7 @@ export default function NewCustomerPage() {
                 type="email"
                 name="email"
                 className="form-input w-full"
-                placeholder="e.g. contact@company.com"
+                placeholder="Email address"
               />
             </div>
           </div>

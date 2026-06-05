@@ -248,11 +248,6 @@ const OrderCard: React.FC<{
             <span className="text-sm">Reject</span>
           </button>
 
-          {/* Routing Indicator */}
-          <div className="flex items-center gap-2 text-xs text-slate-400 px-2 py-1 bg-slate-900 rounded">
-            <ChevronRight className="w-3 h-3 text-amber-500" />
-            <span>→ Cutting Dept</span>
-          </div>
         </div>
       </div>
     </motion.div>

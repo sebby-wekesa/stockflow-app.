@@ -82,7 +82,10 @@ export async function updateOrderStatus(
           return;
         }
 
-        const firstDepartment = getDepartmentsForOrg(user.organizationId)[0] ?? "Cutting";
+        const firstDepartment = getDepartmentsForOrg(user.organizationId)[0];
+        if (!firstDepartment) {
+          throw new Error("Configure at least one production department before approving direct orders");
+        }
         await tx.productionOrder.update({
           where: { id: orderId },
           data: {

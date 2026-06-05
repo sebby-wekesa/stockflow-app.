@@ -148,7 +148,7 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
             </label>
             <input
               className="form-input"
-              placeholder={isImported ? "e.g. M12 Hex Bolts (ISO)" : "e.g. Long Nuts 500mm"}
+              placeholder={isImported ? "Imported item name" : "Local item name"}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -236,7 +236,7 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
             </label>
             <input
               className="form-input"
-              placeholder={isImported ? "e.g. Nairobi Clearing Co." : "e.g. Jua Kali Supplies Ltd"}
+              placeholder={isImported ? "Importer or clearing agent" : "Vendor or supplier"}
               value={vendor}
               onChange={(e) => setVendor(e.target.value)}
             />
@@ -250,7 +250,7 @@ export function ProductIntakeModal({ open, onClose, onSuccess }: ProductIntakeMo
             </label>
             <input
               className="form-input"
-              placeholder="e.g. GRN-2026-0041"
+              placeholder="GRN or invoice reference"
               value={reference}
               onChange={(e) => setReference(e.target.value)}
             />

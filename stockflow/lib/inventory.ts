@@ -21,7 +21,7 @@ const LANDING_COST_MULTIPLIER = 1.25;
 
 /**
  * Processes a raw string item list into structured inventory data.
- * Example input: "500 Long Nuts (Imported)"
+ * Parses product descriptions imported from inventory sheets.
  */
 export function processStockArrivals(items: string[]): ProcessedItem[] {
   return items.map((rawItem) => {

@@ -5,14 +5,14 @@ import { RAW_MATERIAL_CATEGORIES, type RawMaterialCategory } from "@/lib/raw-mat
 
 export default function ReceivePage() {
   const [category, setCategory] = useState<RawMaterialCategory>("Flat Bars");
-  const [materialName, setMaterialName] = useState("Flat bar 16mm");
-  const [diameter, setDiameter] = useState("16mm");
+  const [materialName, setMaterialName] = useState("");
+  const [diameter, setDiameter] = useState("");
   const [length, setLength] = useState("");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [kgReceived, setKgReceived] = useState("");
   const [piecesReceived, setPiecesReceived] = useState("");
-  const [supplier, setSupplier] = useState("Steel Masters Ltd");
+  const [supplier, setSupplier] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,20 +91,9 @@ export default function ReceivePage() {
                 className="form-input"
                 list="material-types"
                 value={materialName}
-                onChange={(e) => {
-                  setMaterialName(e.target.value);
-                  // Auto-set diameter based on material
-                  if (e.target.value.includes("16mm")) setDiameter("16mm");
-                  else if (e.target.value.includes("20mm")) setDiameter("20mm");
-                  else if (e.target.value.includes("25mm")) setDiameter("25mm");
-                }}
-                placeholder="e.g. Flat bar 16mm or custom type"
+                onChange={(e) => setMaterialName(e.target.value)}
+                placeholder="Material type from inventory"
               />
-              <datalist id="material-types">
-                <option value="Flat bar 16mm" />
-                <option value="Round bar 20mm" />
-                <option value="Spring bush 25mm" />
-              </datalist>
             </div>
           </div>
           <div className="form-row">
@@ -113,7 +102,7 @@ export default function ReceivePage() {
               <input
                 type="number"
                 className="form-input"
-                placeholder="e.g. 200"
+                placeholder="0.00"
                 value={kgReceived}
                 onChange={(e) => setKgReceived(e.target.value)}
                 required
@@ -126,7 +115,7 @@ export default function ReceivePage() {
               <input
                 type="number"
                 className="form-input"
-                placeholder="e.g. 25"
+                placeholder="0"
                 value={piecesReceived}
                 onChange={(e) => setPiecesReceived(e.target.value)}
                 required
@@ -141,7 +130,7 @@ export default function ReceivePage() {
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. 6m"
+                placeholder="Length"
                 value={length}
                 onChange={(e) => setLength(e.target.value)}
                 required
@@ -152,7 +141,7 @@ export default function ReceivePage() {
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. 50mm width or 20mm diameter"
+                placeholder="Width or diameter"
                 value={width}
                 onChange={(e) => setWidth(e.target.value)}
                 required
@@ -165,7 +154,7 @@ export default function ReceivePage() {
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. 10mm"
+                placeholder="Height"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
                 required
@@ -178,7 +167,7 @@ export default function ReceivePage() {
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. GRN-2242"
+                placeholder="GRN or reference"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
               />
@@ -191,12 +180,8 @@ export default function ReceivePage() {
                 list="suppliers"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
-                placeholder="e.g. Steel Masters Ltd or type new supplier"
+                placeholder="Supplier from database"
               />
-              <datalist id="suppliers">
-                <option value="Steel Masters Ltd" />
-                <option value="KenSteel Supply" />
-              </datalist>
             </div>
           </div>
           <div className="form-group mb-16">

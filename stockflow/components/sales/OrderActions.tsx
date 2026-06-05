@@ -135,7 +135,7 @@ function CancelDialog({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             className="input"
-            placeholder="e.g. Customer changed mind · entered in error"
+            placeholder="Cancellation reason"
             autoFocus
           />
         </div>
