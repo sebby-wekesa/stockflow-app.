@@ -10,7 +10,7 @@ export function ExportButtons() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `StockFlow_Yield_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `SpringTech_Yield_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 

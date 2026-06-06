@@ -25,7 +25,7 @@ const syne = Syne({
 });
 
 export const metadata: Metadata = {
-  title: "StockFlow — Manufacturing Platform",
+  title: "SpringTech(K)Ltd",
   description: "Manufacturing ERP",
 };
 

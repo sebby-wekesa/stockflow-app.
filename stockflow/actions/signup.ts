@@ -1,30 +1,24 @@
 'use server'
 
-// Public user signup.
+// Public user signup for the single organization configured in the database.
 //
-// This action runs before a user is authenticated. The user chooses an
-// existing organization, then we create both the Supabase Auth user and the
-// app User row under that organization. Admins can then verify and assign
-// the final role from /users.
+// New accounts remain pending until an administrator assigns their final role.
 
 import { createClient } from '@supabase/supabase-js'
-import { prisma } from '@/lib/prisma'
+import { prisma, withRetry } from '@/lib/prisma'
 import { z } from 'zod'
 import { checkRateLimitAsync, getClientIp } from '@/lib/rate-limit'
 import { validatePassword } from '@/lib/security'
-import { ALL_BRANCHES, normalizeBranchCode } from '@/lib/branches'
+import { getSystemOrganization } from '@/lib/system-organization'
 
 const signUpSchema = z.object({
-  organizationId: z.string().trim().min(1, 'Select a valid organization'),
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8).max(128),
   fullName: z.string().trim().min(2).max(120),
-  branchCode: z.enum(ALL_BRANCHES as [string, ...string[]], {
-    errorMap: () => ({ message: 'Select a valid branch' }),
-  }),
+  branchId: z.string().trim().min(1, 'Select a valid branch'),
 })
 
-export async function signUpOrganization(formData: FormData) {
+export async function signUpUser(formData: FormData) {
   // Rate-limit: 3 signups per hour per IP.
   const ip = await getClientIp()
   const rl = await checkRateLimitAsync(`signup:${ip}`, {
@@ -44,11 +38,10 @@ export async function signUpOrganization(formData: FormData) {
   let data: z.infer<typeof signUpSchema>
   try {
     data = signUpSchema.parse({
-      organizationId: formData.get('organizationId'),
       email: formData.get('email'),
       password: formData.get('password'),
       fullName: formData.get('fullName'),
-      branchCode: formData.get('branchCode'),
+      branchId: formData.get('branchId'),
     })
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -63,39 +56,33 @@ export async function signUpOrganization(formData: FormData) {
     return { error: pw.errors[0] }
   }
 
-  const organization = await prisma.organization.findFirst({
-    where: {
-      id: data.organizationId,
-      status: { in: ['ACTIVE', 'PENDING_APPROVAL'] },
-    },
-    select: { id: true, name: true, status: true },
-  })
-  if (!organization) {
-    return { error: 'Select a valid active organization.' }
+  let organization
+  try {
+    organization = await getSystemOrganization()
+  } catch (error) {
+    console.error('[signup] Single organization configuration error:', error)
+    return { error: 'Account registration is temporarily unavailable. Please contact support.' }
   }
 
-  // Branch rows can use business codes like MSA/NBO/BNJ while the signup UI
-  // submits canonical app codes like mombasa/nairobi/bunje.
-  const branches = await prisma.branch.findMany({
-    where: { organizationId: data.organizationId },
-    select: { id: true, code: true, name: true, location: true },
-  })
-  const branch = branches.find(
-    (candidate) =>
-      normalizeBranchCode(candidate.code, candidate.name, candidate.location) === data.branchCode
+  const branch = await withRetry(() =>
+    prisma.branch.findFirst({
+      where: {
+        id: data.branchId,
+        organizationId: organization.id,
+      },
+      select: { id: true },
+    })
   )
   if (!branch) {
     return { error: 'Select a valid branch.' }
   }
 
-  // Pre-check: does a User with this email already exist in our DB? If so,
-  // bail out BEFORE we ask Supabase to create an auth user. This avoids the
-  // race where we create an auth user, then fail the Prisma transaction, and
-  // have to clean up.
-  const existingUser = await prisma.user.findFirst({
-    where: { email: data.email },
-    select: { id: true },
-  })
+  const existingUser = await withRetry(() =>
+    prisma.user.findFirst({
+      where: { email: data.email },
+      select: { id: true },
+    })
+  )
   if (existingUser) {
     return {
       error: 'An account with this email already exists. Try signing in instead.',
@@ -133,19 +120,19 @@ export async function signUpOrganization(formData: FormData) {
 
   const authUserId = authData.user.id
 
-  // Create the app User row. If this fails, delete the Supabase auth user so
-  // the email can retry cleanly.
   try {
-    await prisma.user.create({
-      data: {
-        id: authUserId,
-        email: data.email,
-        name: data.fullName,
-        role: 'PENDING',
-        organizationId: organization.id,
-        branchId: branch.id,
-      },
-    })
+    await withRetry(() =>
+      prisma.user.create({
+        data: {
+          id: authUserId,
+          email: data.email,
+          name: data.fullName,
+          role: 'PENDING',
+          organizationId: organization.id,
+          branchId: branch.id,
+        },
+      })
+    )
   } catch (err) {
     try {
       await supabaseAdmin.auth.admin.deleteUser(authUserId)
@@ -171,3 +158,6 @@ export async function signUpOrganization(formData: FormData) {
 
   return { success: true }
 }
+
+// Keep the old export name for callers that have not moved to signUpUser yet.
+export const signUpOrganization = signUpUser

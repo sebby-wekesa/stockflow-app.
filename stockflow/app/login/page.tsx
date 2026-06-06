@@ -2,29 +2,20 @@
 
 import { type FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn, signUp } from '@/actions/auth';
+import { signIn } from '@/actions/auth';
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     try {
       const formData = new FormData(event.currentTarget);
-      const action = isLogin ? signIn : signUp;
-      const res = await action(formData);
+      const res = await signIn(formData);
       if (res?.error) {
         setError(res.error);
-        return;
-      }
-      if (res && typeof res === 'object' && 'message' in res && typeof res.message === 'string') {
-        setMessage(res.message);
-        setIsLogin(true);
         return;
       }
       if (res && typeof res === 'object' && 'success' in res && res.success === true) {
@@ -67,15 +58,7 @@ export default function LoginPage() {
             letterSpacing: '-0.5px',
             marginBottom: '4px'
           }}>
-            StockFlow
-          </div>
-          <div style={{
-            fontSize: '12px',
-            color: 'var(--text-muted)',
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase'
-          }}>
-            Manufacturing Platform
+            SpringTech(K)Ltd
           </div>
         </div>
 
@@ -93,35 +76,6 @@ export default function LoginPage() {
               {error}
             </div>
           )}
-
-          {message && (
-            <div style={{
-              background: 'rgba(46, 196, 160, 0.15)',
-              color: 'var(--teal)',
-              padding: '12px',
-              borderRadius: 'var(--radius-small)',
-              marginBottom: '16px',
-              fontSize: '14px',
-              border: '1px solid rgba(46, 196, 160, 0.3)'
-            }}>
-              {message}
-            </div>
-          )}
-
-           {!isLogin && (
-             <>
-               <div className="form-group" style={{ marginBottom: '16px' }}>
-                 <label className="form-label">Full Name</label>
-                 <input
-                   type="text"
-                   name="name"
-                   className="form-input"
-                   placeholder="Full name"
-                   required
-                 />
-               </div>
-             </>
-           )}
 
           <div className="form-group" style={{ marginBottom: '16px' }}>
             <label className="form-label">Email</label>
@@ -150,7 +104,7 @@ export default function LoginPage() {
             className="btn btn-primary"
             style={{ width: '100%', marginBottom: '16px' }}
           >
-            {isLogin ? 'Sign In' : 'Sign Up'}
+            Sign In
           </button>
         </form>
 
@@ -168,7 +122,7 @@ export default function LoginPage() {
               display: 'inline-block',
             }}
           >
-            Don&apos;t have an account? Sign up
+            Create an account
           </a>
         </div>
       </div>

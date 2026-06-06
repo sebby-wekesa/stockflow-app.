@@ -60,19 +60,21 @@ async function seedDesigns(organizationId: string) {
 }
 
 async function main() {
-  console.log('--- Starting StockFlow Seed ---')
+  console.log('--- Starting SpringTech(K)Ltd Seed ---')
 
   // 1. Create Organization
   const org = await prisma.organization.upsert({
-    where: { code: 'SF' },
+    where: { id: 'org-stockflow-001' },
     update: {
+      name: 'SpringTech(K)Ltd',
+      code: 'SPRINGTECH',
       status: 'ACTIVE',
       approvedAt: new Date(),
     },
     create: {
       id: 'org-stockflow-001',
-      name: 'StockFlow Manufacturing',
-      code: 'SF',
+      name: 'SpringTech(K)Ltd',
+      code: 'SPRINGTECH',
       slug: 'stockflow-manufacturing',
       status: 'ACTIVE',
       approvedAt: new Date(),

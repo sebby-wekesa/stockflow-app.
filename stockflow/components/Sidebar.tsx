@@ -143,8 +143,7 @@ export function Sidebar({ role, counts = {} }: { role: UserRole; counts?: Sideba
   return (
     <div className="sidebar">
       <div className="sidebar-logo">
-        <div className="logo-mark">StockFlow</div>
-        <div className="logo-sub">Manufacturing Platform</div>
+        <div className="logo-mark">SpringTech(K)Ltd</div>
       </div>
       <div className="role-badge">
         <div className="role-label">Signed in as</div>

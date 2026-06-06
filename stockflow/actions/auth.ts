@@ -52,7 +52,7 @@ function getAuthErrorMessage(error: unknown) {
     return "Please check your email and click the confirmation link before signing in.";
   }
   if (message.includes('User not found') || message.includes('user_not_found')) {
-    return "No account found with this email address. Please sign up first.";
+    return "No account found with this email address. Ask your organization administrator for an invitation.";
   }
   return "Authentication failed. Please try again.";
 }
@@ -109,8 +109,8 @@ export async function signIn(formData: FormData) {
   }
 
   // Verify the user has a fully-set-up account in our Prisma database.
-  // In multitenant mode, never auto-create a User row or attach a user to
-  // the first available organization. Users must arrive via signup or invite.
+  // Never auto-create a User row or attach a user to an organization.
+  // Users arrive through the single-organization signup or an admin invite.
   try {
     const existingUser = await withRetry(() =>
       prisma.user.findUnique({
@@ -123,7 +123,7 @@ export async function signIn(formData: FormData) {
       await supabase.auth.signOut();
       return {
         error:
-          "Your account isn't fully set up. Please complete signup or ask your administrator to invite you.",
+          "Your account isn't fully set up. Ask your organization administrator to invite you.",
       };
     }
 
@@ -168,12 +168,4 @@ export async function signOut() {
   clearAuthCookies(cookieStore);
 
   redirect("/login");
-}
-
-export async function signUp() {
-  // Stage 2+: Old signup flow is disabled.
-  // New multitenant signup will be implemented in Stage 4.
-  return {
-    error: "Signup is currently disabled. Please contact an administrator or use the new signup flow (coming soon)."
-  };
 }

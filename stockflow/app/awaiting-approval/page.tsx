@@ -8,9 +8,8 @@ export default function AwaitingApprovalPage() {
         <div className="text-4xl mb-4">⏳</div>
         <h1 className="font-head text-2xl font-bold mb-3">Awaiting approval</h1>
         <p className="text-muted text-sm mb-6 leading-relaxed">
-          Your account is signed up but pending review by an administrator.
-          You&apos;ll receive an email at your registered address once your
-          organization is approved — usually within one business day.
+          Your account is pending review by an administrator.
+          You&apos;ll be able to use the system once your role is assigned.
         </p>
         <p className="text-xs text-muted mb-8">
           Questions? Reach out to{' '}

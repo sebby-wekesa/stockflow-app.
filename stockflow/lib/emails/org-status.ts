@@ -24,7 +24,7 @@ function sign(): string {
   return [
     '',
     'Thanks,',
-    'The StockFlow team',
+    'The SpringTech(K)Ltd team',
     '',
     '— This is an automated message. Replies go to support.',
   ].join('\n')
@@ -38,7 +38,7 @@ export async function sendOrgApprovedEmail(ctx: OrgContext): Promise<SendEmailRe
   const text = [
     greeting(ctx.ownerName),
     '',
-    `Good news — your organization "${ctx.organizationName}" has been approved on StockFlow.`,
+    `Good news — your organization "${ctx.organizationName}" has been approved on SpringTech(K)Ltd.`,
     '',
     'You can sign in now and start setting up your branches, importing your product catalogue, and inviting your team:',
     '',
@@ -50,7 +50,7 @@ export async function sendOrgApprovedEmail(ctx: OrgContext): Promise<SendEmailRe
 
   return sendEmail({
     to: ctx.ownerEmail,
-    subject: `${ctx.organizationName} is approved on StockFlow`,
+    subject: `${ctx.organizationName} is approved on SpringTech(K)Ltd`,
     text,
   })
 }
@@ -65,7 +65,7 @@ export async function sendOrgRejectedEmail(
   const text = [
     greeting(ctx.ownerName),
     '',
-    `Thanks for signing up "${ctx.organizationName}" on StockFlow.`,
+    `Thanks for signing up "${ctx.organizationName}" on SpringTech(K)Ltd.`,
     '',
     "Unfortunately, we're not able to activate your account at this time. The reason given by our team:",
     '',
@@ -77,7 +77,7 @@ export async function sendOrgRejectedEmail(
 
   return sendEmail({
     to: ctx.ownerEmail,
-    subject: `Your StockFlow signup could not be approved`,
+    subject: `Your SpringTech(K)Ltd signup could not be approved`,
     text,
   })
 }
@@ -92,7 +92,7 @@ export async function sendOrgSuspendedEmail(
   const text = [
     greeting(ctx.ownerName),
     '',
-    `Your organization "${ctx.organizationName}" has been suspended on StockFlow.`,
+    `Your organization "${ctx.organizationName}" has been suspended on SpringTech(K)Ltd.`,
     '',
     'Reason:',
     `  ${ctx.reason}`,
@@ -116,7 +116,7 @@ export async function sendOrgReactivatedEmail(ctx: OrgContext): Promise<SendEmai
   const text = [
     greeting(ctx.ownerName),
     '',
-    `Your organization "${ctx.organizationName}" has been reactivated on StockFlow.`,
+    `Your organization "${ctx.organizationName}" has been reactivated on SpringTech(K)Ltd.`,
     '',
     'Your team can sign in again and pick up where they left off:',
     '',

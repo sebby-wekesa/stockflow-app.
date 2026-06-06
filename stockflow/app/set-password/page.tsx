@@ -52,7 +52,7 @@ export default function SetPasswordPage() {
           Create your password
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "24px" }}>
-          Set a password to finish accepting your StockFlow invitation.
+          Set a password to finish accepting your SpringTech(K)Ltd invitation.
         </p>
 
         {error && (

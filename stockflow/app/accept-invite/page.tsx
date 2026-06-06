@@ -24,7 +24,7 @@ export default function AcceptInvitePage() {
         }}
       >
         <h1 style={{ fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
-          Accept StockFlow invitation
+          Accept SpringTech(K)Ltd invitation
         </h1>
         <p style={{ color: "var(--text-muted)", lineHeight: 1.5, marginBottom: "24px" }}>
           Enter the email address and invitation code from your email. You will then

@@ -2,16 +2,21 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { signUpOrganization } from '@/actions/signup'
-import { BRANCH_LABELS, ALL_BRANCHES } from '@/lib/branches'
+import { signUpUser } from '@/actions/signup'
 
-type SignupOrganization = {
+type SignupBranch = {
   id: string
   name: string
-  status: string
+  code: string
 }
 
-export function SignupForm({ organizations }: { organizations: SignupOrganization[] }) {
+export function SignupForm({
+  organizationName,
+  branches,
+}: {
+  organizationName: string
+  branches: SignupBranch[]
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null)
@@ -21,7 +26,7 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
     const fd = new FormData(e.currentTarget)
     setError(null)
     startTransition(async () => {
-      const res = await signUpOrganization(fd)
+      const res = await signUpUser(fd)
       if ('error' in res) {
         setError((res as any).error)
       } else {
@@ -63,7 +68,7 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
           <p style={{ color: 'var(--muted)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
             Your account for{' '}
             <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{submittedEmail}</span>{' '}
-            is waiting for an administrator to verify it.
+            is waiting for an administrator to assign your role.
           </p>
           <Link
             href="/login"
@@ -112,15 +117,7 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
             letterSpacing: '-0.5px',
             marginBottom: '4px'
           }}>
-            StockFlow
-          </div>
-          <div style={{
-            fontSize: '11px',
-            color: 'var(--muted)',
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase'
-          }}>
-            Manufacturing Platform
+            SpringTech(K)Ltd
           </div>
         </div>
 
@@ -134,7 +131,7 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
           Create your account
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '24px', lineHeight: 1.4 }}>
-          Choose your organization, then an administrator can verify your account from Users & Roles.
+          Create your {organizationName} account. An administrator will review and assign your role.
         </p>
 
         {error && (
@@ -152,27 +149,6 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          <div className="form-group">
-            <label className="form-label">Organization</label>
-            <select
-              name="organizationId"
-              required
-              className="form-input"
-              disabled={isPending || organizations.length === 0}
-              defaultValue=""
-            >
-              <option value="" disabled>
-                {organizations.length === 0 ? 'No organizations available' : 'Select organization'}
-              </option>
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                  {org.status === 'PENDING_APPROVAL' ? ' (pending approval)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div className="form-group">
             <label className="form-label">Your full name</label>
             <input
@@ -216,18 +192,16 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
           <div className="form-group">
             <label className="form-label">Branch</label>
             <select
-              name="branchCode"
+              name="branchId"
               required
               className="form-input"
               disabled={isPending}
               defaultValue=""
             >
-              <option value="" disabled>
-                Select your branch
-              </option>
-              {ALL_BRANCHES.map((branch) => (
-                <option key={branch} value={branch}>
-                  {BRANCH_LABELS[branch]}
+              <option value="" disabled>Select your branch</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name} ({branch.code})
                 </option>
               ))}
             </select>
@@ -239,7 +213,7 @@ export function SignupForm({ organizations }: { organizations: SignupOrganizatio
 
           <button
             type="submit"
-            disabled={isPending || organizations.length === 0}
+            disabled={isPending || branches.length === 0}
             className="btn btn-primary"
             style={{ width: '100%', marginTop: '8px', padding: '11px 16px', fontSize: '14px' }}
           >

@@ -237,7 +237,7 @@ otp_expiry = 3600
 # sender_name = "Admin"
 
 [auth.email.template.invite]
-subject = "You have been invited to StockFlow"
+subject = "You have been invited to SpringTech(K)Ltd"
 content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template

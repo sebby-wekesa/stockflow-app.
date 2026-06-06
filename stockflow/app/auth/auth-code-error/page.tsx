@@ -32,7 +32,7 @@ export default function AuthCodeErrorPage() {
           The email link is invalid, has expired, or has already been used.
         </p>
         <p style={{ color: "var(--text-muted)", lineHeight: 1.5, marginBottom: "24px" }}>
-          Ask your StockFlow administrator to select <strong>Resend invite</strong> on the Users
+          Ask your SpringTech(K)Ltd administrator to select <strong>Resend invite</strong> on the Users
           page, then use only the newest email.
         </p>
         <Link href="/login" className="btn btn-primary">

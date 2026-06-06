@@ -5,7 +5,7 @@ import { requireActiveAuth } from '@/lib/auth'
 import { getOperatorDepartments } from '@/lib/operator-access'
 
 export const metadata: Metadata = {
-  title: 'Stage Logger | StockFlow',
+  title: 'Stage Logger | SpringTech(K)Ltd',
   description: 'Log material weights and track production stages',
 }
 

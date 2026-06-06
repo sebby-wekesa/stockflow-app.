@@ -37,7 +37,7 @@ export type SendEmailResult =
   | { ok: false; provider: 'resend' | 'console'; error: string }
 
 function getFromAddress(): string {
-  return process.env.EMAIL_FROM ?? 'StockFlow <onboarding@resend.dev>'
+  return process.env.EMAIL_FROM ?? 'SpringTech(K)Ltd <onboarding@resend.dev>'
 }
 
 /**

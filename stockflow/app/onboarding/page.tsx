@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
     <div className="max-w-2xl mx-auto p-8">
       <div className="mb-8">
         <h1 className="font-head text-3xl font-bold mb-2">
-          Welcome to StockFlow, {user.name}
+          Welcome to SpringTech(K)Ltd, {user.name}
         </h1>
         <p className="text-muted">
           Let&apos;s get {user.organization.name} set up. Three quick steps:

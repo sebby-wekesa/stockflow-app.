@@ -43,7 +43,7 @@ export default async function ImportCentrePage() {
           <div className="section-header mb-16">
             <div>
               <div className="section-title">Awaiting Commit</div>
-              <div className="section-sub">Review parsed files before adding them to StockFlow</div>
+              <div className="section-sub">Review parsed files before adding them to SpringTech(K)Ltd</div>
             </div>
             <span className="badge badge-amber">{specializedPreviews.length} pending</span>
           </div>
