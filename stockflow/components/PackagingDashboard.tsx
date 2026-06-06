@@ -21,7 +21,6 @@ export default async function PackagingDashboard() {
         </div>
         <div className="packaging-actions">
           <Link href="/pack_done" className="btn btn-primary">Dispatch queue</Link>
-          <Link href="/sales" className="btn btn-ghost">Sales orders</Link>
         </div>
       </div>
 
@@ -54,7 +53,6 @@ export default async function PackagingDashboard() {
             <div className="section-title">Completed Operator Work</div>
             <div className="section-sub">All completed production jobs available to packaging</div>
           </div>
-          <Link href="/jobs?status=COMPLETED" className="btn btn-ghost btn-sm">View production list</Link>
         </div>
         <div className="packaging-list">
           {data.completedProductionWork.map((work) => (
@@ -86,7 +84,6 @@ export default async function PackagingDashboard() {
                 {work.piecesOut.toLocaleString()} pcs/sets · {work.kgOut.toFixed(1)} kg
               </span>
               <div className="pack-actions">
-                <Link href={`/jobs/${work.id}`} className="btn btn-ghost btn-sm">View</Link>
                 {work.packagingStatus === 'AWAITING_PACKAGING' && (
                   <form action={async () => {
                     'use server'
@@ -154,13 +151,13 @@ export default async function PackagingDashboard() {
           </div>
           <div className="packaging-list">
             {data.recentShipments.slice(0, 4).map((order) => (
-              <Link href={`/sales/${order.id}`} className="packaging-row" key={order.id}>
+              <div className="packaging-row" key={order.id}>
                 <div>
                   <div className="pack-order">{order.orderNumber}</div>
                   <div className="pack-product">{order.customerName}</div>
                 </div>
                 <span className="job-kg">{formatKES(order.totalAmount)}</span>
-              </Link>
+              </div>
             ))}
             {data.recentShipments.length === 0 && (
               <div className="packaging-empty">No shipped orders found.</div>

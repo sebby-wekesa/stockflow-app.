@@ -99,7 +99,7 @@ export default async function PackDonePage() {
             <tbody>
               {readySalesOrders.map((order) => (
                 <tr key={order.id}>
-                  <td><Link href={`/sales/${order.id}`} style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</Link></td>
+                  <td style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</td>
                   <td>{order.customerName}</td>
                   <td>{order.SaleItem.map((item) => item.FinishedGoods.design.name).join(', ')}</td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
@@ -142,7 +142,7 @@ export default async function PackDonePage() {
 
                   return (
                     <tr key={work.id}>
-                      <td><Link href={`/jobs/${work.id}`} style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{work.orderNumber}</Link></td>
+                      <td style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{work.orderNumber}</td>
                       <td>{work.design?.name ?? work.productName ?? 'Direct order'}</td>
                       <td>{lastLog?.User?.name ?? lastLog?.User?.email ?? 'Unknown'}</td>
                       <td><span className="job-kg">{piecesOut.toLocaleString()} pcs/sets · {kgOut.toFixed(1)} kg</span></td>
@@ -172,7 +172,7 @@ export default async function PackDonePage() {
               <tbody>
                 {shippedSalesOrders.map((order) => (
                   <tr key={order.id}>
-                    <td><Link href={`/sales/${order.id}`} style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</Link></td>
+                    <td style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</td>
                     <td>{order.customerName}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>KES {Number(order.totalAmount).toLocaleString()}</td>
