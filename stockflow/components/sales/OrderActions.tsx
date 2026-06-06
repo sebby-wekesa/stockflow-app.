@@ -31,7 +31,7 @@ export function OrderActions({
   }
 
   return (
-    <>
+    <div className="sales-order-actions">
       <div className="flex gap-2">
         {status === 'PENDING' && (
           <button
@@ -79,7 +79,7 @@ export function OrderActions({
           onError={setError}
         />
       )}
-    </>
+    </div>
   )
 }
 

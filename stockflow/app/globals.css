@@ -612,6 +612,10 @@ select.form-input option { background: var(--surface2); }
     display: none;
   }
 
+  body:has(.sales-invoice-page) .sales-order-actions {
+    display: none;
+  }
+
   body:has(.sales-invoice-page) .main,
   body:has(.sales-invoice-page) .content,
   .sales-invoice-page {
