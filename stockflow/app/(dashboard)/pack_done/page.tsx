@@ -7,6 +7,13 @@ import { withRetry } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+function getPiecesSets(items: Array<{ unitPrice: unknown; totalPrice: unknown }>) {
+  return items.reduce((sum, item) => {
+    const unitPrice = Number(item.unitPrice)
+    return sum + (unitPrice > 0 ? Number(item.totalPrice) / unitPrice : 0)
+  }, 0)
+}
+
 export default async function PackDonePage() {
   const user = await requireActiveAuth()
   const db = getTenantPrisma(user.organizationId)
@@ -94,7 +101,7 @@ export default async function PackDonePage() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Order</th><th>Customer</th><th>Items</th><th>Quantity</th><th>Value</th><th>Action</th></tr>
+              <tr><th>Order</th><th>Customer</th><th>Items</th><th>Quantity</th><th>PCS/Sets</th><th>Value</th><th>Action</th></tr>
             </thead>
             <tbody>
               {readySalesOrders.map((order) => (
@@ -103,6 +110,7 @@ export default async function PackDonePage() {
                   <td>{order.customerName}</td>
                   <td>{order.SaleItem.map((item) => item.FinishedGoods.design.name).join(', ')}</td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{getPiecesSets(order.SaleItem).toLocaleString()}</td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>KES {Number(order.totalAmount).toLocaleString()}</td>
                   <td>
                     <form action={async () => { 'use server'; await markOrderShipped(order.id) }}>
@@ -112,7 +120,7 @@ export default async function PackDonePage() {
                 </tr>
               ))}
               {readySalesOrders.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No orders are awaiting dispatch.</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No orders are awaiting dispatch.</td></tr>
               )}
             </tbody>
           </table>
@@ -167,7 +175,7 @@ export default async function PackDonePage() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Order</th><th>Customer</th><th>Quantity</th><th>Value</th></tr>
+                <tr><th>Order</th><th>Customer</th><th>Quantity</th><th>PCS/Sets</th><th>Value</th></tr>
               </thead>
               <tbody>
                 {shippedSalesOrders.map((order) => (
@@ -175,11 +183,12 @@ export default async function PackDonePage() {
                     <td style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{order.id}</td>
                     <td>{order.customerName}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{getPiecesSets(order.SaleItem).toLocaleString()}</td>
                     <td style={{ fontFamily: 'var(--font-mono)' }}>KES {Number(order.totalAmount).toLocaleString()}</td>
                   </tr>
                 ))}
                 {shippedSalesOrders.length === 0 && (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No sales orders have been shipped today.</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>No sales orders have been shipped today.</td></tr>
                 )}
               </tbody>
             </table>
