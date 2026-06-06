@@ -42,7 +42,7 @@ export default async function SalesOrderDetailPage({
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="sales-invoice-page max-w-4xl">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <Link href="/sales" className="text-sm text-muted hover:text-text">

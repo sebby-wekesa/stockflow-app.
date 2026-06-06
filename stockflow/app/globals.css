@@ -607,6 +607,24 @@ select.form-input option { background: var(--surface2); }
   border-color: var(--accent) !important;
 }
 
+@media print {
+  body:has(.sales-invoice-page) .sidebar {
+    display: none;
+  }
+
+  body:has(.sales-invoice-page) .main,
+  body:has(.sales-invoice-page) .content,
+  .sales-invoice-page {
+    width: 100%;
+    max-width: none;
+    overflow: visible;
+  }
+
+  body:has(.sales-invoice-page) .content {
+    padding: 0;
+  }
+}
+
 /* OPERATOR LOG FORM */
 .log-form { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-top: 14px; }
 .kg-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
