@@ -37,3 +37,41 @@ Do not commit secrets. Start from environment examples and keep local credential
 ## Agent-Specific Notes
 
 This project uses Next.js 16, whose APIs may differ from older versions. Before changing framework-sensitive code, consult `node_modules/next/dist/docs/`. Keep changes scoped, avoid unrelated refactors, and update Prisma generated artifacts only when schema changes require it.
+
+
+## StockFlow Manufacturing Workflow
+
+Production flow:
+
+WAREHOUSE
+→ MANAGER APPROVAL
+→ CUTTING
+→ FORGING
+→ THREADING
+→ FINISHED GOODS
+→ SALES
+→ PACKAGING
+
+Key Roles:
+
+* ADMIN: System administration and reporting
+* MANAGER: Approves production orders
+* OPERATOR: Performs production stages
+* SALES: Sales orders and customer management
+* PACKAGING: Packaging and fulfillment
+* WAREHOUSE: Raw material intake
+
+Database Rules:
+
+* Always use tenant-scoped access via `getTenantPrisma(organizationId)`
+* Never bypass organization filtering
+* Never expose Supabase service role keys
+* Use Prisma models rather than raw SQL unless necessary
+
+Technology Stack:
+
+* Next.js 16 App Router
+* Prisma 7
+* Supabase PostgreSQL
+* TypeScript Strict Mode
+* pnpm package manager
