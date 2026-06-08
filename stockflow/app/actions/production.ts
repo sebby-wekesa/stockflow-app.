@@ -270,9 +270,8 @@ export async function getOrderForLogging(id: string) {
         },
         StageLog: {
           orderBy: {
-            sequence: "desc",
+            sequence: "asc",
           },
-          take: 1,
         },
         materials: {
           include: {
@@ -293,7 +292,8 @@ export async function getOrderForLogging(id: string) {
   assertOperatorDepartment(user, order.currentDept);
 
   // Determine inheritedKg (from previous stage log or targetKg if first stage)
-  const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
+  const lastLog = order.StageLog.length > 0 ? order.StageLog[order.StageLog.length - 1] : null;
+  const inheritedKg = lastLog ? lastLog.kgOut : order.targetKg;
 
   return {
     ...order,

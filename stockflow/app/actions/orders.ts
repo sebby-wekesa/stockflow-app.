@@ -28,6 +28,7 @@ export async function updateOrderStatus(
       });
       if (rejected.count === 0) throw new Error('Only pending orders can be rejected');
     } else {
+      const depts = await getDepartmentsForOrg(user.organizationId);
       await db.$transaction(async (tx) => {
         const order = await tx.productionOrder.findUnique({
           where: { id: orderId },
@@ -104,7 +105,7 @@ export async function updateOrderStatus(
             },
           });
         } else {
-          const firstDepartment = getDepartmentsForOrg(user.organizationId)[0];
+          const firstDepartment = depts[0];
           if (!firstDepartment) {
             throw new Error("Configure at least one production department before approving direct orders");
           }

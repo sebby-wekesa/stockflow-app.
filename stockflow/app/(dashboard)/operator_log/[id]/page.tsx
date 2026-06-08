@@ -300,21 +300,77 @@ export default function OperatorLogPage() {
           </div>
         </div>
 
-        <div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'8px'}}>Stage progress</div>
-        <div className="kg-trail">
-          <div className="kg-stage done">
-            <div className="kg-stage-name">Received</div>
-            <div className="kg-stage-val">{inheritedKg} kg · {inheritedPieces} pcs/sets</div>
+        <div style={{fontSize:'10px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'12px'}}>Full production pipeline</div>
+        <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
+          {/* Raw material received node */}
+          <div style={{display:'flex',alignItems:'flex-start',gap:'12px'}}>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+              <div style={{width:'12px',height:'12px',borderRadius:'50%',background:'var(--teal)',flexShrink:0,marginTop:'2px'}}/>
+              <div style={{width:'2px',flex:'1',background:'var(--border)',minHeight:'24px'}}/>
+            </div>
+            <div style={{paddingBottom:'16px'}}>
+              <div style={{fontSize:'12px',fontWeight:'600',color:'var(--teal)'}}>Raw material received</div>
+              <div style={{fontSize:'11px',color:'var(--muted)',fontFamily:'var(--font-mono)'}}>
+                {inheritedKg > 0
+                  ? `${Number(order.targetKg).toFixed(2)} kg · ${inheritedPieces} pcs/sets`
+                  : `${Number(order.targetKg).toFixed(2)} kg planned`}
+              </div>
+            </div>
           </div>
-          <div className="kg-arrow">→</div>
-          <div className="kg-stage active">
-            <div className="kg-stage-name">{currentStageInfo?.name}</div>
-            <div className="kg-stage-val">{kgOut || "—"} kg · {piecesOut || "—"} pcs/sets</div>
-          </div>
-          <div className="kg-arrow">→</div>
-          <div className="kg-stage">
-            <div className="kg-stage-name">{nextStageInfo?.name || "Done"}</div>
-            <div className="kg-stage-val">—</div>
+
+          {/* Each design stage */}
+          {order.design.stages.map((stage: any, idx: number) => {
+            const isActive = stage.sequence === order.currentStage;
+            const completedLog = order.StageLog?.find((log: any) => log.sequence === stage.sequence);
+            const isDone = !!completedLog;
+            const isLast = idx === order.design.stages.length - 1;
+
+            let dotColor = 'var(--border)';
+            let labelColor = 'var(--muted)';
+            if (isDone) { dotColor = 'var(--teal)'; labelColor = 'var(--teal)'; }
+            if (isActive && !isDone) { dotColor = 'var(--accent)'; labelColor = 'var(--accent)'; }
+
+            const kgDisplay = isDone
+              ? `${Number(completedLog.kgOut).toFixed(2)} kg out · ${completedLog.piecesOut ?? '—'} pcs/sets`
+              : isActive
+                ? `${kgOut ? `${kgOut} kg out` : '— kg'} · ${piecesOut || '—'} pcs/sets`
+                : '—';
+
+            const statusLabel = isDone ? 'Complete' : isActive ? 'In progress' : 'Pending';
+            const statusColor = isDone ? 'var(--teal)' : isActive ? 'var(--accent)' : 'var(--muted)';
+
+            return (
+              <div key={stage.id} style={{display:'flex',alignItems:'flex-start',gap:'12px'}}>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+                  <div style={{width:'12px',height:'12px',borderRadius:'50%',background:dotColor,flexShrink:0,marginTop:'2px',border: isActive && !isDone ? `2px solid var(--accent)` : 'none',boxSizing:'border-box'}}/>
+                  {!isLast && <div style={{width:'2px',flex:'1',background:'var(--border)',minHeight:'24px'}}/>}
+                </div>
+                <div style={{paddingBottom: isLast ? '0' : '16px',flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'2px'}}>
+                    <span style={{fontSize:'12px',fontWeight:'600',color:labelColor}}>{stage.name}</span>
+                    <span style={{fontSize:'10px',color:statusColor,fontWeight:'500'}}>{statusLabel}</span>
+                    {stage.department && (
+                      <span style={{fontSize:'10px',color:'var(--muted)',background:'var(--surface-2)',padding:'1px 6px',borderRadius:'4px'}}>{stage.department}</span>
+                    )}
+                  </div>
+                  <div style={{fontSize:'11px',color:'var(--muted)',fontFamily:'var(--font-mono)'}}>{kgDisplay}</div>
+                  {isDone && completedLog.kgScrap > 0 && (
+                    <div style={{fontSize:'10px',color:'var(--red)',marginTop:'2px'}}>↳ {Number(completedLog.kgScrap).toFixed(2)} kg scrap</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Finished goods terminal node */}
+          <div style={{display:'flex',alignItems:'flex-start',gap:'12px',marginTop:'4px'}}>
+            <div style={{width:'12px',height:'12px',borderRadius:'50%',background: order.status === 'COMPLETED' ? 'var(--teal)' : 'var(--border)',flexShrink:0,marginTop:'2px'}}/>
+            <div>
+              <div style={{fontSize:'12px',fontWeight:'600',color: order.status === 'COMPLETED' ? 'var(--teal)' : 'var(--muted)'}}>Finished goods</div>
+              <div style={{fontSize:'11px',color:'var(--muted)'}}>
+                {order.status === 'COMPLETED' ? 'Moved to finished goods stock' : 'Awaiting final stage completion'}
+              </div>
+            </div>
           </div>
         </div>
       </div>

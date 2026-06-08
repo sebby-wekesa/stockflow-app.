@@ -358,6 +358,41 @@ export async function receiveRawMaterialsBatch(
 // SEARCH RAW MATERIALS
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LIST RAW MATERIALS FOR PICKER (used by DirectOrderForm)
+// Returns a lightweight list suitable for a dropdown: id, sku, label, availableKg
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listRawMaterialsForPicker() {
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+
+  const materials = await db.rawMaterial.findMany({
+    orderBy: [{ materialName: 'asc' }, { sku: 'asc' }],
+    select: {
+      id: true,
+      sku: true,
+      materialName: true,
+      diameter: true,
+      width: true,
+      height: true,
+      length: true,
+      availableKg: true,
+    },
+  })
+
+  return materials.map((m) => {
+    const size = [m.width, m.height, m.diameter, m.length].filter(Boolean).join('x')
+    const label = size ? `${size} — ${m.materialName}` : m.materialName
+    return {
+      id: m.id,
+      sku: m.sku,
+      label: `${m.sku ? `[${m.sku}] ` : ''}${label}`,
+      availableKg: Number(m.availableKg),
+    }
+  })
+}
+
 export async function searchRawMaterials(query: string) {
   const user = await requireActiveAuth()
   const db = getTenantPrisma(user.organizationId)
