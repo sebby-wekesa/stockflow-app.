@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CATEGORY_LABELS, ORIGIN_LABELS, PRODUCT_TYPES_BY_CATEGORY, PRODUCT_TYPE_LABELS, PRODUCT_UOM_LABELS, PRODUCT_UOMS, normalizeProductUom } from '@/lib/products'
-import type { ProductCategory, StockOrigin } from '@prisma/client'
+import type { ProductCategory, RouteType, StockOrigin } from '@prisma/client'
 import { ALL_BRANCHES, BRANCH_LABELS, type BranchCode } from '@/lib/branches'
 
 type Mode = 'create' | 'edit'
@@ -28,6 +28,7 @@ type Initial = {
   pieces_sets?: number | null
   currentStock?: number | null
   branch?: BranchCode | null
+  route_type?: RouteType | null
 }
 
 export function ProductForm({
@@ -195,6 +196,21 @@ export function ProductForm({
                   {BRANCH_LABELS[branch]}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-2">
+              Production route
+            </label>
+            <select
+              name="route_type"
+              defaultValue={initial?.route_type ?? ''}
+              className="form-input w-full"
+            >
+              <option value="">Not routed</option>
+              <option value="FML">FML - includes Eye Rolling Section</option>
+              <option value="HML">HML - skips Eye Rolling Section</option>
             </select>
           </div>
 

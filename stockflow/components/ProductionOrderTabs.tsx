@@ -17,6 +17,13 @@ type RawMaterialOption = {
   availablePieces: number;
 };
 
+type RoutedProductOption = {
+  id: string;
+  name: string;
+  sku: string | null;
+  routeType: "FML" | "HML" | null;
+};
+
 type MaterialLine = {
   rawMaterialId: string;
   cutLength: string;
@@ -52,20 +59,24 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
   const [activeTab, setActiveTab] = useState<"quick" | "template">("quick");
   const [designs, setDesigns] = useState<Design[]>([]);
   const [materials, setMaterials] = useState<RawMaterialOption[]>([]);
+  const [products, setProducts] = useState<RoutedProductOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState(generateOrderNumber);
   const [productName, setProductName] = useState("");
+  const [productId, setProductId] = useState("");
   const [expectedPieces, setExpectedPieces] = useState("15");
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH">("MEDIUM");
+  const [routeType, setRouteType] = useState<"FML" | "HML">("FML");
   const [lines, setLines] = useState<MaterialLine[]>([emptyLine()]);
 
   useEffect(() => {
     async function load() {
       try {
-        const [designResponse, materialResponse] = await Promise.all([
+        const [designResponse, materialResponse, productResponse] = await Promise.all([
           fetch("/api/designs"),
           fetch("/api/inventory/materials"),
+          fetch("/api/inventory/products?origin=FACTORY_MADE&limit=500"),
         ]);
 
         if (designResponse.ok) {
@@ -76,6 +87,11 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
         if (materialResponse.ok) {
           const materialData = await materialResponse.json();
           setMaterials(Array.isArray(materialData.data) ? materialData.data : []);
+        }
+
+        if (productResponse.ok) {
+          const productData = await productResponse.json();
+          setProducts(Array.isArray(productData.products) ? productData.products : []);
         }
       } catch (error) {
         console.error("Error loading order data:", error);
@@ -92,10 +108,11 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
     return (
       productName.trim().length >= 2 &&
       Number(expectedPieces) > 0 &&
+      Boolean(routeType) &&
       lines.length > 0 &&
       lines.every((line) => line.rawMaterialId && Number(line.pieces) > 0 && Number(line.weightKg) > 0)
     );
-  }, [expectedPieces, lines, productName]);
+  }, [expectedPieces, lines, productName, routeType]);
 
   function updateLine(index: number, patch: Partial<MaterialLine>) {
     setLines((current) =>
@@ -127,8 +144,10 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
           orderType: "direct",
           orderNumber,
           productName,
+          productId: productId || null,
           expectedPieces: Number(expectedPieces),
           priority,
+          routeType,
           initialWeight: 0.0001,
           materialLines: lines.map((line) => ({
             rawMaterialId: line.rawMaterialId,
@@ -148,6 +167,7 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
       showToast(payload?.message || "Quick production order created", "success");
       setOrderNumber(generateOrderNumber());
       setProductName("");
+      setProductId("");
       setExpectedPieces("15");
       setPriority("MEDIUM");
       setLines([emptyLine()]);
@@ -191,12 +211,36 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
               />
             </div>
             <div className="form-group">
+              <label className="form-label">Saved product</label>
+              <select
+                className="form-input production-input"
+                value={productId}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  const product = products.find((item) => item.id === nextId);
+                  setProductId(nextId);
+                  if (product) {
+                    setProductName(product.name);
+                    if (product.routeType) setRouteType(product.routeType);
+                  }
+                }}
+              >
+                <option value="">Free-text product</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.sku ? `${product.sku} - ` : ""}{product.name}{product.routeType ? ` (${product.routeType})` : " (route not tagged)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label className="form-label">Product name</label>
               <input
                 className="form-input production-input"
                 value={productName}
                 onChange={(event) => setProductName(event.target.value)}
                 placeholder="Hilux rear spring leaf"
+                readOnly={Boolean(productId)}
               />
             </div>
           </div>
@@ -212,6 +256,18 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                 value={expectedPieces}
                 onChange={(event) => setExpectedPieces(event.target.value)}
               />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Production route</label>
+              <select
+                className="form-input production-input"
+                value={routeType}
+                onChange={(event) => setRouteType(event.target.value as "FML" | "HML")}
+                disabled={Boolean(productId)}
+              >
+                <option value="FML">FML - includes Eye Rolling Section</option>
+                <option value="HML">HML - skips Eye Rolling Section</option>
+              </select>
             </div>
           </div>
 

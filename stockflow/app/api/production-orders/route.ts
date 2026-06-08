@@ -48,8 +48,10 @@ export async function POST(request: NextRequest) {
       orderNumber,
       jobNumber,
       productName,
+      productId,
       expectedPieces,
       materialLines,
+      routeType,
     } = body
 
     // Validate required fields
@@ -83,6 +85,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (orderType === 'direct') {
+      const selectedProduct = productId
+        ? await db.product.findFirst({
+            where: { id: String(productId) },
+            select: { id: true, name: true, routeType: true },
+          })
+        : null
+      if (productId && !selectedProduct) {
+        return NextResponse.json({ error: 'Selected product was not found' }, { status: 400 })
+      }
+      const resolvedRouteType = selectedProduct ? selectedProduct.routeType : routeType
+      if (!['FML', 'HML'].includes(resolvedRouteType)) {
+        return NextResponse.json({ error: 'Tag the selected product with FML/HML or select a route' }, { status: 400 })
+      }
       if (!productName || typeof productName !== 'string' || productName.trim().length < 2) {
         return NextResponse.json({ error: 'Product name is required' }, { status: 400 })
       }
@@ -151,13 +166,15 @@ export async function POST(request: NextRequest) {
       const productionOrder = await db.productionOrder.create({
         data: {
           orderNumber: finalOrderNumber,
-          productName: productName.trim(),
+          productName: selectedProduct?.name ?? productName.trim(),
+          productId: selectedProduct?.id ?? null,
           expectedPieces: Number(expectedPieces),
           quantity: Number(expectedPieces),
           targetKg,
           priority: priority || 'MEDIUM',
           status: 'PENDING',
           currentStage: 1,
+          routeType: resolvedRouteType,
           materials: {
             create: normalizedLines.map((line) => ({
               organizationId: user.organizationId,

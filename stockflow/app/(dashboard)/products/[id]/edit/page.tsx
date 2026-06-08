@@ -43,6 +43,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     leg_length_inch: (product as any).leg_length_inch ?? null,
     selling_price: (product as any).selling_price ?? null,
     currentStock: product.currentStock ?? null,
+    route_type: product.routeType,
     branch: product.Branch
       ? normalizeBranchCode(product.Branch.code, product.Branch.name, product.Branch.location)
       : null,

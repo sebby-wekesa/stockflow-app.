@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireActiveAuth, type AuthUser } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
-import type { ProductCategory, StockOrigin } from '@prisma/client'
+import type { ProductCategory, RouteType, StockOrigin } from '@prisma/client'
 import { PRODUCT_CATEGORIES, normalizeProductUom } from '@/lib/products'
 import { ALL_BRANCHES, normalizeBranchCode, type BranchCode } from '@/lib/branches'
 import { syncProductShadowStock } from '@/lib/order-lifecycle'
@@ -38,6 +38,7 @@ const createSchema = z.object({
   pieces_sets: z.coerce.number().int().nonnegative().optional().default(0),
   branch: z.enum(ALL_BRANCHES as [BranchCode, ...BranchCode[]]),
   vendor: z.string().max(200).optional().nullable(),
+  route_type: z.enum(['FML', 'HML']).optional().nullable(),
   // Fields below are not in the schema — accepted but ignored so existing forms don't crash:
   product_type: z.string().optional().nullable(),
   description: z.string().max(500).optional().nullable(),
@@ -93,6 +94,7 @@ function extractForm(formData: FormData) {
     pieces_sets: formData.get('pieces_sets') || 0,
     branch: formData.get('branch'),
     vendor: formData.get('vendor') || null,
+    route_type: formData.get('route_type') || null,
     product_type: formData.get('product_type') || null,
     description: formData.get('description') || null,
     vehicle_make: formData.get('vehicle_make') || null,
@@ -157,6 +159,7 @@ export async function createProduct(formData: FormData) {
           piecesSets: parsed.data.pieces_sets ?? 0,
           currentStock: 0,
           branchId: branch.id,
+          routeType: parsed.data.route_type as RouteType | null,
           organizationId: user.organizationId,
         },
       })
@@ -237,6 +240,7 @@ export async function updateProduct(productId: string, formData: FormData) {
         reorderLevel: parsed.data.reorder_point ?? null,
         piecesSets: parsed.data.pieces_sets ?? 0,
         branchId: branch.id,
+        routeType: parsed.data.route_type as RouteType | null,
         ...(stockChanged ? { currentStock: nextStock } : {}),
       },
     })

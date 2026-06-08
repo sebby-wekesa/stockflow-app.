@@ -55,6 +55,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { section: "Production" },
         { label: "Production approvals", href: "/approvals" },
         { label: "Production orders", href: "/jobs" },
+        { label: "Operations", href: "/operations" },
         { section: "Data" },
         { label: "Import centre", href: "/import" },
         { section: "Reports" },
@@ -69,6 +70,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { label: "Approval queue", href: "/approvals" },
         { label: "Department monitoring", href: "/jobs" },
         { label: "Production orders", href: "/orders" },
+        { label: "Operations", href: "/operations" },
         { section: "Investigation" },
         { label: "Scrap reports", href: "/scrap" },
         { label: "Reports", href: "/reports" },
@@ -90,6 +92,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
           badgeColor: "purple",
         },
         { label: "Stage logging", href: "/operator_log" },
+        { label: "Operations", href: "/operations" },
         { section: "History" },
         { label: "Job history", href: "/operator_history" },
       ];
