@@ -10,7 +10,7 @@ const bodySchema = z.object({ organizationId: z.string(), departments: z.array(z
 export async function GET() {
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const depts = getDepartmentsForOrg(user.organizationId)
+  const depts = await getDepartmentsForOrg(user.organizationId)
   return NextResponse.json({ organizationId: user.organizationId, departments: depts })
 }
 

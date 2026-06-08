@@ -141,7 +141,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
   // Department throughput for today (from StageLog + active ProductionOrders)
   // Load department list from tenant settings if present
   const { getDepartmentsForOrg } = await import('@/lib/department-settings')
-  const knownDepts = getDepartmentsForOrg(organizationId);
+  const knownDepts = await getDepartmentsForOrg(organizationId);
 
   const activeByDeptRaw = await safeQuery<any[]>('active jobs by department', () => db.productionOrder.groupBy({
     by: ['currentDept'],

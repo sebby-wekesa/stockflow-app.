@@ -15,8 +15,6 @@ export async function completeStage(data: {
   kgIn: number;
   kgOut: number;
   kgScrap: number;
-  piecesIn?: number;
-  piecesOut?: number;
   scrapReason?: string;
   department?: string;
   notes?: string;
@@ -62,6 +60,22 @@ export async function completeStage(data: {
       throw new Error('Production order not found');
     }
 
+    // Routed leaf-spring orders (FML/HML) are tracked through the Operations
+    // flow (OperationLog), NOT the legacy design-stage flow. Without this guard,
+    // a direct/routed order has no design.stages, so the old code below would
+    // treat the first completion as the "final stage" and push the order
+    // straight to COMPLETED/dispatch. Refuse here and direct callers to the
+    // operations tracker instead.
+    if (order.routeType) {
+      throw new Error(
+        'This order is tracked in Production Operations. Use the operations tracker to start and complete each step.'
+      );
+    }
+    // Direct orders without a design also must not use the legacy stage flow.
+    if (!order.design) {
+      throw new Error('This order has no design stages. Track it in Production Operations instead.');
+    }
+
     if (order.status !== 'IN_PRODUCTION') {
       throw new Error('Order is not in production status');
     }
@@ -89,8 +103,6 @@ export async function completeStage(data: {
         kgIn: validatedData.kgIn,
         kgOut: validatedData.kgOut,
         kgScrap: validatedData.kgScrap,
-        piecesIn: validatedData.piecesIn ?? null,
-        piecesOut: validatedData.piecesOut ?? null,
         scrapReason: validatedData.scrapReason,
         department: validatedData.department || user.department,
         operatorId: user.id,
@@ -239,10 +251,6 @@ export async function getOrderForCompletion(orderId: string) {
 
   // Check permissions - operators can only see orders in their department
   assertOperatorDepartment(user, order.currentDept);
-
-  if (!order.design) {
-    throw new Error('Direct orders use production output recording instead of stage completion');
-  }
 
   const currentStage = order.design.stages.find(s => s.sequence === order.currentStage);
   const inheritedKg = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;

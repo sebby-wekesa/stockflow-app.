@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       expectedPieces,
       materialLines,
       routeType,
+      selectedOptionalSteps = [],
     } = body
 
     // Validate required fields
@@ -84,155 +85,211 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job number already exists' }, { status: 409 })
     }
 
-    if (orderType === 'direct') {
-      const selectedProduct = productId
-        ? await db.product.findFirst({
-            where: { id: String(productId) },
-            select: { id: true, name: true, routeType: true },
-          })
-        : null
-      if (productId && !selectedProduct) {
-        return NextResponse.json({ error: 'Selected product was not found' }, { status: 400 })
-      }
-      const resolvedRouteType = selectedProduct ? selectedProduct.routeType : routeType
-      if (!['FML', 'HML'].includes(resolvedRouteType)) {
-        return NextResponse.json({ error: 'Tag the selected product with FML/HML or select a route' }, { status: 400 })
-      }
-      if (!productName || typeof productName !== 'string' || productName.trim().length < 2) {
-        return NextResponse.json({ error: 'Product name is required' }, { status: 400 })
-      }
-      if (!Number.isInteger(Number(expectedPieces)) || Number(expectedPieces) <= 0) {
-        return NextResponse.json({ error: 'Expected finished pieces must be a positive whole number' }, { status: 400 })
-      }
-      if (!Array.isArray(materialLines) || materialLines.length === 0) {
-        return NextResponse.json({ error: 'Add at least one material line' }, { status: 400 })
-      }
+     if (orderType === 'direct') {
+       const selectedProduct = productId
+         ? await db.product.findFirst({
+             where: { id: String(productId) },
+             select: { id: true, name: true, routeType: true },
+           })
+         : null
+       if (productId && !selectedProduct) {
+         return NextResponse.json({ error: 'Selected product was not found' }, { status: 400 })
+       }
+       const resolvedRouteType = selectedProduct ? selectedProduct.routeType : routeType
+       // Allow null/undefined/empty routeType for direct orders (legacy behavior)
+       // Only validate if a route type is actually provided and not empty
+       if (resolvedRouteType !== null && resolvedRouteType !== undefined && resolvedRouteType !== '' && !['FML', 'HML'].includes(resolvedRouteType)) {
+         return NextResponse.json({ error: 'Tag the selected product with FML/HML or select a route' }, { status: 400 })
+       }
+       if (!productName || typeof productName !== 'string' || productName.trim().length < 2) {
+         return NextResponse.json({ error: 'Product name is required' }, { status: 400 })
+       }
+       if (!Number.isInteger(Number(expectedPieces)) || Number(expectedPieces) <= 0) {
+         return NextResponse.json({ error: 'Expected finished pieces must be a positive whole number' }, { status: 400 })
+       }
+       if (!Array.isArray(materialLines) || materialLines.length === 0) {
+         return NextResponse.json({ error: 'Add at least one material line' }, { status: 400 })
+       }
 
-      const normalizedLines = materialLines.map((line: any) => ({
-        rawMaterialId: String(line.rawMaterialId || ''),
-        cutLength: line.cutLength === '' || line.cutLength == null ? null : Number(line.cutLength),
-        pieces: Number(line.pieces),
-        totalLength: line.totalLength === '' || line.totalLength == null ? null : Number(line.totalLength),
-        weightKg: line.weightKg === '' || line.weightKg == null ? null : Number(line.weightKg),
-      }))
+       const normalizedLines = materialLines.map((line: any) => ({
+         rawMaterialId: String(line.rawMaterialId || ''),
+         cutLength: line.cutLength === '' || line.cutLength == null ? null : Number(line.cutLength),
+         pieces: Number(line.pieces),
+         totalLength: line.totalLength === '' || line.totalLength == null ? null : Number(line.totalLength),
+         weightKg: line.weightKg === '' || line.weightKg == null ? null : Number(line.weightKg),
+       }))
 
-      for (const line of normalizedLines) {
-        if (!line.rawMaterialId) {
-          return NextResponse.json({ error: 'Each material line needs a raw material' }, { status: 400 })
-        }
-        if (!Number.isInteger(line.pieces) || line.pieces <= 0) {
-          return NextResponse.json({ error: 'Each material line needs positive pieces' }, { status: 400 })
-        }
-        if (line.cutLength != null && line.cutLength < 0) {
-          return NextResponse.json({ error: 'Cut length cannot be negative' }, { status: 400 })
-        }
-        if (line.totalLength != null && line.totalLength < 0) {
-          return NextResponse.json({ error: 'Total length cannot be negative' }, { status: 400 })
-        }
-        if (line.weightKg == null || !Number.isFinite(line.weightKg) || line.weightKg <= 0) {
-          return NextResponse.json({ error: 'Each material line needs positive weight used in kg' }, { status: 400 })
-        }
-      }
+       for (const line of normalizedLines) {
+         if (!line.rawMaterialId) {
+           return NextResponse.json({ error: 'Each material line needs a raw material' }, { status: 400 })
+         }
+         if (!Number.isInteger(line.pieces) || line.pieces <= 0) {
+           return NextResponse.json({ error: 'Each material line needs positive pieces' }, { status: 400 })
+         }
+         if (line.cutLength != null && line.cutLength < 0) {
+           return NextResponse.json({ error: 'Cut length cannot be negative' }, { status: 400 })
+         }
+         if (line.totalLength != null && line.totalLength < 0) {
+           return NextResponse.json({ error: 'Total length cannot be negative' }, { status: 400 })
+         }
+         if (line.weightKg == null || !Number.isFinite(line.weightKg) || line.weightKg <= 0) {
+           return NextResponse.json({ error: 'Each material line needs positive weight used in kg' }, { status: 400 })
+         }
+       }
 
-      const materialIds = [...new Set(normalizedLines.map((line) => line.rawMaterialId))]
-      const materials = await db.rawMaterial.findMany({
-        where: { id: { in: materialIds } },
-        select: { id: true, materialName: true, availableKg: true, availablePieces: true },
-      })
-      if (materials.length !== materialIds.length) {
-        return NextResponse.json({ error: 'One or more raw materials were not found' }, { status: 400 })
-      }
+       const materialIds = [...new Set(normalizedLines.map((line) => line.rawMaterialId))]
+       const materials = await db.rawMaterial.findMany({
+         where: { id: { in: materialIds } },
+         select: { id: true, materialName: true, availableKg: true, availablePieces: true },
+       })
+       if (materials.length !== materialIds.length) {
+         return NextResponse.json({ error: 'One or more raw materials were not found' }, { status: 400 })
+       }
 
-      const materialById = new Map(materials.map((material) => [material.id, material]))
-      for (const line of normalizedLines) {
-        const material = materialById.get(line.rawMaterialId)
-        if (!material) continue
-        const weightKg = line.weightKg ?? 0
-        if (Number(material.availableKg) < weightKg) {
-          return NextResponse.json(
-            { error: `Insufficient kg for ${material.materialName}. Available: ${Number(material.availableKg).toFixed(2)}kg, requested: ${weightKg.toFixed(2)}kg` },
-            { status: 400 }
-          )
-        }
-        if (material.availablePieces < line.pieces) {
-          return NextResponse.json(
-            { error: `Insufficient pieces for ${material.materialName}. Available: ${material.availablePieces}, requested: ${line.pieces}` },
-            { status: 400 }
-          )
-        }
-      }
+       const materialById = new Map(materials.map((material) => [material.id, material]))
+       for (const line of normalizedLines) {
+         const material = materialById.get(line.rawMaterialId)
+         if (!material) continue
+         const weightKg = line.weightKg ?? 0
+         if (Number(material.availableKg) < weightKg) {
+           return NextResponse.json(
+             { error: `Insufficient kg for ${material.materialName}. Available: ${Number(material.availableKg).toFixed(2)}kg, requested: ${weightKg.toFixed(2)}kg` },
+             { status: 400 }
+           )
+         }
+         if (material.availablePieces < line.pieces) {
+           return NextResponse.json(
+             { error: `Insufficient pieces for ${material.materialName}. Available: ${material.availablePieces}, requested: ${line.pieces}` },
+             { status: 400 }
+           )
+         }
+       }
 
-      const targetKg = normalizedLines.reduce((sum, line) => sum + (line.weightKg ?? 0), 0)
-      const productionOrder = await db.productionOrder.create({
-        data: {
-          orderNumber: finalOrderNumber,
-          productName: selectedProduct?.name ?? productName.trim(),
-          productId: selectedProduct?.id ?? null,
-          expectedPieces: Number(expectedPieces),
-          quantity: Number(expectedPieces),
-          targetKg,
-          priority: priority || 'MEDIUM',
-          status: 'PENDING',
-          currentStage: 1,
-          routeType: resolvedRouteType,
-          materials: {
-            create: normalizedLines.map((line) => ({
-              organizationId: user.organizationId,
-              rawMaterialId: line.rawMaterialId,
-              cutLength: line.cutLength,
-              pieces: line.pieces,
-              totalLength: line.totalLength,
-              weightKg: line.weightKg,
-            })),
-          },
-        } as any,
-        include: {
-          materials: {
-            include: {
-              RawMaterial: {
-                select: {
-                  id: true,
-                  materialName: true,
-                  diameter: true,
-                  width: true,
-                  height: true,
-                  length: true,
-                },
-              },
-            },
-          },
-        },
-      })
+       const targetKg = normalizedLines.reduce((sum, line) => sum + (line.weightKg ?? 0), 0)
 
-      const duration = Date.now() - startTime;
-      logger.performance('Direct production order created', duration, {
-        orderId: productionOrder.id,
-        orderNumber: productionOrder.orderNumber,
-      });
+       // Create the production order and operation logs in a transaction
+       const result = await db.$transaction(async (tx) => {
+         // Create the production order
+         const productionOrder = await tx.productionOrder.create({
+           data: {
+             orderNumber: finalOrderNumber,
+             productName: selectedProduct?.name ?? productName.trim(),
+             productId: selectedProduct?.id ?? null,
+             expectedPieces: Number(expectedPieces),
+             quantity: Number(expectedPieces),
+             targetKg,
+             priority: priority || 'MEDIUM',
+             status: 'PENDING',
+             currentStage: 1,
+             routeType: resolvedRouteType,
+             materials: {
+               create: normalizedLines.map((line) => ({
+                 organizationId: user.organizationId,
+                 rawMaterialId: line.rawMaterialId,
+                 cutLength: line.cutLength,
+                 pieces: line.pieces,
+                 totalLength: line.totalLength,
+                 weightKg: line.weightKg,
+               })),
+             },
+           } as any,
+           include: {
+             materials: {
+               include: {
+                 RawMaterial: {
+                   select: {
+                     id: true,
+                     materialName: true,
+                     diameter: true,
+                     width: true,
+                     height: true,
+                     length: true,
+                   },
+                 },
+               },
+             },
+           },
+         })
 
-      const response = NextResponse.json(
-        {
-          message: 'Direct production order created successfully',
-          order: {
-            ...productionOrder,
-            targetKg: Number(productionOrder.targetKg),
-            materials: productionOrder.materials.map((line: any) => ({
-              ...line,
-              cutLength: line.cutLength == null ? null : Number(line.cutLength),
-              totalLength: line.totalLength == null ? null : Number(line.totalLength),
-              weightKg: line.weightKg == null ? null : Number(line.weightKg),
-            })),
-          },
-        },
-        { status: 201 }
-      );
+         // If we have a resolved route type, create operation logs for each step in the route
+         if (resolvedRouteType) {
+           // Find the production route for this organization and route type
+           const productionRoute = await tx.productionRoute.findFirst({
+             where: {
+               organizationId: user.organizationId,
+               routeType: resolvedRouteType,
+               isActive: true,
+             },
+           })
 
-      Object.entries(getSecurityHeaders()).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
+           if (productionRoute) {
+             // Get all route operations for this route, ordered by sequence
+             const routeOperations = await tx.routeOperation.findMany({
+               where: {
+                 routeId: productionRoute.id,
+               },
+               orderBy: {
+                 sequence: 'asc',
+               },
+             })
 
-      return response;
-    }
+             // Create operation logs for each route operation
+             for (const routeOp of routeOperations) {
+               // Determine if this optional step should be skipped
+               const isOptionalAndNotSelected = routeOp.optional && !selectedOptionalSteps.includes(routeOp.name)
+               await tx.operationLog.create({
+                 data: {
+                   organizationId: user.organizationId,
+                   productionOrderId: productionOrder.id,
+                   routeOperationId: routeOp.id,
+                   operationName: routeOp.name,
+                   sequence: routeOp.sequence,
+                   section: routeOp.section,
+                   optional: routeOp.optional,
+                   status: isOptionalAndNotSelected ? 'SKIPPED' : 'PENDING',
+                   // startedAt, completedAt, durationSeconds will be null by default
+                 },
+               })
+             }
+           }
+         }
+
+         return {
+           productionOrder,
+         }
+       })
+
+       const productionOrder = result.productionOrder
+
+       const duration = Date.now() - startTime;
+       logger.performance('Direct production order created', duration, {
+         orderId: productionOrder.id,
+         orderNumber: productionOrder.orderNumber,
+       });
+
+       const response = NextResponse.json(
+         {
+           message: 'Direct production order created successfully',
+           order: {
+             ...productionOrder,
+             targetKg: Number(productionOrder.targetKg),
+             materials: productionOrder.materials.map((line: any) => ({
+               ...line,
+               cutLength: line.cutLength == null ? null : Number(line.cutLength),
+               totalLength: line.totalLength == null ? null : Number(line.totalLength),
+               weightKg: line.weightKg == null ? null : Number(line.weightKg),
+             })),
+           },
+         },
+         { status: 201 }
+       );
+
+       Object.entries(getSecurityHeaders()).forEach(([key, value]) => {
+         response.headers.set(key, value);
+       });
+
+       return response;
+     }
 
     if (!designId || !initialWeight) {
       return NextResponse.json(
@@ -252,7 +309,7 @@ export async function POST(request: NextRequest) {
     // Check if design exists (tenant scoped)
     const design = await db.design.findUnique({
       where: { id: designId },
-      include: { stages: { orderBy: { sequence: 'asc' }, take: 1 } },
+      include: { stages: { orderBy: { sequence: 'asc' } } },
     })
 
     if (!design) {
@@ -265,6 +322,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Design has no production stages' }, { status: 400 });
     }
 
+    // Derive route type based on stages (e.g. FML if it contains an Eye Rolling stage, HML otherwise)
+    const hasEyeRolling = design.stages.some(stage =>
+      ['Eye Rolling', 'Scaffolding', 'Tapering'].some(keyword =>
+        stage.name.toLowerCase().includes(keyword.toLowerCase())
+      )
+    );
+    const resolvedRouteType = hasEyeRolling ? 'FML' : 'HML';
+
     // Create production order (organizationId injected automatically by tenant client)
     const productionOrder = await db.productionOrder.create({
       data: {
@@ -276,6 +341,7 @@ export async function POST(request: NextRequest) {
         status: 'PENDING',
         currentStage: design.stages[0].sequence,
         currentDept: design.stages[0].department,
+        routeType: resolvedRouteType,
       } as any,
       include: {
         design: true,

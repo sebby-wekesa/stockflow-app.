@@ -2,230 +2,233 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
-import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { materializeOperationsForOrder } from "@/lib/operation-routing";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROUTE DEFINITIONS
+//
+// The standard leaf-spring routes. FML goes through the Eye Rolling section
+// (whose three sub-steps are optional); HML skips that whole section. Assembly
+// is optional and sits just before Painting.
+// ─────────────────────────────────────────────────────────────────────────────
 
 const EYE_ROLLING_SECTION = "Eye Rolling Section";
 
+// Shared tail used by both routes (everything after the eye-rolling section).
 const COMMON_TAIL = [
   { name: "Drilling", optional: false, section: null },
   { name: "Hardening", optional: false, section: null },
   { name: "Tempering", optional: false, section: null },
   { name: "Hardness Testing", optional: false, section: null },
   { name: "Cambering", optional: false, section: null },
-  { name: "Assembly", optional: true, section: null },
+  { name: "Assembly", optional: true, section: null }, // optional: only for full sets
   { name: "Painting", optional: false, section: null },
 ];
 
-const ROUTE_DEFS = {
-  FML: {
-    name: "Leaf Spring - FML",
-    operations: [
-      { name: "Cutting", optional: false, section: null },
-      { name: "Eye Rolling", optional: true, section: EYE_ROLLING_SECTION },
-      { name: "Scaffolding", optional: true, section: EYE_ROLLING_SECTION },
-      { name: "Tapering", optional: true, section: EYE_ROLLING_SECTION },
-      ...COMMON_TAIL,
-    ],
-  },
-  HML: {
-    name: "Leaf Spring - HML",
-    operations: [
-      { name: "Cutting", optional: false, section: null },
-      ...COMMON_TAIL,
-    ],
-  },
-} as const;
+const FML_OPERATIONS = [
+  { name: "Cutting", optional: false, section: null },
+  // Eye Rolling section — all three are optional; an order uses any subset.
+  { name: "Eye Rolling", optional: true, section: EYE_ROLLING_SECTION },
+  { name: "Scaffolding", optional: true, section: EYE_ROLLING_SECTION },
+  { name: "Tapering", optional: true, section: EYE_ROLLING_SECTION },
+  ...COMMON_TAIL,
+];
 
-const ALLOWED_ROLES = ["ADMIN", "MANAGER", "OPERATOR"] as const;
+const HML_OPERATIONS = [
+  { name: "Cutting", optional: false, section: null },
+  // HML skips the entire Eye Rolling section.
+  ...COMMON_TAIL,
+];
 
-function revalidateOperations(orderId?: string) {
-  revalidatePath("/operations");
-  if (orderId) revalidatePath(`/operations/${orderId}`);
-}
+const ROUTE_DEFS: Record<"FML" | "HML", { name: string; ops: typeof FML_OPERATIONS }> = {
+  FML: { name: "Leaf Spring — FML", ops: FML_OPERATIONS },
+  HML: { name: "Leaf Spring — HML", ops: HML_OPERATIONS },
+};
 
+// Create or refresh the two standard routes for the organization. Idempotent:
+// running it again updates the operations to match the definitions above.
 export async function seedLeafSpringRoutes() {
   const user = await requireRole("ADMIN", "MANAGER");
+  const db = getTenantPrisma(user.organizationId);
 
-  await withTenantTransaction(user.organizationId, async (tx) => {
-    for (const routeType of ["FML", "HML"] as const) {
-      const definition = ROUTE_DEFS[routeType];
-      const route = await tx.productionRoute.upsert({
-        where: {
-          organizationId_routeType: {
-            organizationId: user.organizationId,
-            routeType,
-          },
-        },
-        update: { name: definition.name, isActive: true },
-        create: {
-          routeType,
-          name: definition.name,
-          isActive: true,
-        },
-      });
+  for (const routeType of ["FML", "HML"] as const) {
+    const def = ROUTE_DEFS[routeType];
 
-      await tx.routeOperation.deleteMany({ where: { routeId: route.id } });
-      await tx.routeOperation.createMany({
-        data: definition.operations.map((operation, index) => ({
-          routeId: route.id,
-          name: operation.name,
-          sequence: index + 1,
-          optional: operation.optional,
-          section: operation.section,
-        })),
-      });
-    }
-  });
+    const route = await db.productionRoute.upsert({
+      where: { organizationId_routeType: { organizationId: user.organizationId, routeType } },
+      update: { name: def.name, isActive: true },
+      create: {
+        organizationId: user.organizationId,
+        routeType,
+        name: def.name,
+        isActive: true,
+      },
+    });
 
-  revalidateOperations();
+    // Replace operations to match the canonical definition.
+    await db.routeOperation.deleteMany({ where: { routeId: route.id } });
+    await db.routeOperation.createMany({
+      data: def.ops.map((op, i) => ({
+        organizationId: user.organizationId,
+        routeId: route.id,
+        name: op.name,
+        sequence: i + 1,
+        optional: op.optional,
+        section: op.section,
+      })),
+    });
+  }
+
+  revalidatePath("/operations");
   return { success: true };
 }
 
-export async function startOrderRouting(orderId: string) {
-  const user = await requireRole(...ALLOWED_ROLES);
+// ─────────────────────────────────────────────────────────────────────────────
+// START THE ROUTED FLOW FOR AN ORDER
+//
+// When a production order is ready to begin its operation flow, this materialises
+// one OperationLog per applicable RouteOperation. Optional eye-rolling sub-steps
+// the operator did NOT select are recorded as SKIPPED so the trail is complete.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function startOrderRouting(
+  orderId: string,
+  opts?: { selectedOptionalNames?: string[] } // names of optional ops this order WILL go through
+) {
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
   const db = getTenantPrisma(user.organizationId);
+
   const order = await db.productionOrder.findFirst({
     where: { id: orderId },
     select: { id: true, routeType: true },
   });
-
   if (!order) return { success: false, error: "Order not found" };
-  if (!order.routeType) return { success: false, error: "This order has no FML/HML route" };
-
-  const route = await db.productionRoute.findFirst({
-    where: { routeType: order.routeType, isActive: true },
-    include: { operations: { orderBy: { sequence: "asc" } } },
-  });
-  if (!route?.operations.length) {
-    return { success: false, error: `No active ${order.routeType} route configured. Set up routes first.` };
+  if (!order.routeType) {
+    return { success: false, error: "This order has no route (FML/HML) set" };
   }
 
-  try {
-    await withTenantTransaction(user.organizationId, async (tx) => {
-      const existing = await tx.operationLog.count({ where: { productionOrderId: orderId } });
-      if (existing > 0) throw new Error("Routing already started for this order");
+  const res = await materializeOperationsForOrder(
+    db,
+    user.organizationId,
+    orderId,
+    order.routeType as "FML" | "HML",
+    opts?.selectedOptionalNames
+  );
+  if (!res.ok) return { success: false, error: res.error };
 
-      await tx.operationLog.createMany({
-        data: route.operations.map((operation: any) => ({
-          productionOrderId: orderId,
-          routeOperationId: operation.id,
-          operationName: operation.name,
-          sequence: operation.sequence,
-          section: operation.section,
-          optional: operation.optional,
-          status: "PENDING",
-        })),
-      });
-    });
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "Could not start routing" };
-  }
-
-  revalidateOperations(orderId);
-  return { success: true };
+  revalidatePath(`/operations/${orderId}`);
+  revalidatePath("/operations");
+  return { success: true, operationCount: res.count };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// START / FINISH A SINGLE OPERATION (the two-tap timing)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function startOperation(operationLogId: string) {
-  const user = await requireRole(...ALLOWED_ROLES);
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
   const db = getTenantPrisma(user.organizationId);
+
   const log = await db.operationLog.findFirst({ where: { id: operationLogId } });
-
   if (!log) return { success: false, error: "Operation not found" };
-  if (log.status !== "PENDING") return { success: false, error: "Only pending operations can be started" };
-
-  const [blocking, active] = await Promise.all([
-    db.operationLog.findFirst({
-      where: {
-        productionOrderId: log.productionOrderId,
-        sequence: { lt: log.sequence },
-        status: { in: ["PENDING", "IN_PROGRESS"] },
-      },
-      orderBy: { sequence: "asc" },
-    }),
-    db.operationLog.findFirst({
-      where: { productionOrderId: log.productionOrderId, status: "IN_PROGRESS" },
-    }),
-  ]);
-
-  if (blocking) return { success: false, error: `Complete or skip ${blocking.operationName} first` };
-  if (active) return { success: false, error: `${active.operationName} is already in progress` };
+  if (log.status === "DONE") return { success: false, error: "Operation already completed" };
+  if (log.status === "SKIPPED") return { success: false, error: "Operation was skipped" };
 
   const now = new Date();
-  await withTenantTransaction(user.organizationId, async (tx) => {
+
+  await db.$transaction(async (tx: any) => {
     await tx.operationLog.update({
       where: { id: operationLogId },
       data: { status: "IN_PROGRESS", startedAt: now, operatorId: user.id },
     });
+    // Stamp the order's production start on the first operation that begins.
     await tx.productionOrder.updateMany({
       where: { id: log.productionOrderId, productionStartedAt: null },
-      data: { productionStartedAt: now, status: "IN_PRODUCTION" },
+      data: { productionStartedAt: now },
     });
   });
 
-  revalidateOperations(log.productionOrderId);
-  return { success: true };
+  revalidatePath(`/operations/${log.productionOrderId}`);
+  return { success: true, startedAt: now };
 }
 
-export async function finishOperation(operationLogId: string) {
-  const user = await requireRole(...ALLOWED_ROLES);
+export async function finishOperation(operationLogId: string, notes?: string) {
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
   const db = getTenantPrisma(user.organizationId);
-  const log = await db.operationLog.findFirst({ where: { id: operationLogId } });
 
+  const log = await db.operationLog.findFirst({ where: { id: operationLogId } });
   if (!log) return { success: false, error: "Operation not found" };
-  if (log.status !== "IN_PROGRESS" || !log.startedAt) {
-    return { success: false, error: "Start this operation before marking it done" };
-  }
+  if (log.status === "DONE") return { success: false, error: "Operation already completed" };
+  if (log.status === "SKIPPED") return { success: false, error: "Operation was skipped" };
 
   const now = new Date();
-  const durationSeconds = Math.max(0, Math.round((now.getTime() - log.startedAt.getTime()) / 1000));
-  let orderFinished = false;
+  const startedAt = log.startedAt ?? now; // if they finish without starting, duration = 0
+  const durationSeconds = Math.max(0, Math.round((now.getTime() - new Date(startedAt).getTime()) / 1000));
 
-  await withTenantTransaction(user.organizationId, async (tx) => {
+  const result = await db.$transaction(async (tx: any) => {
     await tx.operationLog.update({
       where: { id: operationLogId },
-      data: { status: "DONE", completedAt: now, durationSeconds },
+      data: {
+        status: "DONE",
+        startedAt,
+        completedAt: now,
+        durationSeconds,
+        operatorId: log.operatorId ?? user.id,
+        notes: notes ?? log.notes ?? null,
+      },
     });
+
+    // If every non-skipped operation is now done, finish the order.
     const remaining = await tx.operationLog.count({
       where: {
         productionOrderId: log.productionOrderId,
         status: { in: ["PENDING", "IN_PROGRESS"] },
       },
     });
+
+    let orderFinished = false;
     if (remaining === 0) {
       await tx.productionOrder.update({
         where: { id: log.productionOrderId },
-        data: { productionFinishedAt: now, completedAt: now, status: "COMPLETED" },
+        data: { productionFinishedAt: now, status: "COMPLETED", completedAt: now },
       });
       orderFinished = true;
     }
+    return { orderFinished };
   });
 
-  revalidateOperations(log.productionOrderId);
-  return { success: true, durationSeconds, orderFinished };
+  revalidatePath(`/operations/${log.productionOrderId}`);
+  revalidatePath("/operations");
+  return { success: true, durationSeconds, orderFinished: result.orderFinished };
 }
 
+// Skip / un-skip an optional operation mid-flow.
 export async function setOperationSkipped(operationLogId: string, skipped: boolean) {
-  const user = await requireRole(...ALLOWED_ROLES);
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
   const db = getTenantPrisma(user.organizationId);
-  const log = await db.operationLog.findFirst({ where: { id: operationLogId } });
 
+  const log = await db.operationLog.findFirst({ where: { id: operationLogId } });
   if (!log) return { success: false, error: "Operation not found" };
   if (!log.optional) return { success: false, error: "Only optional operations can be skipped" };
-  if (log.status === "DONE" || log.status === "IN_PROGRESS") {
-    return { success: false, error: "An active or completed operation cannot be skipped" };
-  }
+  if (log.status === "DONE") return { success: false, error: "Operation already completed" };
 
   await db.operationLog.update({
     where: { id: operationLogId },
     data: { status: skipped ? "SKIPPED" : "PENDING" },
   });
-  revalidateOperations(log.productionOrderId);
+  revalidatePath(`/operations/${log.productionOrderId}`);
   return { success: true };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// READ: the full operation trail for an order (with durations + totals)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function getOrderOperations(orderId: string) {
-  const user = await requireRole(...ALLOWED_ROLES);
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
   const db = getTenantPrisma(user.organizationId);
+
   const order = await db.productionOrder.findFirst({
     where: { id: orderId },
     select: {
@@ -234,53 +237,62 @@ export async function getOrderOperations(orderId: string) {
       productName: true,
       routeType: true,
       status: true,
+      expectedPieces: true,
+      actualPieces: true,
       productionStartedAt: true,
       productionFinishedAt: true,
-      product: { select: { name: true } },
-      design: { select: { name: true } },
     },
   });
   if (!order) return null;
 
-  const operations = await db.operationLog.findMany({
+  const ops = await db.operationLog.findMany({
     where: { productionOrderId: orderId },
     orderBy: { sequence: "asc" },
     include: { Operator: { select: { name: true } } },
   });
-  const done = operations.filter((operation) => operation.status === "DONE");
-  const elapsedSeconds = order.productionStartedAt
-    ? Math.max(0, Math.round(((order.productionFinishedAt ?? new Date()).getTime() - order.productionStartedAt.getTime()) / 1000))
-    : null;
+
+  const doneOps = ops.filter((o: any) => o.status === "DONE");
+  const totalActiveSeconds = doneOps.reduce((s: number, o: any) => s + (o.durationSeconds ?? 0), 0);
+
+  // Wall-clock total (start of first op to finish of last) if available.
+  let elapsedSeconds: number | null = null;
+  if (order.productionStartedAt) {
+    const end = order.productionFinishedAt ?? new Date();
+    elapsedSeconds = Math.max(
+      0,
+      Math.round((new Date(end).getTime() - new Date(order.productionStartedAt).getTime()) / 1000)
+    );
+  }
 
   return {
-    order: {
-      ...order,
-      productName: order.product?.name ?? order.design?.name ?? order.productName,
-    },
-    operations: operations.map((operation) => ({
-      id: operation.id,
-      name: operation.operationName,
-      sequence: operation.sequence,
-      section: operation.section,
-      optional: operation.optional,
-      status: operation.status,
-      startedAt: operation.startedAt,
-      completedAt: operation.completedAt,
-      durationSeconds: operation.durationSeconds,
-      operatorName: operation.Operator?.name ?? null,
+    order,
+    operations: ops.map((o: any) => ({
+      id: o.id,
+      name: o.operationName,
+      sequence: o.sequence,
+      section: o.section,
+      optional: o.optional,
+      status: o.status,
+      startedAt: o.startedAt,
+      completedAt: o.completedAt,
+      durationSeconds: o.durationSeconds,
+      operatorName: o.Operator?.name ?? null,
+      notes: o.notes,
     })),
     totals: {
-      totalActiveSeconds: done.reduce((sum, operation) => sum + (operation.durationSeconds ?? 0), 0),
-      elapsedSeconds,
-      completedCount: done.length,
-      totalCount: operations.filter((operation) => operation.status !== "SKIPPED").length,
+      totalActiveSeconds, // sum of per-operation durations (hands-on time)
+      elapsedSeconds,     // wall-clock from first start to last finish
+      completedCount: doneOps.length,
+      totalCount: ops.filter((o: any) => o.status !== "SKIPPED").length,
     },
   };
 }
 
+// List orders that have a route, for the operations dashboard.
 export async function listRoutedOrders() {
-  const user = await requireRole(...ALLOWED_ROLES);
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
   const db = getTenantPrisma(user.organizationId);
+
   const orders = await db.productionOrder.findMany({
     where: { routeType: { not: null } },
     orderBy: { createdAt: "desc" },
@@ -293,20 +305,18 @@ export async function listRoutedOrders() {
       status: true,
       productionStartedAt: true,
       productionFinishedAt: true,
-      product: { select: { name: true } },
-      design: { select: { name: true } },
       _count: { select: { operationLogs: true } },
     },
   });
 
-  return orders.map((order) => ({
-    id: order.id,
-    orderNumber: order.orderNumber,
-    productName: order.product?.name ?? order.design?.name ?? order.productName,
-    routeType: order.routeType,
-    status: order.status,
-    started: Boolean(order.productionStartedAt),
-    finished: Boolean(order.productionFinishedAt),
-    operationCount: order._count.operationLogs,
+  return orders.map((o: any) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    productName: o.productName,
+    routeType: o.routeType,
+    status: o.status,
+    started: Boolean(o.productionStartedAt),
+    finished: Boolean(o.productionFinishedAt),
+    operationCount: o._count.operationLogs,
   }));
 }

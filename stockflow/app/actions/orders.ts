@@ -44,6 +44,29 @@ export async function updateOrderStatus(
         if (!order) throw new Error("Production order not found");
         if (order.status !== "PENDING") throw new Error("Only pending orders can be approved");
 
+        // 1. Resolve the route type (derived for template-based, or existing for direct)
+        const resolvedRouteType = order.routeType ?? (
+          order.design ? (
+            order.design.stages.some((stage: any) =>
+              ['Eye Rolling', 'Scaffolding', 'Tapering'].some(keyword =>
+                stage.name.toLowerCase().includes(keyword.toLowerCase())
+              )
+            ) ? 'FML' : 'HML'
+          ) : null
+        );
+
+        // 2. Fetch the active route if we have a route type
+        let route = null;
+        if (resolvedRouteType) {
+          route = await tx.productionRoute.findFirst({
+            where: { routeType: resolvedRouteType, isActive: true },
+            include: { operations: { orderBy: { sequence: "asc" } } },
+          });
+          if (!route || route.operations.length === 0) {
+            throw new Error(`No active ${resolvedRouteType} route configured. Set up routes first.`);
+          }
+        }
+
         if (order.design) {
           if (order.design.stages.length === 0) throw new Error("Design has no production stages");
           if (order.design.billOfMaterials.length === 0) throw new Error("Design has no raw material BOM");
@@ -77,26 +100,46 @@ export async function updateOrderStatus(
               rejectionReason: null,
               currentStage: firstStage.sequence,
               currentDept: firstStage.department,
+              routeType: resolvedRouteType,
             },
           });
-          return;
+        } else {
+          const firstDepartment = getDepartmentsForOrg(user.organizationId)[0];
+          if (!firstDepartment) {
+            throw new Error("Configure at least one production department before approving direct orders");
+          }
+          await tx.productionOrder.update({
+            where: { id: orderId },
+            data: {
+              status: "IN_PRODUCTION",
+              approvedBy: user.id,
+              approvedAt: new Date(),
+              rejectionReason: null,
+              currentStage: 1,
+              currentDept: order.currentDept ?? firstDepartment,
+              routeType: resolvedRouteType,
+            },
+          });
         }
 
-        const firstDepartment = getDepartmentsForOrg(user.organizationId)[0];
-        if (!firstDepartment) {
-          throw new Error("Configure at least one production department before approving direct orders");
+        // 3. Create operation logs if route exists
+        if (route && route.operations.length > 0) {
+          const existingOps = await tx.operationLog.count({ where: { productionOrderId: orderId } });
+          if (existingOps === 0) {
+            await tx.operationLog.createMany({
+              data: route.operations.map((operation: any) => ({
+                productionOrderId: orderId,
+                routeOperationId: operation.id,
+                operationName: operation.name,
+                sequence: operation.sequence,
+                section: operation.section,
+                optional: operation.optional,
+                status: "PENDING",
+                organizationId: user.organizationId,
+              })),
+            });
+          }
         }
-        await tx.productionOrder.update({
-          where: { id: orderId },
-          data: {
-            status: "IN_PRODUCTION",
-            approvedBy: user.id,
-            approvedAt: new Date(),
-            rejectionReason: null,
-            currentStage: 1,
-            currentDept: order.currentDept ?? firstDepartment,
-          },
-        });
       });
     }
     

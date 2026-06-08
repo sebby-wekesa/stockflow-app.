@@ -67,7 +67,12 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
   const [productId, setProductId] = useState("");
   const [expectedPieces, setExpectedPieces] = useState("15");
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH">("MEDIUM");
-  const [routeType, setRouteType] = useState<"FML" | "HML">("FML");
+  const [routeType, setRouteType] = useState<"FML" | "HML" | null>("FML");
+  const [selectedOptionalSteps, setSelectedOptionalSteps] = useState<string[]>([
+    "Eye Rolling",
+    "Scaffolding",
+    "Tapering",
+  ]);
   const [lines, setLines] = useState<MaterialLine[]>([emptyLine()]);
 
   useEffect(() => {
@@ -131,33 +136,34 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
     );
   }
 
-  async function submitQuickOrder(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canSubmit || isSubmitting) return;
+   async function submitQuickOrder(event: React.FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+     if (!canSubmit || isSubmitting) return;
 
-    setIsSubmitting(true);
-    try {
-      const response = await fetch("/api/production-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderType: "direct",
-          orderNumber,
-          productName,
-          productId: productId || null,
-          expectedPieces: Number(expectedPieces),
-          priority,
-          routeType,
-          initialWeight: 0.0001,
-          materialLines: lines.map((line) => ({
-            rawMaterialId: line.rawMaterialId,
-            cutLength: line.cutLength === "" ? null : Number(line.cutLength),
-            pieces: Number(line.pieces),
-            totalLength: line.totalLength === "" ? null : Number(line.totalLength),
-            weightKg: Number(line.weightKg),
-          })),
-        }),
-      });
+     setIsSubmitting(true);
+     try {
+       const response = await fetch("/api/production-orders", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+           orderType: "direct",
+           orderNumber,
+           productName,
+           productId: productId || null,
+           expectedPieces: Number(expectedPieces),
+           priority,
+           routeType,
+           selectedOptionalSteps: routeType ? selectedOptionalSteps : [],
+           initialWeight: 0.0001,
+           materialLines: lines.map((line) => ({
+             rawMaterialId: line.rawMaterialId,
+             cutLength: line.cutLength === "" ? null : Number(line.cutLength),
+             pieces: Number(line.pieces),
+             totalLength: line.totalLength === "" ? null : Number(line.totalLength),
+             weightKg: Number(line.weightKg),
+           })),
+         }),
+       });
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -257,18 +263,75 @@ export function ProductionOrderTabs({ onSuccess }: { onSuccess?: () => void }) {
                 onChange={(event) => setExpectedPieces(event.target.value)}
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">Production route</label>
-              <select
-                className="form-input production-input"
-                value={routeType}
-                onChange={(event) => setRouteType(event.target.value as "FML" | "HML")}
-                disabled={Boolean(productId)}
-              >
-                <option value="FML">FML - includes Eye Rolling Section</option>
-                <option value="HML">HML - skips Eye Rolling Section</option>
-              </select>
-            </div>
+             <div className="form-group">
+               <label className="form-label">Production route</label>
+               <select
+                 className="form-input production-input"
+                 value={routeType ?? ""}
+                 onChange={(event) => {
+                   const value = event.target.value;
+                   if (value === "") {
+                     setRouteType(null);
+                   } else if (value === "FML" || value === "HML") {
+                     setRouteType(value);
+                   }
+                 }}
+                 disabled={Boolean(productId)}
+               >
+                 <option value="">None</option>
+                 <option value="FML">FML</option>
+                 <option value="HML">HML</option>
+               </select>
+               {routeType === "FML" && (
+                 <div className="form-group">
+                   <label className="form-label">Optional steps for FML</label>
+                   <div className="optional-steps-checkboxes">
+                     <label className="optional-step-checkbox">
+                       <input
+                         type="checkbox"
+                         checked={selectedOptionalSteps.includes("Eye Rolling")}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedOptionalSteps([...selectedOptionalSteps, "Eye Rolling"]);
+                           } else {
+                             setSelectedOptionalSteps(selectedOptionalSteps.filter((s) => s !== "Eye Rolling"));
+                           }
+                         }}
+                       />
+                       <span>Eye Rolling</span>
+                     </label>
+                     <label className="optional-step-checkbox">
+                       <input
+                         type="checkbox"
+                         checked={selectedOptionalSteps.includes("Scaffolding")}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedOptionalSteps([...selectedOptionalSteps, "Scaffolding"]);
+                           } else {
+                             setSelectedOptionalSteps(selectedOptionalSteps.filter((s) => s !== "Scaffolding"));
+                           }
+                         }}
+                       />
+                       <span>Scaffolding</span>
+                     </label>
+                     <label className="optional-step-checkbox">
+                       <input
+                         type="checkbox"
+                         checked={selectedOptionalSteps.includes("Tapering")}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedOptionalSteps([...selectedOptionalSteps, "Tapering"]);
+                           } else {
+                             setSelectedOptionalSteps(selectedOptionalSteps.filter((s) => s !== "Tapering"));
+                           }
+                         }}
+                       />
+                       <span>Tapering</span>
+                     </label>
+                   </div>
+                 </div>
+               )}
+             </div>
           </div>
 
           <div className="form-group">
