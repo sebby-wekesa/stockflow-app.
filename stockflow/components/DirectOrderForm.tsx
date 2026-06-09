@@ -80,16 +80,15 @@ export function DirectOrderForm({ onSuccess }: { onSuccess?: () => void }) {
       return
     }
     const payloadLines = lines
-      .filter((l) => l.rawMaterialId || l.materialLabel)
+      .filter((l) => l.rawMaterialId)
       .map((l) => ({
-        rawMaterialId: l.rawMaterialId || null,
-        materialLabel: l.materialLabel,
-        cutLengthCm: parseFloat(l.cutLengthCm),
+        rawMaterialId: l.rawMaterialId,
+        cutLength: parseFloat(l.cutLengthCm),
         pieces: parseInt(l.pieces),
-        totalLengthCm: parseFloat(l.totalLengthCm),
+        totalLength: parseFloat(l.totalLengthCm),
       }))
     if (payloadLines.length === 0) {
-      setError('Add at least one material line')
+      setError('Add at least one material line (each must have a material selected)')
       return
     }
 
@@ -243,7 +242,7 @@ export function DirectOrderForm({ onSuccess }: { onSuccess?: () => void }) {
 
       {/* Material lines */}
       <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Package size={16} style={{ color: 'var(--muted)' }} />
             <span style={{ fontWeight: 700, fontSize: 14 }}>Materials to cut</span>

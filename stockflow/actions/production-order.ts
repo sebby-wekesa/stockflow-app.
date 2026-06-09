@@ -96,11 +96,10 @@ export async function approveProductionOrder(orderId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type DirectMaterialLine = {
-  rawMaterialId?: string | null;
-  materialLabel: string;
-  cutLengthCm: number;
+  rawMaterialId: string; // required — every material line links to a stocked raw material
+  cutLength: number;
   pieces: number;
-  totalLengthCm?: number; // optional; defaults to cutLengthCm * pieces
+  totalLength?: number; // optional; defaults to cutLength * pieces
 };
 
 type DirectOrderInput = {
@@ -147,26 +146,27 @@ export async function createDirectProductionOrder(input: DirectOrderInput) {
 
   const materialRows = [];
   for (const [i, m] of input.materials.entries()) {
-    const label = (m.materialLabel ?? "").trim();
-    const cut = Number(m.cutLengthCm);
+    const rawMaterialId = (m.rawMaterialId ?? "").trim();
+    const cut = Number(m.cutLength);
     const pieces = Number(m.pieces);
-    if (!label) return { success: false, error: `Material line ${i + 1}: pick a material` };
+    if (!rawMaterialId) return { success: false, error: `Material line ${i + 1}: pick a material` };
     if (!Number.isFinite(cut) || cut <= 0)
       return { success: false, error: `Material line ${i + 1}: cut length must be positive` };
     if (!Number.isFinite(pieces) || pieces <= 0 || !Number.isInteger(pieces))
       return { success: false, error: `Material line ${i + 1}: pieces must be a whole number` };
     // total length defaults to cut x pieces but the admin can override it
     const total =
-      m.totalLengthCm != null && Number.isFinite(Number(m.totalLengthCm)) && Number(m.totalLengthCm) > 0
-        ? Number(m.totalLengthCm)
+      m.totalLength != null && Number.isFinite(Number(m.totalLength)) && Number(m.totalLength) > 0
+        ? Number(m.totalLength)
         : cut * pieces;
+    // Use relation-connect syntax so the nested create satisfies the required
+    // RawMaterial and Organization relations on ProductionOrderMaterial.
     materialRows.push({
-      organizationId: user.organizationId,
-      rawMaterialId: m.rawMaterialId || null,
-      materialLabel: label,
-      cutLengthCm: cut,
+      cutLength: cut,
       pieces,
-      totalLengthCm: total,
+      totalLength: total,
+      RawMaterial: { connect: { id: rawMaterialId } },
+      Organization: { connect: { id: user.organizationId } },
     });
   }
 
@@ -183,7 +183,7 @@ export async function createDirectProductionOrder(input: DirectOrderInput) {
       expectedPieces,
       quantity: input.quantity && input.quantity > 0 ? input.quantity : 1,
       priority: (input.priority as any) ?? "MEDIUM",
-      notes: input.notes ?? null,
+      targetKg: 0,
       status: "PENDING",
       currentStage: 1,
       routeType,
@@ -281,12 +281,11 @@ export async function recordProductionOutput(
 
       await tx.materialConsumptionLog.create({
         data: {
-          id: crypto.randomUUID(),
-          productionOrderId: orderId,
-          rawMaterialId: targetRawMaterialId,
           quantityConsumed: kgIn,
           notes: `Consumed on production recording (${actual} pcs produced)`,
-          organizationId: user.organizationId,
+          ProductionOrder: { connect: { id: orderId } },
+          RawMaterial: { connect: { id: targetRawMaterialId } },
+          Organization: { connect: { id: user.organizationId } },
         },
       });
     }
@@ -295,7 +294,9 @@ export async function recordProductionOutput(
       where: { id: orderId },
       data: {
         actualPieces: actual,
-        actualKgOut:
+        outputRecordedAt: new Date(),
+        outputRecordedBy: user.id,
+        actualWeightOut:
           input.actualKgOut != null && Number.isFinite(Number(input.actualKgOut))
             ? Number(input.actualKgOut)
             : null,
@@ -350,17 +351,15 @@ export async function saveOrderAsTemplate(orderId: string, templateName?: string
       specifications: {
         expectedPieces: order.expectedPieces,
         materials: order.materials.map((m: {
-          rawMaterialId: string | null
-          materialLabel: string
-          cutLengthCm: unknown
+          rawMaterialId: string
+          cutLength: unknown
           pieces: number
-          totalLengthCm: unknown
+          totalLength: unknown
         }) => ({
           rawMaterialId: m.rawMaterialId,
-          materialLabel: m.materialLabel,
-          cutLengthCm: Number(m.cutLengthCm),
+          cutLength: m.cutLength != null ? Number(m.cutLength) : null,
           pieces: m.pieces,
-          totalLengthCm: Number(m.totalLengthCm),
+          totalLength: m.totalLength != null ? Number(m.totalLength) : null,
         })),
       },
       organizationId: user.organizationId,
@@ -393,6 +392,18 @@ export async function releaseProductionOrder(orderId: string) {
 
   if (order.status !== "APPROVED") {
     throw new Error("Order must be approved before release to production");
+  }
+
+  if (!order.design) {
+    // Direct order: update status to IN_PRODUCTION directly without design stages
+    await db.productionOrder.update({
+      where: { id: orderId },
+      data: {
+        status: "IN_PRODUCTION",
+        currentStage: 1,
+      },
+    });
+    redirect("/production");
   }
 
   if (order.design.stages.length === 0) {

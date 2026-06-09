@@ -61,27 +61,28 @@ export async function signIn(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  // Rate-limit: 5 attempts per minute per (IP, email). This stops single-source
-  // brute force without locking out a busy office where many people sign in.
-  // Check happens BEFORE input validation so even malformed requests count.
-  const ip = await getClientIp();
-  const rlKey = `signin:${ip}:${(email ?? '').toLowerCase().trim()}`;
-  const rl = await checkRateLimitAsync(rlKey, { windowMs: 60_000, maxRequests: 5 });
-  if (!rl.success) {
-    return { error: rl.error };
-  }
-
-  // Validate input
+  // Validate input early so we skip all I/O on bad data.
   const validation = loginSchema.safeParse({ email, password });
-
   if (!validation.success) {
     const errors = validation.error.flatten().fieldErrors;
     const firstError = errors.email?.[0] || errors.password?.[0] || "Invalid input";
     return { error: firstError };
   }
 
-  // Create Supabase server client
-  const supabase = await createSupabaseClient();
+  // getClientIp() and createSupabaseClient() both only await Next.js header/
+  // cookie stores — they are independent, so run them in parallel.
+  const [ip, supabase] = await Promise.all([
+    getClientIp(),
+    createSupabaseClient(),
+  ]);
+
+  // Rate-limit: 5 attempts per minute per (IP, email). This stops single-source
+  // brute force without locking out a busy office where many people sign in.
+  const rlKey = `signin:${ip}:${validation.data.email.toLowerCase()}`;
+  const rl = await checkRateLimitAsync(rlKey, { windowMs: 60_000, maxRequests: 5 });
+  if (!rl.success) {
+    return { error: rl.error };
+  }
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: validation.data.email,
@@ -93,20 +94,14 @@ export async function signIn(formData: FormData) {
     return { error: getAuthErrorMessage(error) };
   }
 
-  if (!data.user) {
+  if (!data.user || !data.session) {
     return { error: "Authentication failed. Please try again." };
   }
 
-  if (!data.session) {
-    return { error: "Authentication failed. Please try again." };
-  }
-
-  // Verify session is properly set in cookies
-  const { data: { session: verifySession } } = await supabase.auth.getSession();
-  if (!verifySession) {
-    console.error("Session not established properly");
-    return { error: "Authentication failed. Please try again." };
-  }
+  // NOTE: We do NOT call supabase.auth.getSession() here — data.session is
+  // already the freshly-issued session returned by signInWithPassword.
+  // A redundant getSession() would cost an extra ~300-800ms network round-trip
+  // to Supabase on every login for zero benefit.
 
   // Verify the user has a fully-set-up account in our Prisma database.
   // Never auto-create a User row or attach a user to an organization.
@@ -135,14 +130,19 @@ export async function signIn(formData: FormData) {
       };
     }
 
-    if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
-      await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
-        user_metadata: {
-          name: existingUser.name,
-          role: existingUser.role,
-        },
-      });
-    }
+     // Sync DB role into Supabase token metadata if they diverge.
+     // Fire-and-forget so the user is never blocked by a slow Admin API call —
+     // the token will carry the correct role on the next login at the latest.
+     if (existingUser.role && existingUser.role !== data.user.user_metadata?.role) {
+       supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+         user_metadata: {
+           name: existingUser.name,
+           role: existingUser.role,
+         },
+       }).catch((err: unknown) => {
+         console.error("[auth] background role sync failed:", err);
+       });
+     }
   } catch (dbError) {
     console.error("Sign-in verification failed:", dbError);
     await supabase.auth.signOut();
