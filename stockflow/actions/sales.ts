@@ -131,49 +131,96 @@ export async function createSalesOrder(formData: FormData) {
       0
     )
 
-    const result = await withTenantTransaction(user.organizationId, async (tx) => {
+const result = await withTenantTransaction(user.organizationId, async (tx) => {
     // Fetch all products in this order (existence check)
     const productIds = data.lines.map((l) => l.product_id)
     type ProductLite = { id: string; sku: string | null; name: string; uom: string; currentStock: number; piecesSets: number }
     const products = await tx.product.findMany({
-      where: { id: { in: productIds } },
-      select: { id: true, sku: true, name: true, uom: true, currentStock: true, piecesSets: true },
+        where: { id: { in: productIds } },
+        select: { id: true, sku: true, name: true, uom: true, currentStock: true, piecesSets: true },
     }) as ProductLite[]
     if (products.length !== data.lines.length) {
-      throw new Error('One or more products not found in your organization')
+        throw new Error('One or more products not found in your organization')
     }
     const productMap = new Map<string, ProductLite>(products.map((p) => [p.id, p]))
+
+    // Check stock availability for all products
+    const lowStockLines = data.lines.filter(l => {
+        const p = productMap.get(l.product_id)!
+        return p.currentStock < Number(l.qty)
+    })
+
+    // If any product is out of stock, create a production request instead of sale order
+    if (lowStockLines.length > 0) {
+        // Create production request for the first out-of-stock item
+        const firstLow = lowStockLines[0]
+        const prodProduct = productMap.get(firstLow.product_id)!
+        
+        // Generate production order number
+        const lastProd = await tx.productionOrder.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { orderNumber: true },
+        })
+        const year = new Date().getFullYear()
+        let nextNum = 1
+        if (lastProd?.orderNumber) {
+            const m = lastProd.orderNumber.match(/ORD-\d{4}-(\d{4})/)
+            if (m) nextNum = parseInt(m[1]) + 1
+        }
+        const prodOrderNumber = `ORD-${year}-${nextNum.toString().padStart(4, '0')}`
+        
+        // Create production request
+        await tx.productionOrder.create({
+            data: {
+                orderNumber: prodOrderNumber,
+                productName: prodProduct.name,
+                quantity: Number(firstLow.qty) - prodProduct.currentStock,
+                targetKg: 0,
+                status: 'PENDING',
+                organizationId: user.organizationId,
+                routeType: null,
+            },
+        })
+        
+        // Return a special result indicating production request was created
+        return { 
+            productionRequestCreated: true, 
+            orderNumber: prodOrderNumber,
+            productName: prodProduct.name,
+            quantityNeeded: Number(firstLow.qty) - prodProduct.currentStock
+        }
+    }
 
     // Ensure the IMPORTED placeholder Design exists (inside the txn,
     // so concurrent invoices don't both try to create it).
     let placeholderDesign = await tx.design.findFirst({ where: { code: 'IMPORTED' } })
     if (!placeholderDesign) {
-      placeholderDesign = await tx.design.create({
-        data: {
-          name: 'Manual sale placeholder',
-          code: 'IMPORTED',
-          description: 'Placeholder design used when recording manual sales.',
-        },
-      })
+        placeholderDesign = await tx.design.create({
+            data: {
+                name: 'Manual sale placeholder',
+                code: 'IMPORTED',
+                description: 'Placeholder design used when recording manual sales.',
+            },
+        })
     }
 
     // Generate the invoice number inside the txn. Concurrent invoices in the
     // same branch are serialized by the unique constraint on (orgId, id) —
     // if a collision occurs the txn aborts and the caller retries.
     const orderNumber =
-      action === 'invoice'
-        ? await nextInvoiceNumber(user.organizationId, salesBranch)
-        : `DRAFT-${Date.now().toString(36).toUpperCase()}`
+        action === 'invoice'
+            ? await nextInvoiceNumber(user.organizationId, salesBranch)
+            : `DRAFT-${Date.now().toString(36).toUpperCase()}`
 
     const order = await tx.saleOrder.create({
-      data: {
-        id: orderNumber,
-        customerId: data.customer_id || null,
-        customerName: data.customer_name,
-        totalAmount,
-        status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
-        createdBy: user.id,
-      },
+        data: {
+            id: orderNumber,
+            customerId: data.customer_id || null,
+            customerName: data.customer_name,
+            totalAmount,
+            status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
+            createdBy: user.id,
+        },
     })
 
     for (const line of data.lines) {
