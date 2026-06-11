@@ -6,7 +6,7 @@ import { postSaleToLedger } from "@/lib/accounting/sales-posting";
 import { withTenantTransaction } from "@/lib/tenant-prisma";
 
 export async function backfillSalesPostings() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
 
   const result = await withTenantTransaction(
     user.organizationId,

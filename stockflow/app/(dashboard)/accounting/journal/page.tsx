@@ -6,7 +6,7 @@ import { JournalForm } from "@/components/accounting/JournalForm";
 export const dynamic = "force-dynamic";
 
 export default async function JournalPage() {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const accounts = await listAccounts();
 
   return (

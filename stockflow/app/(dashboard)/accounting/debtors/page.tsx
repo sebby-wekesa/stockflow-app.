@@ -9,7 +9,7 @@ function money(n: number) {
 }
 
 export default async function DebtorsPage() {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const { rows, totalOutstanding } = await getDebtors();
 
   return (

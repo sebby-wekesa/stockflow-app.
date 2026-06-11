@@ -1,5 +1,5 @@
 // lib/types.ts
-export const USER_ROLES = ['PENDING', 'ADMIN', 'MANAGER', 'OPERATOR', 'SALES', 'PACKAGING', 'WAREHOUSE'] as const;
+export const USER_ROLES = ['PENDING', 'ADMIN', 'MANAGER', 'ACCOUNTS', 'OPERATOR', 'SALES', 'PACKAGING', 'WAREHOUSE'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 
@@ -18,6 +18,7 @@ export const ROLE_PATHS: Record<UserRole, string> = {
   PENDING: '/dashboard',
   ADMIN: '/admin/dashboard',
   MANAGER: '/dashboard',
+  ACCOUNTS: '/accounting',
   OPERATOR: '/dashboard',
   SALES: '/sales',
   PACKAGING: '/packaging',
@@ -28,6 +29,7 @@ export const ROLE_NAMES: Record<UserRole, string> = {
   PENDING: 'Pending Approval',
   ADMIN: 'Administrator',
   MANAGER: 'Production Manager',
+  ACCOUNTS: 'Accounts Team',
   OPERATOR: 'Operator',
   SALES: 'Sales Team',
   PACKAGING: 'Packaging Team',
@@ -38,6 +40,7 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   PENDING: 'var(--muted)',
   ADMIN: 'var(--accent)',
   MANAGER: 'var(--accent)',
+  ACCOUNTS: 'var(--teal)',
   OPERATOR: 'var(--purple)',
   SALES: 'var(--teal)',
   PACKAGING: 'var(--green)',

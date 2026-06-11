@@ -27,7 +27,7 @@ function parseDate(value: string, endOfDay = false): Date | null {
 }
 
 export async function seedChartOfAccounts() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
 
   const result = await withTenantTransaction(user.organizationId, async (tx) => {
     const existing = await tx.chartAccount.findMany({
@@ -141,7 +141,7 @@ export async function seedChartOfAccounts() {
 }
 
 export async function listAccounts() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   return db.chartAccount.findMany({
     orderBy: { code: "asc" },
@@ -164,7 +164,7 @@ export async function createAccount(input: {
   type: (typeof ACCOUNT_TYPES)[number];
   normalBalance?: (typeof NORMAL_BALANCES)[number];
 }) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const code = input.code.trim();
   const name = input.name.trim();
@@ -210,7 +210,7 @@ export async function updateAccount(
   id: string,
   input: { name?: string; isActive?: boolean },
 ) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const account = await db.chartAccount.findFirst({ where: { id } });
   if (!account) return { success: false, error: "Account not found" };
@@ -244,7 +244,7 @@ export async function createManualJournal(input: {
     description?: string;
   }[];
 }) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const date = parseDate(input.date);
   if (!date) return { success: false, error: "Enter a valid journal date" };
 
@@ -277,7 +277,7 @@ export async function createManualJournal(input: {
 }
 
 export async function getTrialBalance(asOf?: string) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const asOfDate = asOf ? parseDate(asOf, true) : null;
   if (asOf && !asOfDate) throw new Error("Invalid trial balance date");
@@ -348,7 +348,7 @@ export async function getGeneralLedger(input: {
   from?: string;
   to?: string;
 }) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const accounts = await db.chartAccount.findMany({
     orderBy: { code: "asc" },

@@ -19,7 +19,7 @@ export default async function TrialBalancePage({
 }: {
   searchParams: Promise<{ asOf?: string }>;
 }) {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const { asOf } = await searchParams;
   const tb = await getTrialBalance(asOf);
 

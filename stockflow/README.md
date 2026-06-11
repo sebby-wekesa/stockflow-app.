@@ -90,6 +90,7 @@ stockflow/
 
 - **ADMIN** — Complete access, user management, system settings
 - **MANAGER** — Approvals, reports, yield oversight
+- **ACCOUNTS** — Accounting, journals, banking, debtors, and creditors
 - **OPERATOR** — Production stage logging, job queues, packaging
 - **SALES** — Customer & order management, catalogue
 - **WAREHOUSE** — Intake, stock movements, alerts, transfers

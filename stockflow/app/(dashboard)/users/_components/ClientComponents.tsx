@@ -64,6 +64,7 @@ export function InviteModal({ onClose }: InviteModalProps) {
               <option value="">Select a role</option>
               <option value="ADMIN">Admin</option>
               <option value="MANAGER">Manager</option>
+              <option value="ACCOUNTS">Accounts</option>
               <option value="OPERATOR">Operator</option>
               <option value="WAREHOUSE">Warehouse</option>
               <option value="SALES">Sales</option>
@@ -157,6 +158,7 @@ export function UserTable({ users }: UserTableProps) {
                   <span className={`badge ${
                     user.role === 'ADMIN' ? 'badge-error' :
                     user.role === 'MANAGER' ? 'badge-warning' :
+                    user.role === 'ACCOUNTS' ? 'badge-info' :
                     user.role === 'WAREHOUSE' ? 'badge-info' :
                     user.role === 'SALES' ? 'badge-success' :
                     user.role === 'OPERATOR' ? 'badge-primary' :

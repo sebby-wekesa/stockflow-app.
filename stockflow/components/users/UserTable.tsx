@@ -10,6 +10,7 @@ import type { User } from '@prisma/client'
 const ROLE_BADGES: Record<string, string> = {
   admin: 'badge-error',
   manager: 'badge-warning',
+  ACCOUNTS: 'badge-info',
   warehouse: 'badge-info',
   sales: 'badge-success',
   accountant: 'badge-neutral',

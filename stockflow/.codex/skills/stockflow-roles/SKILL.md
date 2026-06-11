@@ -27,6 +27,16 @@ Can:
 - monitor production progress
 - manage accounting and post journals
 
+### ACCOUNTS
+
+Can:
+- manage accounting and post journals
+- manage banking, debtors, and creditors
+- view accounting reports
+
+Should not:
+- access production, sales, warehouse, packaging, or system administration workflows
+
 ### OPERATOR
 
 Can:
@@ -66,4 +76,4 @@ Can:
 - Navigation should hide unauthorized pages.
 - Route handlers and server actions must validate authorization.
 - Organization and branch scoping still apply after role checks.
-- Restrict accounting pages and actions to `ADMIN` and `MANAGER`.
+- Restrict accounting pages and actions to `ADMIN`, `MANAGER`, and `ACCOUNTS`.

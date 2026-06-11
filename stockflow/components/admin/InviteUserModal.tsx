@@ -205,6 +205,7 @@ export default function InviteUserModal() {
                   <option value="OPERATOR">Operator</option>
                   <option value="MANAGER">Manager</option>
                   <option value="ADMIN">Admin</option>
+                  <option value="ACCOUNTS">Accounts</option>
                   <option value="WAREHOUSE">Warehouse</option>
                   <option value="SALES">Sales</option>
                   <option value="PACKAGING">Packaging</option>

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const TYPE_ORDER = ["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"];
 
 export default async function ChartOfAccountsPage() {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const accounts = await listAccounts();
 
   const byType: Record<string, any[]> = {};

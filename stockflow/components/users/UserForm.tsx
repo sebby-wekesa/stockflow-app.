@@ -17,6 +17,11 @@ const ROLE_OPTIONS: { value: UserRole; label: string; description: string }[] = 
     description: 'Can approve, view all reports, manage production',
   },
   {
+    value: 'ACCOUNTS',
+    label: 'Accounts',
+    description: 'Manage accounting, journals, banking, debtors, and creditors',
+  },
+  {
     value: 'OPERATOR',
     label: 'Operator',
     description: 'Manage production stages and operations',

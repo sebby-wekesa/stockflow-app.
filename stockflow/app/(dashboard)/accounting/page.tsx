@@ -16,7 +16,7 @@ function money(n: number) {
 }
 
 export default async function AccountingPage() {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
 
   // Each of these is resilient to an empty/unseeded org.
   const [accounts, tb, debtors, creditors, banks] = await Promise.all([

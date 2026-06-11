@@ -83,6 +83,19 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { label: "Import centre", href: "/import" },
       ];
 
+    case 'ACCOUNTS':
+      return [
+        { section: "Accounting" },
+        { label: "Accounting overview", href: "/accounting" },
+        { label: "Trial balance", href: "/accounting/trial-balance" },
+        { label: "General ledger", href: "/accounting/ledger" },
+        { label: "Banking", href: "/accounting/banking" },
+        { label: "Debtors", href: "/accounting/debtors" },
+        { label: "Creditors", href: "/accounting/creditors" },
+        { label: "Chart of accounts", href: "/accounting/chart" },
+        { label: "Journal entry", href: "/accounting/journal" },
+      ];
+
     case 'OPERATOR':
       return [
         { section: "My Work" },
@@ -204,6 +217,7 @@ export function RoleBadge({ role }: { role: Role }) {
     PENDING: "badge-muted",
     ADMIN: "badge-amber",
     MANAGER: "badge-amber",
+    ACCOUNTS: "badge-teal",
     OPERATOR: "badge-purple",
     SALES: "badge-teal",
     PACKAGING: "badge-green",

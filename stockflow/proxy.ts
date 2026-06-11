@@ -44,6 +44,7 @@ type UserContextRow = {
 
 const ROUTE_ROLE_RULES: Array<{ paths: string[]; roles: string[] }> = [
   { paths: ['/users'], roles: ['ADMIN'] },
+  { paths: ['/accounting'], roles: ['ADMIN', 'MANAGER', 'ACCOUNTS'] },
   { paths: ['/reports', '/analytics', '/scrap'], roles: ['ADMIN', 'MANAGER'] },
   { paths: ['/approvals', '/manager', '/manager_dash'], roles: ['ADMIN', 'MANAGER'] },
   { paths: ['/operator', '/operator_queue', '/operator_log', '/operator_history', '/stage-logger'], roles: ['OPERATOR', 'ADMIN', 'MANAGER'] },
@@ -259,6 +260,14 @@ export async function proxy(request: NextRequest) {
     const homePage = getRoleHomePage(ctx.role)
     return applySecurityHeaders(
       NextResponse.redirect(new URL(homePage, request.url)),
+      nonce,
+      csp
+    )
+  }
+
+  if (ctx.role === 'ACCOUNTS' && !pathMatches(pathname, '/accounting')) {
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL(getRoleHomePage(ctx.role), request.url)),
       nonce,
       csp
     )

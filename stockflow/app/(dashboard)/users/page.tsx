@@ -259,6 +259,7 @@ export default async function UsersPage({
                 <td>
                   <span className={`badge ${
                     ['ADMIN', 'MANAGER'].includes(user.role) ? 'badge-amber' :
+                    user.role === 'ACCOUNTS' ? 'badge-teal' :
                     user.role === 'OPERATOR' ? 'badge-purple' :
                     user.role === 'SALES' ? 'badge-teal' :
                     'badge-muted'

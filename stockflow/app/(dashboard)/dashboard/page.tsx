@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 import { TeamRole } from '@/lib/proxy'
 import OperatorDashboard from '../operator/OperatorDashboard'
@@ -12,6 +13,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const user = await requireAuth();
+  if (user.role === 'ACCOUNTS') {
+    redirect('/accounting');
+  }
+
   const role = user.role.toLowerCase() as TeamRole;
   return await TeamDashboard({ role, user });
 }

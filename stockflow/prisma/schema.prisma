@@ -8,78 +8,8 @@ datasource db {
   provider = "postgresql"
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-
 model AuditLog {
-  id             String   @id @default(uuid())
-  organizationId String
+  id             String       @id @default(uuid())
   userId         String
   action         String
   entityType     String?
@@ -87,26 +17,26 @@ model AuditLog {
   details        String?
   ipAddress      String?
   userAgent      String?
-  createdAt      DateTime @default(now())
-  User           User     @relation(fields: [userId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  organizationId String
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "AuditLog_organizationId_fk")
+  User           User         @relation(fields: [userId], references: [id])
 
   @@index([organizationId])
 }
 
 model BillOfMaterials {
   id             String       @id @default(uuid())
-  organizationId String
   designId       String
   rawMaterialId  String
   quantity       Decimal      @db.Decimal(10, 4)
   unitOfMeasure  String       @default("kg")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  organizationId String
   design         Design       @relation(fields: [designId], references: [id], onDelete: Cascade)
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "BillOfMaterials_organizationId_fk")
   RawMaterial    RawMaterial  @relation(fields: [rawMaterialId], references: [id])
-  Organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([designId, rawMaterialId])
   @@index([organizationId])
@@ -115,9 +45,9 @@ model BillOfMaterials {
 model Branch {
   id                     String                   @id @default(uuid())
   organizationId         String
-  name                   String
+  name                   String                   @unique
   location               String?
-  code                   String
+  code                   String                   @unique
   address                String?
   phone                  String?
   managerId              String?
@@ -126,22 +56,21 @@ model Branch {
   Organization           Organization             @relation(fields: [organizationId], references: [id])
   InventoryFinishedGoods InventoryFinishedGoods[]
   InventoryRawMaterial   InventoryRawMaterial[]
+  Invitation             Invitation[]
   MaterialReceipt        MaterialReceipt[]
   Product                Product[]
   ProductReceipt         ProductReceipt[]
   StockMovement          StockMovement[]
   User                   User[]
-  Invitation             Invitation[]
 
-  @@unique([organizationId, name])
-  @@unique([organizationId, code])
+  @@unique([organizationId, code], map: "Branch_org_code_key")
+  @@unique([organizationId, name], map: "Branch_org_name_key")
 }
 
 model Customer {
   id                   String                @id @default(uuid())
-  organizationId       String
   name                 String
-  code                 String
+  code                 String                @unique
   contactName          String?
   email                String?
   phone                String?
@@ -149,42 +78,41 @@ model Customer {
   taxId                String?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  organizationId       String
+  Organization         Organization          @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Customer_organizationId_fk")
   CustomerPortalAccess CustomerPortalAccess?
-  SaleOrder            SaleOrder[]
   Payment              Payment[]
+  SaleOrder            SaleOrder[]
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, code])
+  @@unique([organizationId, code], map: "Customer_org_code_key")
   @@index([organizationId])
 }
 
 model CustomerPortalAccess {
-  id             String    @id @default(uuid())
-  organizationId String
-  customerId     String    @unique
-  accessCode     String    @unique
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
+  id             String       @id @default(uuid())
+  customerId     String       @unique
+  accessCode     String       @unique
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
   lastLogin      DateTime?
-  Customer       Customer  @relation(fields: [customerId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  Customer       Customer     @relation(fields: [customerId], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "CustomerPortalAccess_organizationId_fk")
 
   @@index([organizationId])
 }
 
 model DemandForecast {
   id               String       @id @default(uuid())
-  organizationId   String
   rawMaterialId    String
   forecastDate     DateTime
   forecastedDemand Decimal      @db.Decimal(10, 4)
   confidenceLevel  Float
   basedOnDays      Int
   createdAt        DateTime     @default(now())
+  organizationId   String
+  Organization     Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "DemandForecast_organizationId_fk")
   RawMaterial      RawMaterial  @relation(fields: [rawMaterialId], references: [id])
-  Organization     Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([rawMaterialId, forecastDate])
   @@index([organizationId])
@@ -192,63 +120,60 @@ model DemandForecast {
 
 model Design {
   id               String            @id @default(uuid())
-  organizationId   String
   name             String
-  code             String
-  category         String?
+  code             String            @unique
   description      String?
   targetDimensions String?
   targetWeight     Decimal?          @db.Decimal(10, 4)
-  expectedYield    Float?
-  specifications   Json?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  organizationId   String
   lastSeenAt       DateTime?
+  category         String?
+  expectedYield    Float?
+  specifications   Json?
   billOfMaterials  BillOfMaterials[]
+  Organization     Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Design_organizationId_fk")
   finishedGoods    FinishedGoods[]
   productionOrders ProductionOrder[]
   stages           Stage[]
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, code])
+  @@unique([organizationId, code], map: "Design_org_code_key")
   @@index([organizationId])
 }
 
 model FinishedGoods {
   id                     String                   @id @default(uuid())
-  organizationId         String
-  sku                    String
+  sku                    String                   @unique
   designId               String
   quantity               Int
-  reservedQuantity       Int                      @default(0)
   kgProduced             Decimal                  @db.Decimal(10, 4)
-  barcode                String?
+  barcode                String?                  @unique
   batchNumber            String?
   unitCost               Float?
   createdAt              DateTime                 @default(now())
+  organizationId         String
+  reservedQuantity       Int                      @default(0)
   design                 Design                   @relation(fields: [designId], references: [id])
+  Organization           Organization             @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "FinishedGoods_organizationId_fk")
   InventoryFinishedGoods InventoryFinishedGoods[]
   SaleItem               SaleItem[]
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, sku])
-  @@unique([organizationId, barcode])
+  @@unique([organizationId, barcode], map: "FinishedGoods_org_barcode_key")
+  @@unique([organizationId, sku], map: "FinishedGoods_org_sku_key")
   @@index([organizationId])
 }
 
 model ImportBatch {
   id             String       @id @default(uuid())
-  organizationId String
   file_name      String
-  file_url       String? // base64 buffer for re-parsing on commit (cleared after success)
+  file_url       String?
   sheet_type     String
   import_mode    ImportMode   @default(update)
   target_branch  String?
   status         ImportStatus @default(uploaded)
   row_count      Int
-  mapping_config Json? // specialized import metadata (preview rows, source label)
+  mapping_config Json?
   imported_at    DateTime?
   ok_count       Int?
   skipped_count  Int?
@@ -257,17 +182,16 @@ model ImportBatch {
   created_by     String
   created_at     DateTime     @default(now())
   updated_at     DateTime     @updatedAt
+  organizationId String
   User           User         @relation(fields: [created_by], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ImportBatch_organizationId_fk")
   ImportRow      ImportRow[]
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
 
 model ImportRow {
   id               String       @id @default(uuid())
-  organizationId   String
   batch_id         String
   row_number       Int
   raw_data         Json
@@ -284,8 +208,9 @@ model ImportRow {
   errors           String?
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
+  organizationId   String
   ImportBatch      ImportBatch  @relation(fields: [batch_id], references: [id], onDelete: Cascade)
-  Organization     Organization @relation(fields: [organizationId], references: [id])
+  Organization     Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ImportRow_organizationId_fk")
 
   @@index([batch_id])
   @@index([organizationId])
@@ -293,16 +218,16 @@ model ImportRow {
 
 model InventoryFinishedGoods {
   id              String        @id @default(uuid())
-  organizationId  String
   branchId        String
   finishedGoodsId String
   availableQty    Int           @default(0)
   reservedQty     Int           @default(0)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  organizationId  String
   Branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
   FinishedGoods   FinishedGoods @relation(fields: [finishedGoodsId], references: [id], onDelete: Cascade)
-  Organization    Organization  @relation(fields: [organizationId], references: [id])
+  Organization    Organization  @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "InventoryFinishedGoods_organizationId_fk")
 
   @@unique([branchId, finishedGoodsId])
   @@index([organizationId])
@@ -310,16 +235,16 @@ model InventoryFinishedGoods {
 
 model InventoryRawMaterial {
   id             String       @id @default(uuid())
-  organizationId String
   branchId       String
   rawMaterialId  String
   availableKg    Decimal      @default(0) @db.Decimal(10, 4)
   reservedKg     Decimal      @default(0) @db.Decimal(10, 4)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  organizationId String
   Branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "InventoryRawMaterial_organizationId_fk")
   RawMaterial    RawMaterial  @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
-  Organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([branchId, rawMaterialId])
   @@index([organizationId])
@@ -327,83 +252,78 @@ model InventoryRawMaterial {
 
 model MaterialConsumptionLog {
   id                String          @id @default(uuid())
-  organizationId    String
   productionOrderId String
   rawMaterialId     String
   quantityConsumed  Decimal         @db.Decimal(10, 4)
   consumedAt        DateTime        @default(now())
   stageId           String?
   notes             String?
+  organizationId    String
+  Organization      Organization    @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "MaterialConsumptionLog_organizationId_fk")
   ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
   RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
   Stage             Stage?          @relation(fields: [stageId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
 
 model MaterialReceipt {
-  id             String      @id @default(uuid())
-  organizationId String
+  id             String       @id @default(uuid())
   materialId     String
-  kgReceived     Decimal     @db.Decimal(10, 4)
-  piecesReceived Int         @default(0)
+  kgReceived     Decimal      @db.Decimal(10, 4)
   reference      String?
   supplierId     String?
   branchId       String?
   loggedBy       String?
-  createdAt      DateTime    @default(now())
-  Branch         Branch?     @relation(fields: [branchId], references: [id])
-  RawMaterial    RawMaterial @relation(fields: [materialId], references: [id])
-  Supplier       Supplier?   @relation(fields: [supplierId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  organizationId String
+  piecesReceived Int          @default(0)
+  Branch         Branch?      @relation(fields: [branchId], references: [id])
+  RawMaterial    RawMaterial  @relation(fields: [materialId], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "MaterialReceipt_organizationId_fk")
+  Supplier       Supplier?    @relation(fields: [supplierId], references: [id])
 
   @@index([organizationId])
 }
 
 model NotificationSettings {
-  id              String   @id @default(uuid())
-  organizationId  String
-  userId          String   @unique
-  emailEnabled    Boolean  @default(true)
-  whatsappEnabled Boolean  @default(false)
+  id              String       @id @default(uuid())
+  userId          String       @unique
+  emailEnabled    Boolean      @default(true)
+  whatsappEnabled Boolean      @default(false)
   whatsappNumber  String?
-  orderApproved   Boolean  @default(true)
-  highScrapAlert  Boolean  @default(true)
-  stockoutAlert   Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  User            User     @relation(fields: [userId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  orderApproved   Boolean      @default(true)
+  highScrapAlert  Boolean      @default(true)
+  stockoutAlert   Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organizationId  String
+  Organization    Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "NotificationSettings_organizationId_fk")
+  User            User         @relation(fields: [userId], references: [id])
 
   @@index([organizationId])
 }
 
 model Organization {
-  id             String       @id @default(uuid())
-  name           String
-  slug           String       @unique // url-safe identifier, e.g. "acme-springs"
-  status         OrgStatus    @default(PENDING_APPROVAL)
-  ownerUserId    String?      @unique
-  approvedAt     DateTime?
-  disabledAt     DateTime?
-  disabledReason String?
-  code           String       @unique
-  address        String?
-  phone          String?
-  email          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  Branch         Branch[]
-  User           User[]
-  Invitation     Invitation[]
-
-  // Inverse relations for all models with organizationId (required by Prisma for the @relation)
+  id                       String                    @id @default(uuid())
+  name                     String
+  code                     String                    @unique
+  address                  String?
+  phone                    String?
+  email                    String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  slug                     String                    @unique
+  status                   OrgStatus                 @default(PENDING_APPROVAL)
+  ownerUserId              String?                   @unique
+  approvedAt               DateTime?
+  disabledAt               DateTime?
+  disabledReason           String?
   auditLogs                AuditLog[]
+  bankAccounts             BankAccount[]
   billOfMaterials          BillOfMaterials[]
+  Branch                   Branch[]
+  chartAccounts            ChartAccount[]
   customers                Customer[]
   customerPortalAccesses   CustomerPortalAccess[]
   demandForecasts          DemandForecast[]
@@ -413,20 +333,24 @@ model Organization {
   importRows               ImportRow[]
   inventoryFinishedGoods   InventoryFinishedGoods[]
   inventoryRawMaterials    InventoryRawMaterial[]
+  Invitation               Invitation[]
+  journalEntries           JournalEntry[]
+  ledgerLines              LedgerLine[]
   materialConsumptionLogs  MaterialConsumptionLog[]
   materialReceipts         MaterialReceipt[]
   notificationSettings     NotificationSettings[]
+  operationLogs            OperationLog[]
+  payments                 Payment[]
   products                 Product[]
   productAliases           ProductAlias[]
   productReceipts          ProductReceipt[]
-  productionOrderMaterials ProductionOrderMaterial[]
   productionOrders         ProductionOrder[]
+  productionOrderMaterials ProductionOrderMaterial[]
   productionRoutes         ProductionRoute[]
-  routeOperations          RouteOperation[]
-  operationLogs            OperationLog[]
   purchaseOrders           PurchaseOrder[]
   purchaseOrderItems       PurchaseOrderItem[]
   rawMaterials             RawMaterial[]
+  routeOperations          RouteOperation[]
   saleItems                SaleItem[]
   saleOrders               SaleOrder[]
   stages                   Stage[]
@@ -434,52 +358,47 @@ model Organization {
   stockMovements           StockMovement[]
   suppliers                Supplier[]
   unitOfMeasures           UnitOfMeasure[]
-  chartAccounts            ChartAccount[]
-  journalEntries           JournalEntry[]
-  ledgerLines              LedgerLine[]
-  bankAccounts             BankAccount[]
-  payments                 Payment[]
+  User                     User[]
 }
 
 model Product {
   id              String            @id @default(uuid())
-  organizationId  String
   name            String
-  sku             String?
+  sku             String?           @unique
   category        ProductCategory   @default(springs)
-  routeType       RouteType?
   origin          StockOrigin       @default(FACTORY_MADE)
   uom             String            @default("KG")
   currentStock    Float             @default(0)
-  piecesSets      Int               @default(0)
   unitCost        Float?
   landingCost     Float?
   vendor          String?
   branchId        String?
-  reorderLevel    Int? // Minimum stock level before reorder
+  reorderLevel    Int?
   stockStatus     StockStatus?      @default(AVAILABLE)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  organizationId  String
+  piecesSets      Int               @default(0)
+  routeType       RouteType?
   Branch          Branch?           @relation(fields: [branchId], references: [id])
+  Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Product_organizationId_fk")
   ProductAlias    ProductAlias[]
   ProductReceipt  ProductReceipt[]
-  StockMovement   StockMovement[]
   ProductionOrder ProductionOrder[]
+  StockMovement   StockMovement[]
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, sku])
+  @@unique([organizationId, sku], map: "Product_org_sku_key")
   @@index([organizationId])
 }
 
 model ProductAlias {
   id             String       @id @default(uuid())
-  organizationId String
   product_id     String
   alias          String
   created_at     DateTime     @default(now())
+  organizationId String
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ProductAlias_organizationId_fk")
   Product        Product      @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  Organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([product_id, alias])
   @@index([alias])
@@ -487,8 +406,7 @@ model ProductAlias {
 }
 
 model ProductReceipt {
-  id             String   @id @default(uuid())
-  organizationId String
+  id             String       @id @default(uuid())
   productId      String
   qtyReceived    Float
   unitCost       Float?
@@ -497,31 +415,21 @@ model ProductReceipt {
   vendor         String?
   loggedBy       String?
   branchId       String?
-  createdAt      DateTime @default(now())
-  Branch         Branch?  @relation(fields: [branchId], references: [id])
-  Product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  organizationId String
+  Branch         Branch?      @relation(fields: [branchId], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ProductReceipt_organizationId_fk")
+  Product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
 
 model ProductionOrder {
   id                     String                    @id @default(uuid())
-  organizationId         String
-  saleOrderId            String?
-  saleItemId             String?                   @unique
-  productId              String?
-  orderNumber            String
+  orderNumber            String                    @unique
   designId               String?
-  productName            String?
-  expectedPieces         Int?
-  actualPieces           Int?
-  actualWeightOut        Decimal?                  @db.Decimal(10, 4)
-  outputRecordedAt       DateTime?
-  outputRecordedBy       String?
   quantity               Int                       @default(1)
-  targetKg               Decimal                   @db.Decimal(10, 4)
+  targetKg               Decimal?                  @db.Decimal(10, 4)
   status                 ProductionStatus          @default(PENDING)
   priority               Priority                  @default(MEDIUM)
   currentStage           Int                       @default(1)
@@ -529,25 +437,35 @@ model ProductionOrder {
   assignedTo             String?
   approvedBy             String?
   approvedAt             DateTime?
-  rejectionReason        String?
   completedAt            DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  organizationId         String
+  saleOrderId            String?
+  saleItemId             String?                   @unique
+  rejectionReason        String?
+  productName            String?
+  expectedPieces         Int?
+  actualPieces           Int?
+  actualWeightOut        Decimal?                  @db.Decimal(10, 4)
+  outputRecordedAt       DateTime?
+  outputRecordedBy       String?
+  productId              String?
   routeType              RouteType?
   productionStartedAt    DateTime?
   productionFinishedAt   DateTime?
-  createdAt              DateTime                  @default(now())
-  updatedAt              DateTime                  @updatedAt
+  notes                  String?
   MaterialConsumptionLog MaterialConsumptionLog[]
-  design                 Design?                   @relation(fields: [designId], references: [id])
-  materials              ProductionOrderMaterial[]
   operationLogs          OperationLog[]
-  product                Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  saleOrder              SaleOrder?                @relation(fields: [saleOrderId], references: [id])
+  design                 Design?                   @relation(fields: [designId], references: [id], onDelete: Restrict)
+  Organization           Organization              @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ProductionOrder_organizationId_fk")
+  product                Product?                  @relation(fields: [productId], references: [id])
   saleItem               SaleItem?                 @relation(fields: [saleItemId], references: [id])
+  saleOrder              SaleOrder?                @relation(fields: [saleOrderId], references: [id])
+  materials              ProductionOrderMaterial[]
   StageLog               StageLog[]
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, orderNumber])
+  @@unique([organizationId, orderNumber], map: "ProductionOrder_org_orderNumber_key")
   @@index([organizationId])
   @@index([saleOrderId])
   @@index([productId])
@@ -561,8 +479,8 @@ model ProductionRoute {
   isActive       Boolean          @default(true)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  operations     RouteOperation[]
   Organization   Organization     @relation(fields: [organizationId], references: [id])
+  operations     RouteOperation[]
 
   @@unique([organizationId, routeType])
   @@index([organizationId])
@@ -578,9 +496,9 @@ model RouteOperation {
   section        String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  route          ProductionRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
   operationLogs  OperationLog[]
   Organization   Organization    @relation(fields: [organizationId], references: [id])
+  route          ProductionRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
 
   @@unique([routeId, sequence])
   @@index([organizationId])
@@ -604,10 +522,10 @@ model OperationLog {
   notes             String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  RouteOperation    RouteOperation? @relation(fields: [routeOperationId], references: [id], onDelete: SetNull)
-  Operator          User?           @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  Operator          User?           @relation(fields: [operatorId], references: [id])
   Organization      Organization    @relation(fields: [organizationId], references: [id])
+  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  RouteOperation    RouteOperation? @relation(fields: [routeOperationId], references: [id])
 
   @@unique([productionOrderId, sequence])
   @@index([organizationId])
@@ -618,16 +536,16 @@ model ProductionOrderMaterial {
   id                String          @id @default(uuid())
   organizationId    String
   productionOrderId String
-  rawMaterialId     String
+  rawMaterialId     String?
   cutLength         Decimal?        @db.Decimal(10, 4)
   pieces            Int
   totalLength       Decimal?        @db.Decimal(10, 4)
-  weightKg          Decimal?        @db.Decimal(10, 4)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
-  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
+  weightKg          Decimal?        @db.Decimal(10, 4)
   Organization      Organization    @relation(fields: [organizationId], references: [id])
+  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  RawMaterial       RawMaterial?    @relation(fields: [rawMaterialId], references: [id])
 
   @@index([organizationId])
   @@index([productionOrderId])
@@ -636,8 +554,7 @@ model ProductionOrderMaterial {
 
 model PurchaseOrder {
   id                String              @id @default(uuid())
-  organizationId    String
-  poNumber          String
+  poNumber          String              @unique
   supplierId        String
   status            PurchaseStatus      @default(DRAFT)
   totalAmount       Decimal             @db.Decimal(10, 2)
@@ -647,51 +564,50 @@ model PurchaseOrder {
   approvedAt        DateTime?
   expectedDelivery  DateTime?
   notes             String?
+  organizationId    String
+  Payment           Payment[]
+  Organization      Organization        @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "PurchaseOrder_organizationId_fk")
   Supplier          Supplier            @relation(fields: [supplierId], references: [id])
   PurchaseOrderItem PurchaseOrderItem[]
-  Payment           Payment[]
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, poNumber])
+  @@unique([organizationId, poNumber], map: "PurchaseOrder_org_poNumber_key")
   @@index([organizationId])
 }
 
 model PurchaseOrderItem {
   id              String        @id @default(uuid())
-  organizationId  String
   purchaseOrderId String
   rawMaterialId   String
   quantity        Decimal       @db.Decimal(10, 4)
   unitPrice       Decimal       @db.Decimal(10, 2)
   totalPrice      Decimal       @db.Decimal(10, 2)
+  organizationId  String
+  Organization    Organization  @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "PurchaseOrderItem_organizationId_fk")
   PurchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   RawMaterial     RawMaterial   @relation(fields: [rawMaterialId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
 
 model RawMaterial {
   id                      String                    @id @default(uuid())
-  organizationId          String
-  sku                     String
+  sku                     String                    @unique
   materialName            String
-  category                String                    @default("Flat Bars")
   diameter                String
-  length                  String                    @default("")
-  width                   String                    @default("")
-  height                  String                    @default("")
   supplierId              String?
-  barcode                 String?
+  barcode                 String?                   @unique
   batchNumber             String?
   availableKg             Decimal                   @default(0) @db.Decimal(10, 4)
   reservedKg              Decimal                   @default(0) @db.Decimal(10, 4)
-  availablePieces         Int                       @default(0)
   costPerKg               Float?
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
+  organizationId          String
+  category                String                    @default("Flat Bars")
+  length                  String                    @default("")
+  width                   String                    @default("")
+  height                  String                    @default("")
+  availablePieces         Int                       @default(0)
   BillOfMaterials         BillOfMaterials[]
   DemandForecast          DemandForecast[]
   InventoryRawMaterial    InventoryRawMaterial[]
@@ -699,35 +615,32 @@ model RawMaterial {
   MaterialReceipt         MaterialReceipt[]
   ProductionOrderMaterial ProductionOrderMaterial[]
   PurchaseOrderItem       PurchaseOrderItem[]
+  Organization            Organization              @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "RawMaterial_organizationId_fk")
   Supplier                Supplier?                 @relation(fields: [supplierId], references: [id])
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, sku])
-  @@unique([organizationId, barcode])
+  @@unique([organizationId, barcode], map: "RawMaterial_org_barcode_key")
+  @@unique([organizationId, sku], map: "RawMaterial_org_sku_key")
   @@index([organizationId])
 }
 
 model SaleItem {
   id              String           @id @default(uuid())
-  organizationId  String
   saleOrderId     String
   finishedGoodsId String
   quantity        Int
   unitPrice       Decimal          @db.Decimal(10, 2)
   totalPrice      Decimal          @db.Decimal(10, 2)
-  FinishedGoods   FinishedGoods    @relation(fields: [finishedGoodsId], references: [id])
+  organizationId  String
   ProductionOrder ProductionOrder?
+  FinishedGoods   FinishedGoods    @relation(fields: [finishedGoodsId], references: [id])
+  Organization    Organization     @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "SaleItem_organizationId_fk")
   SaleOrder       SaleOrder        @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
 
 model SaleOrder {
   id              String            @id @default(uuid())
-  organizationId  String
   customerId      String?
   customerName    String
   totalAmount     Decimal           @db.Decimal(10, 2)
@@ -735,31 +648,31 @@ model SaleOrder {
   createdBy       String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  SaleItem        SaleItem[]
-  ProductionOrder ProductionOrder[]
+  organizationId  String
   Payment         Payment[]
-  Customer        Customer?         @relation(fields: [customerId], references: [id])
+  ProductionOrder ProductionOrder[]
+  SaleItem        SaleItem[]
   createdByUser   User?             @relation(fields: [createdBy], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  Customer        Customer?         @relation(fields: [customerId], references: [id])
+  Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "SaleOrder_organizationId_fk")
 
   @@index([organizationId])
 }
 
 model Stage {
   id                     String                   @id @default(uuid())
-  organizationId         String
   name                   String
   department             String
   sequence               Int
-  specifications         Json?
   designId               String
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
+  organizationId         String
+  specifications         Json?
   MaterialConsumptionLog MaterialConsumptionLog[]
   design                 Design                   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  Organization           Organization             @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Stage_organizationId_fk")
   StageLog               StageLog[]
-  Organization           Organization             @relation(fields: [organizationId], references: [id])
 
   @@unique([designId, sequence])
   @@index([organizationId])
@@ -767,7 +680,6 @@ model Stage {
 
 model StageLog {
   id              String          @id @default(uuid())
-  organizationId  String
   orderId         String
   stageId         String?
   stageName       String
@@ -775,27 +687,26 @@ model StageLog {
   kgIn            Decimal         @db.Decimal(10, 4)
   kgOut           Decimal         @db.Decimal(10, 4)
   kgScrap         Decimal         @db.Decimal(10, 4)
-  piecesIn        Int?
-  piecesOut       Int?
   scrapReason     String?
   department      String?
   operatorId      String
   notes           String?
   completedAt     DateTime        @default(now())
+  organizationId  String
+  piecesIn        Int?
+  piecesOut       Int?
   User            User            @relation(fields: [operatorId], references: [id])
   ProductionOrder ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  Organization    Organization    @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "StageLog_organizationId_fk")
   Stage           Stage?          @relation(fields: [stageId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
 
 model Supplier {
   id              String            @id @default(uuid())
-  organizationId  String
   name            String
-  code            String
+  code            String            @unique
   contactName     String?
   email           String?
   phone           String?
@@ -803,27 +714,26 @@ model Supplier {
   taxId           String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  organizationId  String
   MaterialReceipt MaterialReceipt[]
+  Payment         Payment[]
   PurchaseOrder   PurchaseOrder[]
   RawMaterial     RawMaterial[]
-  Payment         Payment[]
+  Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Supplier_organizationId_fk")
 
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, code])
+  @@unique([organizationId, code], map: "Supplier_org_code_key")
   @@index([organizationId])
 }
 
 model UnitOfMeasure {
-  id             String   @id @default(uuid())
-  organizationId String
+  id             String       @id @default(uuid())
   name           String
   symbol         String
   category       String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "UnitOfMeasure_organizationId_fk")
 
   @@index([organizationId])
 }
@@ -835,25 +745,235 @@ model User {
   name                 String?
   role                 Role                  @default(PENDING)
   department           String?
-  departments          String[]              @default([])
   organizationId       String?
   branchId             String?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   lastSeenAt           DateTime?
+  departments          String[]              @default([])
   AuditLog             AuditLog[]
   ImportBatch          ImportBatch[]
+  SentInvitations      Invitation[]          @relation("Inviter")
   NotificationSettings NotificationSettings?
-  StageLog             StageLog[]
   OperationLog         OperationLog[]
+  SaleOrderCreated     SaleOrder[]
+  StageLog             StageLog[]
   Branch               Branch?               @relation(fields: [branchId], references: [id])
   Organization         Organization?         @relation(fields: [organizationId], references: [id])
-  SaleOrderCreated     SaleOrder[]
-
-  SentInvitations Invitation[] @relation("Inviter")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Invitation {
+  id             String       @id @default(uuid())
+  organizationId String
+  email          String
+  role           Role         @default(OPERATOR)
+  branchId       String?
+  token          String       @unique
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  Branch         Branch?      @relation(fields: [branchId], references: [id], onUpdate: NoAction, map: "Invitation_branch_fk")
+  InvitedByUser  User         @relation("Inviter", fields: [invitedBy], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "Invitation_inviter_fk")
+  Organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "Invitation_org_fk")
+
+  @@unique([organizationId, email], map: "Invitation_org_email_key")
+  @@index([organizationId])
+  @@index([token])
+}
+
+model StockMovement {
+  id             String       @id @default(uuid())
+  productId      String
+  branchId       String?
+  movementType   String
+  quantity       Float
+  reference      String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  organizationId String
+  Branch         Branch?      @relation(fields: [branchId], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "StockMovement_organizationId_fk")
+  Product        Product      @relation(fields: [productId], references: [id])
+
+  @@index([organizationId])
+}
+
+model ChartAccount {
+  id             String         @id @default(uuid())
+  organizationId String
+  code           String
+  name           String
+  type           AccountType
+  normalBalance  NormalBalance
+  parentId       String?
+  isBank         Boolean        @default(false)
+  isSystem       Boolean        @default(false)
+  isActive       Boolean        @default(true)
+  description    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  bankAccount    BankAccount?
+  Organization   Organization   @relation(fields: [organizationId], references: [id])
+  parent         ChartAccount?  @relation("AccountTree", fields: [parentId], references: [id])
+  children       ChartAccount[] @relation("AccountTree")
+  ledgerLines    LedgerLine[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([organizationId, type])
+}
+
+model JournalEntry {
+  id             String        @id @default(uuid())
+  organizationId String
+  entryNumber    String
+  date           DateTime
+  memo           String?
+  status         JournalStatus @default(POSTED)
+  source         JournalSource @default(MANUAL)
+  sourceType     String?
+  sourceId       String?
+  postedAt       DateTime?
+  postedBy       String?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  Organization   Organization  @relation(fields: [organizationId], references: [id])
+  lines          LedgerLine[]
+  payments       Payment[]
+
+  @@unique([organizationId, entryNumber])
+  @@unique([organizationId, source, sourceType, sourceId], map: "JournalEntry_org_source_sourcetype_sourceid_key")
+  @@index([organizationId])
+  @@index([organizationId, date])
+  @@index([sourceType, sourceId])
+}
+
+model LedgerLine {
+  id             String       @id @default(uuid())
+  organizationId String
+  journalEntryId String
+  accountId      String
+  debit          Decimal      @default(0) @db.Decimal(14, 2)
+  credit         Decimal      @default(0) @db.Decimal(14, 2)
+  description    String?
+  createdAt      DateTime     @default(now())
+  account        ChartAccount @relation(fields: [accountId], references: [id])
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  Organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([journalEntryId])
+}
+
+model BankAccount {
+  id             String       @id @default(uuid())
+  organizationId String
+  accountId      String       @unique
+  name           String
+  bankName       String?
+  accountNumber  String?
+  currency       String       @default("KES")
+  openingBalance Decimal      @default(0) @db.Decimal(14, 2)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  account        ChartAccount @relation(fields: [accountId], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id])
+  payments       Payment[]
+
+  @@index([organizationId])
+}
+
+model Payment {
+  id              String           @id @default(uuid())
+  organizationId  String
+  paymentNumber   String
+  direction       PaymentDirection
+  method          PaymentMethod    @default(BANK_TRANSFER)
+  date            DateTime
+  amount          Decimal          @db.Decimal(14, 2)
+  reference       String?
+  notes           String?
+  customerId      String?
+  supplierId      String?
+  saleOrderId     String?
+  purchaseOrderId String?
+  bankAccountId   String?
+  journalEntryId  String?
+  createdBy       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  bankAccount     BankAccount?     @relation(fields: [bankAccountId], references: [id])
+  Customer        Customer?        @relation(fields: [customerId], references: [id])
+  journalEntry    JournalEntry?    @relation(fields: [journalEntryId], references: [id])
+  Organization    Organization     @relation(fields: [organizationId], references: [id])
+  PurchaseOrder   PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  SaleOrder       SaleOrder?       @relation(fields: [saleOrderId], references: [id])
+  Supplier        Supplier?        @relation(fields: [supplierId], references: [id])
+
+  @@unique([organizationId, paymentNumber])
+  @@index([organizationId])
+  @@index([organizationId, direction])
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([saleOrderId])
+  @@index([purchaseOrderId])
+}
+
+model ProductMaster {
+  name          String
+  location      String
+  category      String
+  opening_stock Decimal  @default(0) @db.Decimal(12, 2)
+  current_stock Decimal  @default(0) @db.Decimal(12, 2)
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@id([name, location])
+  @@index([location])
+}
+
+model SalesTransaction {
+  id               String   @id
+  product_name     String
+  quantity         Decimal  @db.Decimal(12, 2)
+  transaction_date DateTime
+  invoice_number   String?
+  customer_name    String?
+  location         String
+  created_at       DateTime @default(now())
+
+  @@index([location])
+  @@index([transaction_date])
+}
+
+model StockReceipt {
+  id               String   @id
+  product_name     String
+  quantity         Decimal  @db.Decimal(12, 2)
+  transaction_date DateTime
+  reference_memo   String?
+  location         String
+  created_at       DateTime @default(now())
+
+  @@index([location])
+  @@index([transaction_date])
+}
+
+model inventory_transactions {
+  id               String   @id
+  product_name     String
+  quantity         Float
+  transaction_date DateTime @db.Timestamp(6)
+  reference_memo   String?
+  location         String?
+  created_at       DateTime @db.Timestamp(6)
+}
 
 enum ImportMode {
   update
@@ -911,6 +1031,7 @@ enum Role {
   PENDING
   ADMIN
   MANAGER
+  ACCOUNTS
   OPERATOR
   WAREHOUSE
   SALES
@@ -918,10 +1039,10 @@ enum Role {
 }
 
 enum OrgStatus {
-  PENDING_APPROVAL // signed up, awaiting manual approval
-  ACTIVE // approved, can use the app
-  SUSPENDED // soft-disabled (logins blocked, data preserved)
-  CLOSED // long-term disabled, may be deleted later
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  CLOSED
 }
 
 enum SaleStatus {
@@ -986,48 +1107,6 @@ enum StockStatus {
   REORDER_NEEDED
 }
 
-model Invitation {
-  id             String       @id @default(uuid())
-  organizationId String
-  email          String
-  role           Role         @default(OPERATOR)
-  branchId       String?
-  token          String       @unique
-  invitedBy      String
-  expiresAt      DateTime
-  acceptedAt     DateTime?
-  cancelledAt    DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  Organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  Branch         Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  InvitedByUser  User         @relation("Inviter", fields: [invitedBy], references: [id])
-
-  @@unique([organizationId, email])
-  @@index([organizationId])
-  @@index([token])
-}
-
-model StockMovement {
-  id             String   @id @default(uuid())
-  organizationId String
-  productId      String
-  branchId       String?
-  movementType   String // 'stock_in', 'stock_out', 'adjustment', 'sale', 'return'
-  quantity       Float
-  reference      String? // Order number, import batch, etc.
-  notes          String?
-  createdAt      DateTime @default(now())
-  Product        Product  @relation(fields: [productId], references: [id])
-  Branch         Branch?  @relation(fields: [branchId], references: [id])
-
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@index([organizationId])
-}
-
-// ACCOUNTING (double-entry: chart of accounts -> journals -> ledger -> reports)
-
 enum AccountType {
   ASSET
   LIABILITY
@@ -1068,133 +1147,4 @@ enum PaymentMethod {
   CHEQUE
   CARD
   OTHER
-}
-
-model ChartAccount {
-  id             String        @id @default(uuid())
-  organizationId String
-  code           String
-  name           String
-  type           AccountType
-  normalBalance  NormalBalance
-  parentId       String?
-  isBank         Boolean       @default(false)
-  isSystem       Boolean       @default(false)
-  isActive       Boolean       @default(true)
-  description    String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  parent       ChartAccount?  @relation("AccountTree", fields: [parentId], references: [id])
-  children     ChartAccount[] @relation("AccountTree")
-  ledgerLines  LedgerLine[]
-  bankAccount  BankAccount?
-  Organization Organization   @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, code])
-  @@index([organizationId])
-  @@index([organizationId, type])
-}
-
-model JournalEntry {
-  id             String        @id @default(uuid())
-  organizationId String
-  entryNumber    String
-  date           DateTime
-  memo           String?
-  status         JournalStatus @default(POSTED)
-  source         JournalSource @default(MANUAL)
-  sourceType     String?
-  sourceId       String?
-  postedAt       DateTime?
-  postedBy       String?
-  createdBy      String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  lines        LedgerLine[]
-  payments     Payment[]
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, entryNumber])
-  @@unique([organizationId, source, sourceType, sourceId])
-  @@index([organizationId])
-  @@index([organizationId, date])
-  @@index([sourceType, sourceId])
-}
-
-model LedgerLine {
-  id             String   @id @default(uuid())
-  organizationId String
-  journalEntryId String
-  accountId      String
-  debit          Decimal  @default(0) @db.Decimal(14, 2)
-  credit         Decimal  @default(0) @db.Decimal(14, 2)
-  description    String?
-  createdAt      DateTime @default(now())
-
-  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account      ChartAccount @relation(fields: [accountId], references: [id])
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@index([organizationId])
-  @@index([accountId])
-  @@index([journalEntryId])
-}
-
-model BankAccount {
-  id             String   @id @default(uuid())
-  organizationId String
-  accountId      String   @unique
-  name           String
-  bankName       String?
-  accountNumber  String?
-  currency       String   @default("KES")
-  openingBalance Decimal  @default(0) @db.Decimal(14, 2)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  account      ChartAccount @relation(fields: [accountId], references: [id])
-  payments     Payment[]
-  Organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@index([organizationId])
-}
-
-model Payment {
-  id              String           @id @default(uuid())
-  organizationId  String
-  paymentNumber   String
-  direction       PaymentDirection
-  method          PaymentMethod    @default(BANK_TRANSFER)
-  date            DateTime
-  amount          Decimal          @db.Decimal(14, 2)
-  reference       String?
-  notes           String?
-  customerId      String?
-  supplierId      String?
-  saleOrderId     String?
-  purchaseOrderId String?
-  bankAccountId   String?
-  journalEntryId  String?
-  createdBy       String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  Customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  Supplier      Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  SaleOrder     SaleOrder?     @relation(fields: [saleOrderId], references: [id], onDelete: SetNull)
-  PurchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
-  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
-  journalEntry  JournalEntry?  @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
-  Organization  Organization   @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, paymentNumber])
-  @@index([organizationId])
-  @@index([organizationId, direction])
-  @@index([customerId])
-  @@index([supplierId])
-  @@index([saleOrderId])
-  @@index([purchaseOrderId])
 }

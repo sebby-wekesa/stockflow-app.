@@ -56,6 +56,7 @@ Key Roles:
 
 * ADMIN: System administration and reporting
 * MANAGER: Approves production orders
+* ACCOUNTS: Accounting, journals, banking, debtors, and creditors
 * OPERATOR: Performs production stages
 * SALES: Sales orders and customer management
 * PACKAGING: Packaging and fulfillment

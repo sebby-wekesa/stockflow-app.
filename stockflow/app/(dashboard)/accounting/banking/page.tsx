@@ -10,7 +10,7 @@ function money(n: number) {
 }
 
 export default async function BankingPage() {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const [banks, parties] = await Promise.all([
     listBankAccounts(),
     listPaymentParties(),

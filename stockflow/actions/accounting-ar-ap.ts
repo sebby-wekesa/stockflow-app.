@@ -24,7 +24,7 @@ function parseDate(value: string): Date | null {
 }
 
 export async function getDebtors() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const [customers, payments] = await Promise.all([
     db.customer.findMany({
@@ -80,7 +80,7 @@ export async function getDebtors() {
 }
 
 export async function getCreditors() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const [suppliers, payments] = await Promise.all([
     db.supplier.findMany({
@@ -134,7 +134,7 @@ export async function getCreditors() {
 }
 
 export async function listPaymentParties() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const [customers, suppliers] = await Promise.all([
     db.customer.findMany({
@@ -150,7 +150,7 @@ export async function listPaymentParties() {
 }
 
 export async function listBankAccounts() {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const banks = await db.bankAccount.findMany({
     where: { isActive: true },
@@ -190,7 +190,7 @@ export async function createBankAccount(input: {
   glAccountId: string;
   openingBalance?: number;
 }) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const db = getTenantPrisma(user.organizationId);
   const name = input.name.trim();
   const openingBalance = Number(input.openingBalance ?? 0);
@@ -269,7 +269,7 @@ export async function recordPayment(input: {
   reference?: string;
   notes?: string;
 }) {
-  const user = await requireRole("ADMIN", "MANAGER");
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const amount = Number(input.amount);
   const date = parseDate(input.date);
   if (!Number.isFinite(amount) || amount <= 0) {

@@ -153,6 +153,7 @@ export function UserRow({ user }: UserRowProps) {
           <option value="PENDING">Pending</option>
           <option value="ADMIN">Admin</option>
           <option value="MANAGER">Manager</option>
+          <option value="ACCOUNTS">Accounts</option>
           <option value="OPERATOR">Operator</option>
           <option value="WAREHOUSE">Warehouse</option>
           <option value="SALES">Sales</option>

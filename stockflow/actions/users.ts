@@ -47,7 +47,7 @@ function getSupabaseAdmin() {
 const inviteSchema = z.object({
   email: z.string().email().toLowerCase(),
   name: z.string().min(1).max(200),
-  role: z.enum(['ADMIN', 'MANAGER', 'OPERATOR', 'WAREHOUSE', 'SALES', 'PACKAGING']),
+  role: z.enum(['ADMIN', 'MANAGER', 'ACCOUNTS', 'OPERATOR', 'WAREHOUSE', 'SALES', 'PACKAGING']),
   branchId: z.string().min(1, 'Branch is required'),
 })
 
@@ -110,7 +110,7 @@ export async function inviteUser(formData: FormData) {
 
 const updateSchema = z.object({
   name: z.string().min(1).max(200),
-  role: z.enum(['ADMIN', 'MANAGER', 'OPERATOR', 'WAREHOUSE', 'SALES', 'PACKAGING']),
+  role: z.enum(['ADMIN', 'MANAGER', 'ACCOUNTS', 'OPERATOR', 'WAREHOUSE', 'SALES', 'PACKAGING']),
   branchId: z.string().min(1),
 })
 

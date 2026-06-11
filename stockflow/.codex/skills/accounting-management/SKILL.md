@@ -9,7 +9,7 @@ StockFlow accounting is tenant-scoped double-entry bookkeeping.
 
 ## Access
 
-- Restrict accounting pages and actions to `ADMIN` and `MANAGER`.
+- Restrict accounting pages and actions to `ADMIN`, `MANAGER`, and `ACCOUNTS`.
 - Use `getTenantPrisma(organizationId)` for reads and `withTenantTransaction` for multi-write operations.
 - Validate every referenced account, customer, supplier, and bank account belongs to the active organization.
 

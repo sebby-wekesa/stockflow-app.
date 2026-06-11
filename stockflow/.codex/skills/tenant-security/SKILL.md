@@ -31,6 +31,7 @@ Common roles:
 
 - `ADMIN`: system administration and reporting
 - `MANAGER`: production approval and management
+- `ACCOUNTS`: accounting, journals, banking, debtors, and creditors
 - `OPERATOR`: department stage work only
 - `SALES`: sales orders and customer management
 - `PACKAGING`: packaging and fulfillment

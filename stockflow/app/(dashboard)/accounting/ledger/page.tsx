@@ -16,7 +16,7 @@ export default async function GeneralLedgerPage({
 }: {
   searchParams: Promise<{ account?: string; from?: string; to?: string }>;
 }) {
-  await requireRole("ADMIN", "MANAGER");
+  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const sp = await searchParams;
   const data = await getGeneralLedger({ accountId: sp.account, from: sp.from, to: sp.to });
 
