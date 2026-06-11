@@ -52,4 +52,6 @@ Before data access, verify:
 - Never expose service role keys.
 - Never bypass middleware or server-side auth checks.
 - Never return cross-tenant records in list views, reports, exports, or APIs.
+- Validate tenant ownership of accounting foreign keys before posting ledger lines or payments.
+- Use tenant-scoped transactions for journals and payments so their related writes stay atomic.
 - Add tests for tenant-scoped behavior when changing shared data access.

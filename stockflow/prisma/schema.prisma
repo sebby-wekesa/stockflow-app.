@@ -151,6 +151,7 @@ model Customer {
   updatedAt            DateTime              @updatedAt
   CustomerPortalAccess CustomerPortalAccess?
   SaleOrder            SaleOrder[]
+  Payment              Payment[]
 
   Organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -433,6 +434,11 @@ model Organization {
   stockMovements           StockMovement[]
   suppliers                Supplier[]
   unitOfMeasures           UnitOfMeasure[]
+  chartAccounts            ChartAccount[]
+  journalEntries           JournalEntry[]
+  ledgerLines              LedgerLine[]
+  bankAccounts             BankAccount[]
+  payments                 Payment[]
 }
 
 model Product {
@@ -643,6 +649,7 @@ model PurchaseOrder {
   notes             String?
   Supplier          Supplier            @relation(fields: [supplierId], references: [id])
   PurchaseOrderItem PurchaseOrderItem[]
+  Payment           Payment[]
 
   Organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -730,6 +737,7 @@ model SaleOrder {
   updatedAt       DateTime          @updatedAt
   SaleItem        SaleItem[]
   ProductionOrder ProductionOrder[]
+  Payment         Payment[]
   Customer        Customer?         @relation(fields: [customerId], references: [id])
   createdByUser   User?             @relation(fields: [createdBy], references: [id])
 
@@ -798,6 +806,7 @@ model Supplier {
   MaterialReceipt MaterialReceipt[]
   PurchaseOrder   PurchaseOrder[]
   RawMaterial     RawMaterial[]
+  Payment         Payment[]
 
   Organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -1015,4 +1024,177 @@ model StockMovement {
   Organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
+}
+
+// ACCOUNTING (double-entry: chart of accounts -> journals -> ledger -> reports)
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum JournalSource {
+  MANUAL
+  SALE
+  PURCHASE
+  PAYMENT_RECEIVED
+  PAYMENT_MADE
+  OPENING_BALANCE
+}
+
+enum PaymentDirection {
+  RECEIVED
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MPESA
+  CHEQUE
+  CARD
+  OTHER
+}
+
+model ChartAccount {
+  id             String        @id @default(uuid())
+  organizationId String
+  code           String
+  name           String
+  type           AccountType
+  normalBalance  NormalBalance
+  parentId       String?
+  isBank         Boolean       @default(false)
+  isSystem       Boolean       @default(false)
+  isActive       Boolean       @default(true)
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  parent       ChartAccount?  @relation("AccountTree", fields: [parentId], references: [id])
+  children     ChartAccount[] @relation("AccountTree")
+  ledgerLines  LedgerLine[]
+  bankAccount  BankAccount?
+  Organization Organization   @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([organizationId, type])
+}
+
+model JournalEntry {
+  id             String        @id @default(uuid())
+  organizationId String
+  entryNumber    String
+  date           DateTime
+  memo           String?
+  status         JournalStatus @default(POSTED)
+  source         JournalSource @default(MANUAL)
+  sourceType     String?
+  sourceId       String?
+  postedAt       DateTime?
+  postedBy       String?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  lines        LedgerLine[]
+  payments     Payment[]
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, entryNumber])
+  @@unique([organizationId, source, sourceType, sourceId])
+  @@index([organizationId])
+  @@index([organizationId, date])
+  @@index([sourceType, sourceId])
+}
+
+model LedgerLine {
+  id             String   @id @default(uuid())
+  organizationId String
+  journalEntryId String
+  accountId      String
+  debit          Decimal  @default(0) @db.Decimal(14, 2)
+  credit         Decimal  @default(0) @db.Decimal(14, 2)
+  description    String?
+  createdAt      DateTime @default(now())
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      ChartAccount @relation(fields: [accountId], references: [id])
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([journalEntryId])
+}
+
+model BankAccount {
+  id             String   @id @default(uuid())
+  organizationId String
+  accountId      String   @unique
+  name           String
+  bankName       String?
+  accountNumber  String?
+  currency       String   @default("KES")
+  openingBalance Decimal  @default(0) @db.Decimal(14, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account      ChartAccount @relation(fields: [accountId], references: [id])
+  payments     Payment[]
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model Payment {
+  id              String           @id @default(uuid())
+  organizationId  String
+  paymentNumber   String
+  direction       PaymentDirection
+  method          PaymentMethod    @default(BANK_TRANSFER)
+  date            DateTime
+  amount          Decimal          @db.Decimal(14, 2)
+  reference       String?
+  notes           String?
+  customerId      String?
+  supplierId      String?
+  saleOrderId     String?
+  purchaseOrderId String?
+  bankAccountId   String?
+  journalEntryId  String?
+  createdBy       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  Customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  Supplier      Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  SaleOrder     SaleOrder?     @relation(fields: [saleOrderId], references: [id], onDelete: SetNull)
+  PurchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  journalEntry  JournalEntry?  @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+  Organization  Organization   @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, paymentNumber])
+  @@index([organizationId])
+  @@index([organizationId, direction])
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([saleOrderId])
+  @@index([purchaseOrderId])
 }

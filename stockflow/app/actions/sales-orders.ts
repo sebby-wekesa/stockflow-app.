@@ -1,9 +1,10 @@
 "use server";
 
-import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { revalidatePath } from 'next/cache';
 import { releaseSaleOrderReservation, reserveSaleOrder } from '@/lib/order-lifecycle';
+import { postSaleToLedger, voidSalePosting } from '@/lib/accounting/sales-posting';
 
 export async function createSalesOrder(data: {
   customerId?: string;
@@ -39,15 +40,13 @@ export async function createSalesOrder(data: {
   }
 
   const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
-
   // Only sales staff, admins, and managers can create sales orders
   if (user.role !== 'SALES' && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only sales staff can create orders');
   }
 
   // Use tenant-scoped transaction for atomic order creation
-  return await db.$transaction(async (tx) => {
+  return await withTenantTransaction(user.organizationId, async (tx) => {
     // Ensure placeholder design exists for non-manufactured product shadows
     let placeholderDesignId: string
     const existingDesign = await tx.design.findUnique({
@@ -84,7 +83,7 @@ export async function createSalesOrder(data: {
 
         if (!fgId && item.productId) {
           // General Product → create/lookup shadow FinishedGoods
-          const product = await tx.product.findUnique({
+          const product = await tx.product.findFirst({
             where: { id: item.productId },
             select: { id: true, sku: true, name: true, unitCost: true, currentStock: true },
           })
@@ -116,7 +115,7 @@ export async function createSalesOrder(data: {
         }
 
         if (!fgId && item.designId) {
-          const design = await tx.design.findUnique({
+          const design = await tx.design.findFirst({
             where: { id: item.designId },
             include: {
               stages: { orderBy: { sequence: 'asc' } },
@@ -155,7 +154,7 @@ export async function createSalesOrder(data: {
 
         // Validate stock for manufactured items (shadow items have qty=0 and are decremented on Product instead)
         if (item.source !== 'product' && item.source !== 'design') {
-          const fg = await tx.finishedGoods.findUnique({
+          const fg = await tx.finishedGoods.findFirst({
             where: { id: fgId },
             include: { design: true },
           })
@@ -217,7 +216,7 @@ export async function createSalesOrder(data: {
       )
       if (!saleItem) throw new Error('Could not link sale item to production order')
 
-      const design = await tx.design.findUnique({
+      const design = await tx.design.findFirst({
         where: { id: item.designId },
         include: { stages: { orderBy: { sequence: 'asc' } } },
       })
@@ -306,15 +305,13 @@ export async function getSalesOrders(role?: string, limit?: number) {
 
 export async function confirmSalesOrder(orderId: string) {
   const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
-
   // Only admins and managers can confirm orders
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only managers can confirm orders');
   }
 
-  await db.$transaction(async (tx) => {
-    const order = await tx.saleOrder.findUnique({
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const order = await tx.saleOrder.findFirst({
       where: { id: orderId },
       include: { SaleItem: { include: { FinishedGoods: true } } },
     });
@@ -330,6 +327,11 @@ export async function confirmSalesOrder(orderId: string) {
     }
 
     await reserveSaleOrder(tx, order);
+    await postSaleToLedger(tx, user.organizationId, {
+      id: order.id,
+      totalAmount: Number(order.totalAmount),
+      date: order.createdAt,
+    }, user.id);
   });
 
   revalidatePath('/sales');
@@ -339,15 +341,13 @@ export async function confirmSalesOrder(orderId: string) {
 
 export async function cancelSalesOrder(orderId: string) {
   const user = await requireActiveAuth();
-  const db = getTenantPrisma(user.organizationId);
-
   // Only admins and managers can cancel orders
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     throw new Error('Unauthorized: Only managers can cancel orders');
   }
 
-  await db.$transaction(async (tx) => {
-    const order = await tx.saleOrder.findUnique({
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const order = await tx.saleOrder.findFirst({
       where: { id: orderId },
       include: { SaleItem: { include: { FinishedGoods: true } } },
     });
@@ -366,6 +366,7 @@ export async function cancelSalesOrder(orderId: string) {
     }
 
     await releaseSaleOrderReservation(tx, order);
+    await voidSalePosting(tx, orderId);
     await tx.productionOrder.updateMany({
       where: { saleOrderId: orderId, status: { in: ['PENDING', 'APPROVED'] } },
       data: { status: 'CANCELLED' },

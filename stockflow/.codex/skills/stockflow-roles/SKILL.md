@@ -14,6 +14,7 @@ StockFlow users should only see and do what their role allows.
 Can:
 - manage system settings
 - view reports
+- manage accounting and post journals
 - manage users
 - manage master data
 
@@ -24,6 +25,7 @@ Can:
 - approve production
 - reject production
 - monitor production progress
+- manage accounting and post journals
 
 ### OPERATOR
 
@@ -64,3 +66,4 @@ Can:
 - Navigation should hide unauthorized pages.
 - Route handlers and server actions must validate authorization.
 - Organization and branch scoping still apply after role checks.
+- Restrict accounting pages and actions to `ADMIN` and `MANAGER`.

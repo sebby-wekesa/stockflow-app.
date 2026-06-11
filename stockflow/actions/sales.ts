@@ -7,6 +7,7 @@ import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { nextInvoiceNumber } from '@/lib/sales'
 import { releaseSaleOrderReservation, reserveSaleOrder } from '@/lib/order-lifecycle'
+import { postSaleToLedger, voidSalePosting } from '@/lib/accounting/sales-posting'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SALES SCHEMA NOTES
@@ -263,6 +264,11 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
       })
       if (!reservableOrder) throw new Error('Sales order not found after creation')
       await reserveSaleOrder(tx, { ...reservableOrder, status: 'PENDING' })
+      await postSaleToLedger(tx, user.organizationId, {
+        id: order.id,
+        totalAmount: Number(order.totalAmount),
+        date: order.createdAt,
+      }, user.id)
     }
 
     return order
@@ -308,6 +314,11 @@ export async function confirmDraft(orderId: string) {
     }
 
     await reserveSaleOrder(tx, order)
+    await postSaleToLedger(tx, user.organizationId, {
+      id: order.id,
+      totalAmount: Number(order.totalAmount),
+      date: order.createdAt,
+    }, user.id)
   }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/sales')
@@ -400,6 +411,11 @@ export async function updateDraftSalesOrder(formData: FormData) {
         })
         if (!updated) throw new Error('Order not found after update')
         await reserveSaleOrder(tx, updated)
+        await postSaleToLedger(tx, user.organizationId, {
+          id: updated.id,
+          totalAmount: Number(updated.totalAmount),
+          date: updated.createdAt,
+        }, user.id)
       }
     }, { maxWait: 10000, timeout: 30000 })
 
@@ -484,6 +500,7 @@ export async function cancelOrder(orderId: string, reason: string) {
     }
 
     await releaseSaleOrderReservation(tx, { ...order, status: current.status })
+    await voidSalePosting(tx, orderId)
 
     await tx.saleOrder.update({
       where: { id: orderId },

@@ -32,5 +32,5 @@
     "**/*.mts",
     "prisma.config.ts"
   ],
-  "exclude": ["node_modules", "boos"]
+  "exclude": ["node_modules", "boos", "accounts"]
 }

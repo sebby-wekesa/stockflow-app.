@@ -60,6 +60,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { label: "Import centre", href: "/import" },
         { section: "Reports" },
         { label: "Reports", href: "/reports" },
+        { label: "Accounting", href: "/accounting" },
         { label: "Scrap and yield", href: "/admin/yield" },
       ];
 
@@ -74,6 +75,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { section: "Investigation" },
         { label: "Scrap reports", href: "/scrap" },
         { label: "Reports", href: "/reports" },
+        { label: "Accounting", href: "/accounting" },
         { section: "Reference" },
         { label: "Design templates", href: "/designs" },
         { label: "Inventory overview", href: "/stock" },
