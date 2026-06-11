@@ -94,6 +94,62 @@ test("uses stage logs for kg, operator, timestamp, and active department", () =>
   });
   expect(flow.find((stage) => stage.key === "forging-chamfering")).toMatchObject({
     status: "ACTIVE",
+    sequence: 2,
+    kgIn: 96,
+    canComplete: true,
+  });
+});
+
+test("activates finished goods after the five production stages", () => {
+  const stageNames = [
+    "Cutting",
+    "Forging / Chamfering",
+    "Threading / Locking",
+    "Electroplating",
+    "Drilling / Grinding",
+  ];
+  const flow = buildProductionFlow(input({
+    status: "IN_PRODUCTION",
+    approvedAt,
+    currentDept: "Finished Goods",
+    stageLogs: stageNames.map((stageName, index) => ({
+      stageName,
+      department: stageName,
+      kgIn: 100 - index,
+      kgOut: 99 - index,
+      kgScrap: 1,
+      operatorName: `Operator ${index + 1}`,
+      completedAt,
+    })),
+  }));
+
+  expect(flow.find((stage) => stage.key === "finished-goods")).toMatchObject({
+    status: "ACTIVE",
+    sequence: 6,
+    kgIn: 95,
+    kgOut: null,
+    canComplete: true,
+  });
+  expect(flow.find((stage) => stage.key === "packaging")).toMatchObject({
+    status: "PENDING",
+    canComplete: false,
+  });
+});
+
+test("activates packaging after finished goods completion", () => {
+  const flow = buildProductionFlow(input({
+    status: "COMPLETED",
+    approvedAt,
+    completedAt,
+    actualWeightOut: 92,
+    currentDept: "Packaging",
+  }));
+
+  expect(flow.find((stage) => stage.key === "packaging")).toMatchObject({
+    status: "ACTIVE",
+    sequence: 7,
+    kgIn: 92,
+    canComplete: true,
   });
 });
 

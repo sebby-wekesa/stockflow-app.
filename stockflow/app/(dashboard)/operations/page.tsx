@@ -45,7 +45,7 @@ export default async function OperationsPage() {
                 Open operation tracker
               </Link>
             </div>
-            <ProductionFlowDiagram stages={order.stages} />
+            <ProductionFlowDiagram orderId={order.id} stages={order.stages} />
           </section>
         ))}
 

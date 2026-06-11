@@ -643,8 +643,17 @@ select.form-input option { background: var(--surface2); }
 .production-flow-metrics dd { margin-top: 3px; font-family: var(--font-mono); font-size: 10px; overflow-wrap: anywhere; }
 .production-flow-meta { display: grid; gap: 9px; padding-top: 10px; }
 .production-flow-meta dd { margin-top: 2px; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.production-flow-complete { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; margin-top: 12px; }
 .production-flow-arrow { flex-shrink: 0; margin: 0 8px; color: var(--muted); }
 .production-flow-spin { animation: spin 1.8s linear infinite; }
+.production-flow-modal-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.72); }
+.production-flow-modal { width: min(560px, 100%); padding: 20px; box-shadow: 0 24px 80px rgba(0,0,0,0.45); }
+.production-flow-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.production-flow-modal-header .btn { display: inline-flex; align-items: center; gap: 4px; }
+.production-flow-form { display: grid; gap: 14px; }
+.production-flow-form .form-row { margin-bottom: 0; }
+.production-flow-form .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.production-flow-balance-note { padding: 9px 10px; border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-sm); background: rgba(240,192,64,0.08); color: var(--accent); font-size: 11px; }
 .operation-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; padding: 18px; margin-bottom: 16px; }
 .operation-summary span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
 .operation-summary strong { font-size: 14px; }

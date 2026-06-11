@@ -2,9 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
-import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { materializeOperationsForOrder } from "@/lib/operation-routing";
-import { buildProductionFlow } from "@/lib/production-flow";
+import {
+  buildProductionFlow,
+  getProductionFlowStageDefinition,
+  PRODUCTION_FLOW_STAGE_DEFINITIONS,
+  resolveProductionFlowStageKey,
+} from "@/lib/production-flow";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE DEFINITIONS
@@ -220,6 +225,223 @@ export async function setOperationSkipped(operationLogId: string, skipped: boole
   });
   revalidatePath(`/operations/${log.productionOrderId}`);
   return { success: true };
+}
+
+export async function completeProductionFlowStage(input: {
+  orderId: string;
+  stageKey: string;
+  kgIn: number;
+  kgOut: number;
+  kgScrap: number;
+  scrapReason?: string;
+  notes?: string;
+}) {
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
+  const definition = getProductionFlowStageDefinition(input.stageKey);
+  const validScrapReasons = new Set([
+    "MACHINE_FAULT",
+    "MATERIAL_DEFECT",
+    "HUMAN_ERROR",
+    "PROCESS_LOSS",
+  ]);
+
+  if (!definition) return { success: false, error: "Unknown production stage" };
+
+  const kgIn = Number(input.kgIn);
+  const kgOut = Number(input.kgOut);
+  const kgScrap = Number(input.kgScrap);
+  if (![kgIn, kgOut, kgScrap].every(Number.isFinite)) {
+    return { success: false, error: "Enter valid kg values" };
+  }
+  if (kgIn < 0 || kgOut < 0 || kgScrap < 0) {
+    return { success: false, error: "Kg values cannot be negative" };
+  }
+  if (
+    definition.key !== "electroplating" &&
+    Math.abs(kgIn - (kgOut + kgScrap)) > 0.01
+  ) {
+    return { success: false, error: "Kg In must equal Kg Out plus Kg Scrap" };
+  }
+  if (kgScrap > 0 && !input.scrapReason?.trim()) {
+    return { success: false, error: "Select a scrap reason when scrap is recorded" };
+  }
+  if (input.scrapReason?.trim() && !validScrapReasons.has(input.scrapReason.trim())) {
+    return { success: false, error: "Select a valid scrap reason" };
+  }
+
+  try {
+    const result = await withTenantTransaction(user.organizationId, async (tx: any) => {
+      const order = await tx.productionOrder.findFirst({
+        where: { id: input.orderId },
+        include: {
+          StageLog: { orderBy: { completedAt: "asc" } },
+          operationLogs: { orderBy: { sequence: "asc" } },
+        },
+      });
+      if (!order) throw new Error("Production order not found");
+      if (["PENDING", "REJECTED", "CANCELLED"].includes(order.status)) {
+        throw new Error("Production order has not been released");
+      }
+
+      const completedKeys = new Set<string>();
+      for (const log of order.StageLog) {
+        const key = resolveProductionFlowStageKey(log.stageName) ??
+          resolveProductionFlowStageKey(log.department);
+        if (key) completedKeys.add(key);
+      }
+      for (const operation of order.operationLogs) {
+        if (operation.status !== "DONE") continue;
+        const key = resolveProductionFlowStageKey(operation.operationName);
+        if (key) completedKeys.add(key);
+      }
+      const activeOperation = order.operationLogs.find(
+        (operation: any) => operation.status === "IN_PROGRESS",
+      );
+      const activeStageKey = resolveProductionFlowStageKey(order.currentDept) ??
+        resolveProductionFlowStageKey(activeOperation?.operationName ?? null);
+      const activeDefinition = activeStageKey
+        ? getProductionFlowStageDefinition(activeStageKey)
+        : null;
+      if (activeDefinition) {
+        for (const stage of PRODUCTION_FLOW_STAGE_DEFINITIONS) {
+          if (stage.sequence < activeDefinition.sequence) completedKeys.add(stage.key);
+        }
+      }
+      if (order.status === "COMPLETED") {
+        for (const stage of PRODUCTION_FLOW_STAGE_DEFINITIONS.slice(0, 6)) {
+          completedKeys.add(stage.key);
+        }
+      }
+
+      const expectedStage = PRODUCTION_FLOW_STAGE_DEFINITIONS.find(
+        (stage) => !completedKeys.has(stage.key),
+      );
+      if (!expectedStage) throw new Error("All production workflow stages are complete");
+      if (expectedStage.key !== definition.key) {
+        throw new Error(`Complete ${expectedStage.name} before ${definition.name}`);
+      }
+      if (definition.key === "packaging" && order.status !== "COMPLETED") {
+        throw new Error("Finished Goods must be completed before Packaging");
+      }
+      if (definition.key !== "packaging" && order.status !== "IN_PRODUCTION") {
+        throw new Error("Order is not in production");
+      }
+
+      const priorKeys = new Set(
+        PRODUCTION_FLOW_STAGE_DEFINITIONS
+          .filter((stage) => stage.sequence < definition.sequence)
+          .map((stage) => stage.key),
+      );
+      const priorLog = [...order.StageLog].reverse().find((log: any) => {
+        const key = resolveProductionFlowStageKey(log.stageName) ??
+          resolveProductionFlowStageKey(log.department);
+        return key ? priorKeys.has(key) : false;
+      });
+      const expectedKgIn = priorLog?.kgOut != null
+        ? Number(priorLog.kgOut)
+        : definition.key === "packaging" && order.actualWeightOut != null
+          ? Number(order.actualWeightOut)
+          : Number(order.targetKg);
+      if (expectedKgIn > 0 && Math.abs(expectedKgIn - kgIn) > 0.01) {
+        throw new Error(`Kg In must match the previous output of ${expectedKgIn.toFixed(2)} kg`);
+      }
+
+      const now = new Date();
+      const matchingOperations = order.operationLogs.filter((operation: any) =>
+        operation.status !== "DONE" &&
+        operation.status !== "SKIPPED" &&
+        resolveProductionFlowStageKey(operation.operationName) === definition.key
+      );
+      for (const operation of matchingOperations) {
+        const startedAt = operation.startedAt ?? now;
+        const durationSeconds = Math.max(
+          0,
+          Math.round((now.getTime() - new Date(startedAt).getTime()) / 1000),
+        );
+        await tx.operationLog.update({
+          where: { id: operation.id },
+          data: {
+            status: "DONE",
+            startedAt,
+            completedAt: now,
+            durationSeconds,
+            operatorId: operation.operatorId ?? user.id,
+          },
+        });
+      }
+
+      const stageLog = await tx.stageLog.create({
+        data: {
+          organizationId: user.organizationId,
+          orderId: order.id,
+          stageName: definition.name,
+          sequence: definition.sequence,
+          kgIn,
+          kgOut,
+          kgScrap,
+          scrapReason: input.scrapReason?.trim() || null,
+          department: definition.department,
+          operatorId: user.id,
+          notes: input.notes?.trim() || null,
+          completedAt: now,
+        },
+      });
+
+      const nextStage = PRODUCTION_FLOW_STAGE_DEFINITIONS.find(
+        (stage) => stage.sequence === definition.sequence + 1,
+      );
+      if (definition.key === "finished-goods") {
+        await tx.productionOrder.update({
+          where: { id: order.id },
+          data: {
+            status: "COMPLETED",
+            completedAt: now,
+            productionFinishedAt: now,
+            actualWeightOut: kgOut,
+            outputRecordedAt: now,
+            outputRecordedBy: user.id,
+            currentStage: definition.sequence + 1,
+            currentDept: nextStage?.department ?? "Packaging",
+          },
+        });
+      } else if (definition.key === "packaging") {
+        await tx.productionOrder.update({
+          where: { id: order.id },
+          data: {
+            currentStage: definition.sequence + 1,
+            currentDept: "Ready for dispatch",
+          },
+        });
+      } else {
+        await tx.productionOrder.update({
+          where: { id: order.id },
+          data: {
+            productionStartedAt: order.productionStartedAt ?? now,
+            currentStage: nextStage?.sequence ?? definition.sequence + 1,
+            currentDept: nextStage?.department ?? null,
+          },
+        });
+      }
+
+      return { stageLog, nextStage };
+    });
+
+    revalidatePath("/operations");
+    revalidatePath(`/operations/${input.orderId}`);
+    revalidatePath("/jobs");
+    revalidatePath("/dashboard");
+    revalidatePath("/packaging");
+    return {
+      success: true,
+      completedStage: definition.name,
+      nextStage: result.nextStage?.name ?? null,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to complete stage",
+    };
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

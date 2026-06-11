@@ -7,6 +7,7 @@ export type ProductionFlowStatus =
 
 export type ProductionFlowStage = {
   key: string;
+  sequence: number | null;
   name: string;
   department: string;
   status: ProductionFlowStatus;
@@ -15,6 +16,7 @@ export type ProductionFlowStage = {
   kgScrap: number | null;
   assignedOperator: string | null;
   completedAt: Date | null;
+  canComplete: boolean;
 };
 
 type StageEvidence = {
@@ -61,45 +63,67 @@ export type ProductionFlowInput = {
   operationLogs: OperationEvidence[];
 };
 
-type StageDefinition = {
+export type ProductionFlowStageDefinition = {
   key: string;
+  sequence: number;
   name: string;
   department: string;
   aliases: string[];
 };
 
-const PROCESS_DEFINITIONS: StageDefinition[] = [
+export const PRODUCTION_FLOW_STAGE_DEFINITIONS: ProductionFlowStageDefinition[] = [
   {
     key: "cutting",
+    sequence: 1,
     name: "Cutting",
     department: "Cutting",
     aliases: ["cutting"],
   },
   {
     key: "forging-chamfering",
+    sequence: 2,
     name: "Forging / Chamfering",
     department: "Forging / Chamfering",
     aliases: ["forging", "chamfer", "chamfering"],
   },
   {
     key: "threading-locking",
+    sequence: 3,
     name: "Threading / Locking",
     department: "Threading / Locking",
     aliases: ["threading", "locking"],
   },
   {
     key: "electroplating",
+    sequence: 4,
     name: "Electroplating",
     department: "Electroplating",
     aliases: ["electroplating", "electro plating", "plating"],
   },
   {
     key: "drilling-grinding",
+    sequence: 5,
     name: "Drilling / Grinding",
     department: "Drilling / Grinding",
     aliases: ["drilling", "grinding"],
   },
+  {
+    key: "finished-goods",
+    sequence: 6,
+    name: "Finished Goods",
+    department: "Finished Goods",
+    aliases: ["finished goods"],
+  },
+  {
+    key: "packaging",
+    sequence: 7,
+    name: "Packaging",
+    department: "Packaging",
+    aliases: ["packaging"],
+  },
 ];
+
+const PROCESS_DEFINITIONS = PRODUCTION_FLOW_STAGE_DEFINITIONS.slice(0, 5);
 
 function emptyStage(
   key: string,
@@ -109,6 +133,7 @@ function emptyStage(
 ): ProductionFlowStage {
   return {
     key,
+    sequence: null,
     name,
     department,
     status,
@@ -117,6 +142,7 @@ function emptyStage(
     kgScrap: null,
     assignedOperator: null,
     completedAt: null,
+    canComplete: false,
   };
 }
 
@@ -124,22 +150,35 @@ function normalise(value: string | null | undefined) {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ") ?? "";
 }
 
-function matchesDefinition(value: string | null, definition: StageDefinition) {
+export function matchesProductionFlowStage(
+  value: string | null,
+  definition: ProductionFlowStageDefinition,
+) {
   const candidate = normalise(value);
   return definition.aliases.some((alias) => candidate.includes(normalise(alias)));
 }
 
+export function getProductionFlowStageDefinition(stageKey: string) {
+  return PRODUCTION_FLOW_STAGE_DEFINITIONS.find((definition) => definition.key === stageKey);
+}
+
+export function resolveProductionFlowStageKey(value: string | null) {
+  return PRODUCTION_FLOW_STAGE_DEFINITIONS.find((definition) =>
+    matchesProductionFlowStage(value, definition),
+  )?.key ?? null;
+}
+
 function buildProcessStage(
-  definition: StageDefinition,
+  definition: ProductionFlowStageDefinition,
   input: ProductionFlowInput,
 ): ProductionFlowStage {
   const logs = input.stageLogs.filter(
     (log) =>
-      matchesDefinition(log.stageName, definition) ||
-      matchesDefinition(log.department, definition),
+      matchesProductionFlowStage(log.stageName, definition) ||
+      matchesProductionFlowStage(log.department, definition),
   );
   const operations = input.operationLogs.filter((operation) =>
-    matchesDefinition(operation.name, definition),
+    matchesProductionFlowStage(operation.name, definition),
   );
   const latestLog = logs.at(-1);
   const latestOperation = operations.at(-1);
@@ -152,13 +191,14 @@ function buildProcessStage(
   if (logs.length > 0 || completedOperation) status = "COMPLETED";
   if (
     activeOperation ||
-    (matchesDefinition(input.currentDept, definition) && status !== "COMPLETED")
+    (matchesProductionFlowStage(input.currentDept, definition) && status !== "COMPLETED")
   ) {
     status = "ACTIVE";
   }
 
   return {
     key: definition.key,
+    sequence: definition.sequence,
     name: definition.name,
     department: latestLog?.department || definition.department,
     status,
@@ -175,6 +215,7 @@ function buildProcessStage(
       input.assignedOperatorName,
     completedAt:
       latestLog?.completedAt ?? completedOperation?.completedAt ?? null,
+    canComplete: false,
   };
 }
 
@@ -274,6 +315,17 @@ export function buildProductionFlow(input: ProductionFlowInput): ProductionFlowS
     }
   }
 
+  let inheritedKg: number | null = materialsReserved.kgOut ?? input.targetKg;
+  processStages = processStages.map((stage) => {
+    const kgIn = stage.kgIn ?? (stage.status === "ACTIVE" ? inheritedKg : null);
+    if (stage.kgOut != null) inheritedKg = stage.kgOut;
+    return {
+      ...stage,
+      kgIn,
+      canComplete: stage.status === "ACTIVE",
+    };
+  });
+
   const latestStageLog = input.stageLogs.at(-1);
   const latestCompletedOperation = [...input.operationLogs]
     .reverse()
@@ -285,22 +337,55 @@ export function buildProductionFlow(input: ProductionFlowInput): ProductionFlowS
     "Finished Goods",
     isRejected || isCancelled ? "BLOCKED" : isCompleted ? "COMPLETED" : "PENDING",
   );
-  finishedGoods.kgIn = latestStageLog?.kgOut ?? input.actualWeightOut;
-  finishedGoods.kgOut = input.actualWeightOut ?? latestStageLog?.kgOut ?? null;
-  finishedGoods.kgScrap = isCompleted ? 0 : null;
+  const finishedGoodsDefinition = getProductionFlowStageDefinition("finished-goods")!;
+  const finishedGoodsLog = input.stageLogs.find((log) =>
+    matchesProductionFlowStage(log.stageName, finishedGoodsDefinition),
+  );
+  const productionStagesComplete = processStages.every((stage) => stage.status === "COMPLETED");
+  finishedGoods.sequence = finishedGoodsDefinition.sequence;
+  finishedGoods.status = finishedGoodsLog
+    ? "COMPLETED"
+    : isRejected || isCancelled
+      ? "BLOCKED"
+      : isCompleted
+        ? "COMPLETED"
+        : input.status === "IN_PRODUCTION" && productionStagesComplete
+          ? "ACTIVE"
+          : "PENDING";
+  finishedGoods.kgIn =
+    finishedGoodsLog?.kgIn ??
+    latestStageLog?.kgOut ??
+    inheritedKg ??
+    input.actualWeightOut;
+  finishedGoods.kgOut =
+    finishedGoodsLog?.kgOut ??
+    input.actualWeightOut ??
+    (isCompleted ? latestStageLog?.kgOut ?? null : null);
+  finishedGoods.kgScrap = finishedGoodsLog?.kgScrap ?? (isCompleted ? 0 : null);
   finishedGoods.assignedOperator =
+    finishedGoodsLog?.operatorName ??
     input.outputRecorderName ??
     latestStageLog?.operatorName ??
     latestCompletedOperation?.operatorName ??
     null;
-  finishedGoods.completedAt = isCompleted
-    ? input.completedAt ?? input.productionFinishedAt ?? input.outputRecordedAt
-    : null;
+  finishedGoods.completedAt =
+    finishedGoodsLog?.completedAt ??
+    (isCompleted ? input.completedAt ?? input.productionFinishedAt ?? input.outputRecordedAt : null);
+  finishedGoods.canComplete = finishedGoods.status === "ACTIVE";
 
   const packaging = emptyStage("packaging", "Packaging", "Packaging");
+  const packagingDefinition = getProductionFlowStageDefinition("packaging")!;
+  const packagingLog = input.stageLogs.find((log) =>
+    matchesProductionFlowStage(log.stageName, packagingDefinition),
+  );
   const currentDepartment = normalise(input.currentDept);
   const saleStatus = input.saleOrder?.status;
-  if (isRejected || isCancelled || saleStatus === "CANCELLED") {
+  packaging.sequence = packagingDefinition.sequence;
+  if (packagingLog) {
+    packaging.status = "COMPLETED";
+    packaging.completedAt = packagingLog.completedAt;
+    packaging.assignedOperator = packagingLog.operatorName;
+  } else if (isRejected || isCancelled || saleStatus === "CANCELLED") {
     packaging.status = "BLOCKED";
   } else if (
     currentDepartment === "ready for dispatch" ||
@@ -312,13 +397,18 @@ export function buildProductionFlow(input: ProductionFlowInput): ProductionFlowS
     packaging.completedAt = input.saleOrder?.updatedAt ?? input.updatedAt;
   } else if (
     currentDepartment === "packaging" ||
-    (isCompleted && saleStatus === "CONFIRMED")
+    isCompleted
   ) {
     packaging.status = "ACTIVE";
   }
-  packaging.kgIn = isCompleted ? finishedGoods.kgOut : null;
-  packaging.kgOut = packaging.status === "COMPLETED" ? finishedGoods.kgOut : null;
-  packaging.kgScrap = packaging.status === "COMPLETED" ? 0 : null;
+  packaging.kgIn = packagingLog?.kgIn ?? (isCompleted ? finishedGoods.kgOut : null);
+  packaging.kgOut = packagingLog?.kgOut ?? (
+    packaging.status === "COMPLETED" ? finishedGoods.kgOut : null
+  );
+  packaging.kgScrap = packagingLog?.kgScrap ?? (
+    packaging.status === "COMPLETED" ? 0 : null
+  );
+  packaging.canComplete = packaging.status === "ACTIVE";
 
   return [
     salesOrder,
