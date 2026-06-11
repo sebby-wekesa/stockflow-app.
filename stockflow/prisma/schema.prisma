@@ -429,7 +429,7 @@ model ProductionOrder {
   orderNumber            String                    @unique
   designId               String?
   quantity               Int                       @default(1)
-  targetKg               Decimal?                  @db.Decimal(10, 4)
+  targetKg               Decimal                   @db.Decimal(10, 4)
   status                 ProductionStatus          @default(PENDING)
   priority               Priority                  @default(MEDIUM)
   currentStage           Int                       @default(1)
@@ -536,7 +536,7 @@ model ProductionOrderMaterial {
   id                String          @id @default(uuid())
   organizationId    String
   productionOrderId String
-  rawMaterialId     String?
+  rawMaterialId     String
   cutLength         Decimal?        @db.Decimal(10, 4)
   pieces            Int
   totalLength       Decimal?        @db.Decimal(10, 4)
@@ -545,7 +545,7 @@ model ProductionOrderMaterial {
   weightKg          Decimal?        @db.Decimal(10, 4)
   Organization      Organization    @relation(fields: [organizationId], references: [id])
   ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  RawMaterial       RawMaterial?    @relation(fields: [rawMaterialId], references: [id])
+  RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
 
   @@index([organizationId])
   @@index([productionOrderId])
