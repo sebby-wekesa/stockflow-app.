@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { materializeOperationsForOrder } from "@/lib/operation-routing";
+import { buildProductionFlow } from "@/lib/production-flow";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE DEFINITIONS
@@ -318,5 +319,155 @@ export async function listRoutedOrders() {
     started: Boolean(o.productionStartedAt),
     finished: Boolean(o.productionFinishedAt),
     operationCount: o._count.operationLogs,
+  }));
+}
+
+// Project every production order onto the fixed end-to-end workflow used by
+// the operations dashboard. Evidence comes from the order lifecycle, stage
+// logs, routed operation logs, and linked sales/packaging state.
+export async function listProductionOrderFlows() {
+  const user = await requireRole("ADMIN", "MANAGER", "OPERATOR");
+  const db = getTenantPrisma(user.organizationId);
+
+  const orders = await db.productionOrder.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      orderNumber: true,
+      productName: true,
+      routeType: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      approvedBy: true,
+      approvedAt: true,
+      completedAt: true,
+      productionStartedAt: true,
+      productionFinishedAt: true,
+      outputRecordedAt: true,
+      outputRecordedBy: true,
+      assignedTo: true,
+      currentDept: true,
+      targetKg: true,
+      actualWeightOut: true,
+      design: {
+        select: {
+          name: true,
+          billOfMaterials: { select: { id: true } },
+        },
+      },
+      materials: { select: { id: true } },
+      saleOrder: {
+        select: {
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          createdByUser: { select: { name: true, email: true } },
+        },
+      },
+      StageLog: {
+        orderBy: { sequence: "asc" },
+        select: {
+          stageName: true,
+          department: true,
+          kgIn: true,
+          kgOut: true,
+          kgScrap: true,
+          completedAt: true,
+          User: { select: { name: true, email: true } },
+        },
+      },
+      operationLogs: {
+        orderBy: { sequence: "asc" },
+        select: {
+          operationName: true,
+          status: true,
+          startedAt: true,
+          completedAt: true,
+          Operator: { select: { name: true, email: true } },
+        },
+      },
+      _count: { select: { operationLogs: true } },
+    },
+  });
+
+  const userIds = Array.from(new Set(
+    orders.flatMap((order: any) =>
+      [order.approvedBy, order.assignedTo, order.outputRecordedBy].filter(Boolean),
+    ),
+  ));
+  const namedUsers = userIds.length > 0
+    ? await db.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      })
+    : [];
+  const userNames = new Map(
+    namedUsers.map((namedUser) => [
+      namedUser.id,
+      namedUser.name ?? namedUser.email,
+    ]),
+  );
+
+  return orders.map((order: any) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    productName: order.design?.name ?? order.productName ?? "Direct order",
+    routeType: order.routeType,
+    status: order.status,
+    operationCount: order._count.operationLogs,
+    stages: buildProductionFlow({
+      status: order.status,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      approvedAt: order.approvedAt,
+      completedAt: order.completedAt,
+      productionStartedAt: order.productionStartedAt,
+      productionFinishedAt: order.productionFinishedAt,
+      outputRecordedAt: order.outputRecordedAt,
+      currentDept: order.currentDept,
+      targetKg: Number(order.targetKg),
+      actualWeightOut:
+        order.actualWeightOut == null ? null : Number(order.actualWeightOut),
+      materialCount:
+        order.materials.length + (order.design?.billOfMaterials.length ?? 0),
+      reviewerName: order.approvedBy
+        ? userNames.get(order.approvedBy) ?? null
+        : null,
+      assignedOperatorName: order.assignedTo
+        ? userNames.get(order.assignedTo) ?? null
+        : null,
+      outputRecorderName: order.outputRecordedBy
+        ? userNames.get(order.outputRecordedBy) ?? null
+        : null,
+      saleOrder: order.saleOrder
+        ? {
+            status: order.saleOrder.status,
+            createdAt: order.saleOrder.createdAt,
+            updatedAt: order.saleOrder.updatedAt,
+            operatorName:
+              order.saleOrder.createdByUser?.name ??
+              order.saleOrder.createdByUser?.email ??
+              null,
+          }
+        : null,
+      stageLogs: order.StageLog.map((log: any) => ({
+        stageName: log.stageName,
+        department: log.department,
+        kgIn: Number(log.kgIn),
+        kgOut: Number(log.kgOut),
+        kgScrap: Number(log.kgScrap),
+        operatorName: log.User?.name ?? log.User?.email ?? null,
+        completedAt: log.completedAt,
+      })),
+      operationLogs: order.operationLogs.map((operation: any) => ({
+        name: operation.operationName,
+        status: operation.status,
+        operatorName:
+          operation.Operator?.name ?? operation.Operator?.email ?? null,
+        startedAt: operation.startedAt,
+        completedAt: operation.completedAt,
+      })),
+    }),
   }));
 }
