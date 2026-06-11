@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { normalizeUserRole } from '@/lib/types'
+import { normalizeUserRole, type UserRole } from '@/lib/types'
 import { getRoleHomePage } from '@/lib/auth-session'
 
 /**
@@ -34,6 +34,11 @@ const STATUS_ROUTES = [
 ]
 
 type OrganizationStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
+
+type UserContext = {
+  role: UserRole
+  orgStatus: OrganizationStatus
+}
 
 type UserContextRow = {
   role?: string | null
@@ -100,15 +105,14 @@ function applySecurityHeaders(response: NextResponse, nonce: string, csp: string
   return response
 }
 
-async function resolveUserContext(userId: string, fallbackRole?: string) {
+async function resolveUserContext(userId: string): Promise<UserContext | null> {
   const supabaseAdmin = getSupabaseAdmin()
   if (!supabaseAdmin) {
-    return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
+    console.error('User context lookup unavailable: Supabase service role is not configured')
+    return null
   }
 
   try {
-    // Look up the user's role AND their org's status in one query.
-    // We hit the Prisma User + Organization tables here instead of profiles.
     const { data, error } = await supabaseAdmin
       .from('User')
       .select('role, Organization (status)')
@@ -117,18 +121,21 @@ async function resolveUserContext(userId: string, fallbackRole?: string) {
 
     if (error) {
       console.error('User context lookup failed:', error)
-      return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
+      return null
     }
 
     const userContext = data as UserContextRow | null
-    const orgStatus = userContext?.Organization?.status ?? 'ACTIVE'
+    if (!userContext?.role || !userContext.Organization?.status) {
+      return null
+    }
+
     return {
-      role: normalizeUserRole(userContext?.role ?? fallbackRole),
-      orgStatus,
+      role: normalizeUserRole(userContext.role),
+      orgStatus: userContext.Organization.status,
     }
   } catch (error) {
     console.error('User context lookup error:', error)
-    return { role: normalizeUserRole(fallbackRole), orgStatus: 'ACTIVE' as const }
+    return null
   }
 }
 
@@ -192,10 +199,17 @@ export async function proxy(request: NextRequest) {
   }
 
   // Has a valid user - look up role and org status
-  const ctx = await resolveUserContext(
-    user.id,
-    user.user_metadata?.role
-  )
+  const ctx = await resolveUserContext(user.id)
+
+  if (!ctx) {
+    if (isPublicRoute) {
+      return applySecurityHeaders(response, nonce, csp)
+    }
+
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', pathname)
+    return applySecurityHeaders(NextResponse.redirect(loginUrl), nonce, csp)
+  }
 
   // Hard blocks: SUSPENDED or CLOSED orgs cannot do anything except see the
   // explanation page and log out

@@ -43,6 +43,7 @@ Check production deployment has:
 - `DIRECT_URL`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only; required for proxy user-context lookup and admin auth operations)
 
 Do not expose private secrets in client code.
 

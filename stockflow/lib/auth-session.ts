@@ -1,13 +1,9 @@
 import { createClient, type Session } from "@supabase/supabase-js";
-import { getSupabaseAdmin } from "./supabase-admin";
+import { authPrisma, withRetry } from "./prisma";
 import { normalizeUserRole, ROLE_PATHS, type UserRole } from "./types";
 
 type MutableCookieStore = {
   set(name: string, value: string, options?: Record<string, unknown>): unknown;
-};
-
-type ProfileRoleRow = {
-  role: string | null;
 };
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -52,28 +48,18 @@ export function clearAuthCookies(cookieStore: MutableCookieStore) {
 }
 
 export async function resolveUserRole(userId: string, fallbackRole: unknown): Promise<UserRole> {
-  const supabaseAdmin = getSupabaseAdmin();
-
-  if (!supabaseAdmin) {
-    return normalizeUserRole(fallbackRole);
-  }
-
   try {
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
+    const user = await withRetry(() =>
+      authPrisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      }),
+      2,
+    );
 
-    const profile = (data ?? null) as ProfileRoleRow | null;
-
-    if (error) {
-      console.error("Profile lookup failed:", error);
-    }
-
-    return normalizeUserRole(profile?.role ?? fallbackRole);
+    return normalizeUserRole(user?.role ?? fallbackRole);
   } catch (error) {
-    console.error("Unexpected profile lookup failure:", error);
+    console.error("User role lookup failed:", error);
     return normalizeUserRole(fallbackRole);
   }
 }
@@ -111,20 +97,8 @@ export async function getSessionContext(accessToken: string) {
     return null;
   }
 
-  const { data, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const profile = (data ?? null) as ProfileRoleRow | null;
-
-  if (profileError) {
-    console.error("Session role lookup failed:", profileError.message);
-  }
-
   return {
     user,
-    role: normalizeUserRole(profile?.role ?? user.user_metadata?.role),
+    role: await resolveUserRole(user.id, user.user_metadata?.role),
   };
 }
