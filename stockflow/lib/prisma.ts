@@ -1,8 +1,36 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
+import {
+  getDefaultAutoSelectFamily,
+  getDefaultAutoSelectFamilyAttemptTimeout,
+  setDefaultAutoSelectFamilyAttemptTimeout,
+} from 'node:net'
 import { Pool } from 'pg'
 
 const databaseUrl = process.env.DATABASE_URL
+
+function getPositiveNumber(value: string | undefined, fallback: number) {
+  const configured = Number(value)
+  return Number.isFinite(configured) && configured > 0 ? configured : fallback
+}
+
+function configureNetworkFamilyAttemptTimeout() {
+  if (!getDefaultAutoSelectFamily()) return
+
+  const configured = Number(process.env.DB_NETWORK_FAMILY_ATTEMPT_TIMEOUT_MS)
+  const current = getDefaultAutoSelectFamilyAttemptTimeout()
+  const timeout = Number.isFinite(configured) && configured > 0
+    ? Math.max(10, Math.trunc(configured))
+    : Math.max(current, 2_000)
+
+  if (timeout !== current) {
+    setDefaultAutoSelectFamilyAttemptTimeout(timeout)
+  }
+}
+
+// Node 22 defaults to 250ms per resolved address. Remote database poolers can
+// need longer to establish TLS, causing false AggregateError/ETIMEDOUT failures.
+configureNetworkFamilyAttemptTimeout()
 
 function getPoolMax() {
   const configured = Number(process.env.DB_POOL_MAX || process.env.DB_CONNECTION_LIMIT)
@@ -78,8 +106,19 @@ const prismaClientSingleton = () => {
     const pool = new Pool({
       connectionString: getConnectionString(databaseUrl),
       max: getPoolMax(),
-      idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 10_000),
-      connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10_000),
+      idleTimeoutMillis: getPositiveNumber(
+        process.env.DB_IDLE_TIMEOUT_MS,
+        process.env.NODE_ENV === 'production' ? 10_000 : 300_000,
+      ),
+      connectionTimeoutMillis: getPositiveNumber(
+        process.env.DB_CONNECTION_TIMEOUT_MS,
+        10_000,
+      ),
+      keepAlive: true,
+      keepAliveInitialDelayMillis: getPositiveNumber(
+        process.env.DB_KEEP_ALIVE_INITIAL_DELAY_MS,
+        10_000,
+      ),
     })
     const adapter = new PrismaPg(pool, { disposeExternalPool: true })
     const client = new PrismaClient({ adapter })

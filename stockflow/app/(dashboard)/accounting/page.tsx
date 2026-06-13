@@ -28,6 +28,9 @@ export default async function AccountingPage() {
   ]);
 
   const cards = [
+    { href: "/accounting/insights", title: "Financial Insights", desc: "Revenue, profit & concentration risk", icon: "💡" },
+    { href: "/accounting/profit-loss", title: "Profit & Loss", desc: "Income statement for any period", icon: "📈" },
+    { href: "/accounting/balance-sheet", title: "Balance Sheet", desc: "Assets, liabilities & equity", icon: "📊" },
     { href: "/accounting/trial-balance", title: "Trial Balance", desc: "Debits vs credits across all accounts", icon: "⚖️" },
     { href: "/accounting/ledger", title: "General Ledger", desc: "Every transaction, account by account", icon: "📒" },
     { href: "/accounting/debtors", title: "Debtors", desc: "Who owes you and how much", icon: "📥" },

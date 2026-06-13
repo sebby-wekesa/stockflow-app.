@@ -25,6 +25,7 @@ import { supabaseServerComponent } from "./supabase-admin";
 import { authPrisma, withRetry } from "./prisma";
 import { type UserRole } from "./types";
 import type { OrgStatus } from "@prisma/client";
+import { cache } from "react";
 
 export type Role = UserRole;
 
@@ -46,7 +47,7 @@ export type AuthUser = {
   };
 };
 
-export async function getUser(): Promise<AuthUser | null> {
+async function getUserUncached(): Promise<AuthUser | null> {
   const supabase = await supabaseServerComponent();
   const { data: { user: authUser } } = await supabase.auth.getUser();
 
@@ -119,6 +120,10 @@ export async function getUser(): Promise<AuthUser | null> {
     return null;
   }
 }
+
+// Layouts, pages, and server actions frequently request the same user during
+// one render. Reuse that lookup instead of competing for another DB connection.
+export const getUser = cache(getUserUncached);
 
 export async function requireAuth(): Promise<AuthUser> {
   const user = await getUser();

@@ -87,6 +87,9 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
       return [
         { section: "Accounting" },
         { label: "Accounting overview", href: "/accounting" },
+        { label: "Financial insights", href: "/accounting/insights" },
+        { label: "Profit and loss", href: "/accounting/profit-loss" },
+        { label: "Balance sheet", href: "/accounting/balance-sheet" },
         { label: "Trial balance", href: "/accounting/trial-balance" },
         { label: "General ledger", href: "/accounting/ledger" },
         { label: "Banking", href: "/accounting/banking" },
