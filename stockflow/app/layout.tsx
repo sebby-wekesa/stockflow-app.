@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Mono, DM_Sans, Syne } from "next/font/google";
 import { headers } from "next/headers";
 import { ToastProvider } from "@/components/Toast";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,9 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${dmMono.variable} ${syne.variable}`}>
       <body>
-        <ToastProvider>{children}</ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -28,6 +28,7 @@ export default async function AccountingPage() {
   ]);
 
   const cards = [
+    { href: "/accounting/transactions", title: "Record Transactions", desc: "Expenses, income, bills, invoices & transfers", icon: "➕" },
     { href: "/accounting/insights", title: "Financial Insights", desc: "Revenue, profit & concentration risk", icon: "💡" },
     { href: "/accounting/profit-loss", title: "Profit & Loss", desc: "Income statement for any period", icon: "📈" },
     { href: "/accounting/balance-sheet", title: "Balance Sheet", desc: "Assets, liabilities & equity", icon: "📊" },

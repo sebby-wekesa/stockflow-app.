@@ -66,6 +66,7 @@ function pathMatches(pathname: string, prefix: string) {
 
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development'
+  const isProduction = process.env.NODE_ENV === 'production'
 
   return [
     "default-src 'self'",
@@ -79,7 +80,7 @@ function buildCsp(nonce: string): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    "upgrade-insecure-requests",
+    ...(isProduction ? ["upgrade-insecure-requests"] : []),
   ].join('; ')
 }
 
