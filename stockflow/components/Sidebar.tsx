@@ -6,6 +6,7 @@ import type { UserRole as Role } from "@/lib/types";
 import type { UserRole } from "@/lib/types";
 import { ROLE_NAMES, ROLE_COLORS } from "@/lib/types";
 import { signOut } from "@/actions/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type SidebarCounts = {
   operatorQueue?: number
@@ -199,19 +200,16 @@ export function Sidebar({ role, counts = {} }: { role: UserRole; counts?: Sideba
             </Link>
           );
         })}
-        
-        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-          <form action={signOut} style={{ display: 'block', width: '100%' }}>
-            <button
-              type="submit"
-              className="bg-[#f0c040] hover:bg-[#f5d060] text-black"
-              style={{ width: '100%', padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginTop: '20px' }}
-            >
-              Log out
-            </button>
-          </form>
-        </div>
       </nav>
+      <div className="sidebar-footer">
+        <div className="sidebar-footer-label">Appearance</div>
+        <ThemeToggle />
+        <form action={signOut}>
+          <button type="submit" className="btn btn-primary sidebar-logout">
+            Log out
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

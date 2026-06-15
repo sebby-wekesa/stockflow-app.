@@ -30,6 +30,21 @@ export const metadata: Metadata = {
   description: "Manufacturing ERP",
 };
 
+const themeInitializationScript = `
+  (function () {
+    try {
+      var theme = localStorage.getItem("theme");
+      if (theme !== "light" && theme !== "dark") {
+        theme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      document.documentElement.classList.add(theme);
+      document.documentElement.style.colorScheme = theme;
+    } catch (_) {
+      document.documentElement.classList.add("dark");
+    }
+  })();
+`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -38,7 +53,14 @@ export default async function RootLayout({
   await headers();
 
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmMono.variable} ${syne.variable}`}>
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${dmMono.variable} ${syne.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
+      </head>
       <body>
         <ThemeProvider>
           <ToastProvider>{children}</ToastProvider>

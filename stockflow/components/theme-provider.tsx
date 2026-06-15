@@ -2,25 +2,45 @@
 
 import * as React from "react";
 
+type Theme = "light" | "dark";
+
 interface ThemeContextProps {
-  theme: "light" | "dark";
-  setTheme: (theme: "light" | "dark") => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
 }
 
 const ThemeContext = React.createContext<ThemeContextProps | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = React.useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("theme") as "light" | "dark") ?? "dark";
-    }
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") {
     return "dark";
-  });
+  }
+
+  try {
+    const storedTheme = localStorage.getItem("theme");
+    if (storedTheme === "light" || storedTheme === "dark") {
+      return storedTheme;
+    }
+
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = React.useState<Theme>(getInitialTheme);
 
   React.useEffect(() => {
-    localStorage.setItem("theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {
+      // The selected theme still applies when storage is unavailable.
+    }
+
     document.documentElement.classList.toggle("light", theme === "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   return (
