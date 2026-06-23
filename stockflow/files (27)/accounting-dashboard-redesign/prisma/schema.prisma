@@ -1,0 +1,1251 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+  binaryTargets   = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  action         String
+  entityType     String?
+  entityId       String?
+  details        String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+  User           User     @relation(fields: [userId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model BillOfMaterials {
+  id             String       @id @default(uuid())
+  organizationId String
+  designId       String
+  rawMaterialId  String
+  quantity       Decimal      @db.Decimal(10, 4)
+  unitOfMeasure  String       @default("kg")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  design         Design       @relation(fields: [designId], references: [id], onDelete: Cascade)
+  RawMaterial    RawMaterial  @relation(fields: [rawMaterialId], references: [id])
+  Organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([designId, rawMaterialId])
+  @@index([organizationId])
+}
+
+model Branch {
+  id                     String                   @id @default(uuid())
+  organizationId         String
+  name                   String
+  location               String?
+  code                   String
+  address                String?
+  phone                  String?
+  managerId              String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  Organization           Organization             @relation(fields: [organizationId], references: [id])
+  InventoryFinishedGoods InventoryFinishedGoods[]
+  InventoryRawMaterial   InventoryRawMaterial[]
+  MaterialReceipt        MaterialReceipt[]
+  Product                Product[]
+  ProductReceipt         ProductReceipt[]
+  StockMovement          StockMovement[]
+  User                   User[]
+  Invitation             Invitation[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+}
+
+model Customer {
+  id                   String                @id @default(uuid())
+  organizationId       String
+  name                 String
+  code                 String
+  contactName          String?
+  email                String?
+  phone                String?
+  address              String?
+  taxId                String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  CustomerPortalAccess CustomerPortalAccess?
+  SaleOrder            SaleOrder[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model CustomerPortalAccess {
+  id             String    @id @default(uuid())
+  organizationId String
+  customerId     String    @unique
+  accessCode     String    @unique
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  lastLogin      DateTime?
+  Customer       Customer  @relation(fields: [customerId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model DemandForecast {
+  id               String       @id @default(uuid())
+  organizationId   String
+  rawMaterialId    String
+  forecastDate     DateTime
+  forecastedDemand Decimal      @db.Decimal(10, 4)
+  confidenceLevel  Float
+  basedOnDays      Int
+  createdAt        DateTime     @default(now())
+  RawMaterial      RawMaterial  @relation(fields: [rawMaterialId], references: [id])
+  Organization     Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([rawMaterialId, forecastDate])
+  @@index([organizationId])
+}
+
+model Design {
+  id               String            @id @default(uuid())
+  organizationId   String
+  name             String
+  code             String
+  category         String?
+  description      String?
+  targetDimensions String?
+  targetWeight     Decimal?          @db.Decimal(10, 4)
+  expectedYield    Float?
+  specifications   Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  lastSeenAt       DateTime?
+  billOfMaterials  BillOfMaterials[]
+  finishedGoods    FinishedGoods[]
+  productionOrders ProductionOrder[]
+  stages           Stage[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model FinishedGoods {
+  id                     String                   @id @default(uuid())
+  organizationId         String
+  sku                    String
+  designId               String
+  quantity               Int
+  reservedQuantity       Int                      @default(0)
+  kgProduced             Decimal                  @db.Decimal(10, 4)
+  barcode                String?
+  batchNumber            String?
+  unitCost               Float?
+  createdAt              DateTime                 @default(now())
+  design                 Design                   @relation(fields: [designId], references: [id])
+  InventoryFinishedGoods InventoryFinishedGoods[]
+  SaleItem               SaleItem[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
+  @@index([organizationId])
+}
+
+model ImportBatch {
+  id             String       @id @default(uuid())
+  organizationId String
+  file_name      String
+  file_url       String? // base64 buffer for re-parsing on commit (cleared after success)
+  sheet_type     String
+  import_mode    ImportMode   @default(update)
+  target_branch  String?
+  status         ImportStatus @default(uploaded)
+  row_count      Int
+  mapping_config Json? // specialized import metadata (preview rows, source label)
+  imported_at    DateTime?
+  ok_count       Int?
+  skipped_count  Int?
+  error_count    Int?
+  error_summary  String?
+  created_by     String
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+  User           User         @relation(fields: [created_by], references: [id])
+  ImportRow      ImportRow[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model ImportRow {
+  id               String       @id @default(uuid())
+  organizationId   String
+  batch_id         String
+  row_number       Int
+  raw_data         Json
+  mapped_data      Json?
+  matched_product  String?
+  match_confidence Float?
+  resolution       String?
+  resolved_product String?
+  order_number     String?
+  customer_name    String?
+  qty              Float?
+  unit_price       Float?
+  notes            String?
+  errors           String?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+  ImportBatch      ImportBatch  @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  Organization     Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([batch_id])
+  @@index([organizationId])
+}
+
+model InventoryFinishedGoods {
+  id              String        @id @default(uuid())
+  organizationId  String
+  branchId        String
+  finishedGoodsId String
+  availableQty    Int           @default(0)
+  reservedQty     Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  Branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  FinishedGoods   FinishedGoods @relation(fields: [finishedGoodsId], references: [id], onDelete: Cascade)
+  Organization    Organization  @relation(fields: [organizationId], references: [id])
+
+  @@unique([branchId, finishedGoodsId])
+  @@index([organizationId])
+}
+
+model InventoryRawMaterial {
+  id             String       @id @default(uuid())
+  organizationId String
+  branchId       String
+  rawMaterialId  String
+  availableKg    Decimal      @default(0) @db.Decimal(10, 4)
+  reservedKg     Decimal      @default(0) @db.Decimal(10, 4)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  Branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  RawMaterial    RawMaterial  @relation(fields: [rawMaterialId], references: [id], onDelete: Cascade)
+  Organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([branchId, rawMaterialId])
+  @@index([organizationId])
+}
+
+model MaterialConsumptionLog {
+  id                String          @id @default(uuid())
+  organizationId    String
+  productionOrderId String
+  rawMaterialId     String
+  quantityConsumed  Decimal         @db.Decimal(10, 4)
+  consumedAt        DateTime        @default(now())
+  stageId           String?
+  notes             String?
+  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
+  Stage             Stage?          @relation(fields: [stageId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model MaterialReceipt {
+  id             String      @id @default(uuid())
+  organizationId String
+  materialId     String
+  kgReceived     Decimal     @db.Decimal(10, 4)
+  piecesReceived Int         @default(0)
+  reference      String?
+  supplierId     String?
+  branchId       String?
+  loggedBy       String?
+  createdAt      DateTime    @default(now())
+  Branch         Branch?     @relation(fields: [branchId], references: [id])
+  RawMaterial    RawMaterial @relation(fields: [materialId], references: [id])
+  Supplier       Supplier?   @relation(fields: [supplierId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model NotificationSettings {
+  id              String   @id @default(uuid())
+  organizationId  String
+  userId          String   @unique
+  emailEnabled    Boolean  @default(true)
+  whatsappEnabled Boolean  @default(false)
+  whatsappNumber  String?
+  orderApproved   Boolean  @default(true)
+  highScrapAlert  Boolean  @default(true)
+  stockoutAlert   Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  User            User     @relation(fields: [userId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model Organization {
+  id             String       @id @default(uuid())
+  name           String
+  slug           String       @unique // url-safe identifier, e.g. "acme-springs"
+  status         OrgStatus    @default(PENDING_APPROVAL)
+  ownerUserId    String?      @unique
+  approvedAt     DateTime?
+  disabledAt     DateTime?
+  disabledReason String?
+  code           String       @unique
+  address        String?
+  phone          String?
+  email          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  Branch         Branch[]
+  User           User[]
+  Invitation     Invitation[]
+
+  // Inverse relations for all models with organizationId (required by Prisma for the @relation)
+  auditLogs                AuditLog[]
+  billOfMaterials          BillOfMaterials[]
+  customers                Customer[]
+  customerPortalAccesses   CustomerPortalAccess[]
+  demandForecasts          DemandForecast[]
+  designs                  Design[]
+  finishedGoods            FinishedGoods[]
+  importBatches            ImportBatch[]
+  importRows               ImportRow[]
+  inventoryFinishedGoods   InventoryFinishedGoods[]
+  inventoryRawMaterials    InventoryRawMaterial[]
+  materialConsumptionLogs  MaterialConsumptionLog[]
+  materialReceipts         MaterialReceipt[]
+  notificationSettings     NotificationSettings[]
+  products                 Product[]
+  productAliases           ProductAlias[]
+  productReceipts          ProductReceipt[]
+  productionOrderMaterials ProductionOrderMaterial[]
+  productionOrders         ProductionOrder[]
+  productionRoutes         ProductionRoute[]
+  routeOperations          RouteOperation[]
+  operationLogs            OperationLog[]
+  purchaseOrders           PurchaseOrder[]
+  purchaseOrderItems       PurchaseOrderItem[]
+  rawMaterials             RawMaterial[]
+  saleItems                SaleItem[]
+  saleOrders               SaleOrder[]
+  stages                   Stage[]
+  stageLogs                StageLog[]
+  stockMovements           StockMovement[]
+  suppliers                Supplier[]
+  unitOfMeasures           UnitOfMeasure[]
+  chartAccounts            ChartAccount[]
+  journalEntries           JournalEntry[]
+  ledgerLines              LedgerLine[]
+  bankAccounts             BankAccount[]
+  payments                 Payment[]
+}
+
+model Product {
+  id              String            @id @default(uuid())
+  organizationId  String
+  name            String
+  sku             String?
+  category        ProductCategory   @default(springs)
+  routeType       RouteType?
+  origin          StockOrigin       @default(FACTORY_MADE)
+  uom             String            @default("KG")
+  currentStock    Float             @default(0)
+  piecesSets      Int               @default(0)
+  unitCost        Float?
+  landingCost     Float?
+  vendor          String?
+  branchId        String?
+  reorderLevel    Int? // Minimum stock level before reorder
+  stockStatus     StockStatus?      @default(AVAILABLE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  Branch          Branch?           @relation(fields: [branchId], references: [id])
+  ProductAlias    ProductAlias[]
+  ProductReceipt  ProductReceipt[]
+  StockMovement   StockMovement[]
+  ProductionOrder ProductionOrder[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, sku])
+  @@index([organizationId])
+}
+
+model ProductAlias {
+  id             String       @id @default(uuid())
+  organizationId String
+  product_id     String
+  alias          String
+  created_at     DateTime     @default(now())
+  Product        Product      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  Organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([product_id, alias])
+  @@index([alias])
+  @@index([organizationId])
+}
+
+model ProductReceipt {
+  id             String   @id @default(uuid())
+  organizationId String
+  productId      String
+  qtyReceived    Float
+  unitCost       Float?
+  landingCost    Float?
+  reference      String?
+  vendor         String?
+  loggedBy       String?
+  branchId       String?
+  createdAt      DateTime @default(now())
+  Branch         Branch?  @relation(fields: [branchId], references: [id])
+  Product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model ProductionOrder {
+  id                     String                    @id @default(uuid())
+  organizationId         String
+  saleOrderId            String?
+  saleItemId             String?                   @unique
+  productId              String?
+  orderNumber            String
+  designId               String?
+  productName            String?
+  expectedPieces         Int?
+  actualPieces           Int?
+  actualWeightOut        Decimal?                  @db.Decimal(10, 4)
+  outputRecordedAt       DateTime?
+  outputRecordedBy       String?
+  quantity               Int                       @default(1)
+  targetKg               Decimal                   @db.Decimal(10, 4)
+  status                 ProductionStatus          @default(PENDING)
+  priority               Priority                  @default(MEDIUM)
+  currentStage           Int                       @default(1)
+  currentDept            String?
+  assignedTo             String?
+  approvedBy             String?
+  approvedAt             DateTime?
+  rejectionReason        String?
+  completedAt            DateTime?
+  routeType              RouteType?
+  productionStartedAt    DateTime?
+  productionFinishedAt   DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  MaterialConsumptionLog MaterialConsumptionLog[]
+  design                 Design?                   @relation(fields: [designId], references: [id])
+  materials              ProductionOrderMaterial[]
+  operationLogs          OperationLog[]
+  product                Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  saleOrder              SaleOrder?                @relation(fields: [saleOrderId], references: [id])
+  saleItem               SaleItem?                 @relation(fields: [saleItemId], references: [id])
+  StageLog               StageLog[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, orderNumber])
+  @@index([organizationId])
+  @@index([saleOrderId])
+  @@index([productId])
+}
+
+model ProductionRoute {
+  id             String           @id @default(uuid())
+  organizationId String
+  routeType      RouteType
+  name           String
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  operations     RouteOperation[]
+  Organization   Organization     @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, routeType])
+  @@index([organizationId])
+}
+
+model RouteOperation {
+  id             String          @id @default(uuid())
+  organizationId String
+  routeId        String
+  name           String
+  sequence       Int
+  optional       Boolean         @default(false)
+  section        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  route          ProductionRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  operationLogs  OperationLog[]
+  Organization   Organization    @relation(fields: [organizationId], references: [id])
+
+  @@unique([routeId, sequence])
+  @@index([organizationId])
+  @@index([routeId])
+}
+
+model OperationLog {
+  id                String          @id @default(uuid())
+  organizationId    String
+  productionOrderId String
+  routeOperationId  String?
+  operationName     String
+  sequence          Int
+  section           String?
+  optional          Boolean         @default(false)
+  status            OperationStatus @default(PENDING)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  durationSeconds   Int?
+  operatorId        String?
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  RouteOperation    RouteOperation? @relation(fields: [routeOperationId], references: [id], onDelete: SetNull)
+  Operator          User?           @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  Organization      Organization    @relation(fields: [organizationId], references: [id])
+
+  @@unique([productionOrderId, sequence])
+  @@index([organizationId])
+  @@index([productionOrderId])
+}
+
+model ProductionOrderMaterial {
+  id                String          @id @default(uuid())
+  organizationId    String
+  productionOrderId String
+  rawMaterialId     String
+  cutLength         Decimal?        @db.Decimal(10, 4)
+  pieces            Int
+  totalLength       Decimal?        @db.Decimal(10, 4)
+  weightKg          Decimal?        @db.Decimal(10, 4)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  ProductionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  RawMaterial       RawMaterial     @relation(fields: [rawMaterialId], references: [id])
+  Organization      Organization    @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([productionOrderId])
+  @@index([rawMaterialId])
+}
+
+model PurchaseOrder {
+  id                String              @id @default(uuid())
+  organizationId    String
+  poNumber          String
+  supplierId        String
+  status            PurchaseStatus      @default(DRAFT)
+  totalAmount       Decimal             @db.Decimal(10, 2)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  approvedBy        String?
+  approvedAt        DateTime?
+  expectedDelivery  DateTime?
+  notes             String?
+  Supplier          Supplier            @relation(fields: [supplierId], references: [id])
+  PurchaseOrderItem PurchaseOrderItem[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, poNumber])
+  @@index([organizationId])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  organizationId  String
+  purchaseOrderId String
+  rawMaterialId   String
+  quantity        Decimal       @db.Decimal(10, 4)
+  unitPrice       Decimal       @db.Decimal(10, 2)
+  totalPrice      Decimal       @db.Decimal(10, 2)
+  PurchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  RawMaterial     RawMaterial   @relation(fields: [rawMaterialId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model RawMaterial {
+  id                      String                    @id @default(uuid())
+  organizationId          String
+  sku                     String
+  materialName            String
+  category                String                    @default("Flat Bars")
+  diameter                String
+  length                  String                    @default("")
+  width                   String                    @default("")
+  height                  String                    @default("")
+  supplierId              String?
+  barcode                 String?
+  batchNumber             String?
+  availableKg             Decimal                   @default(0) @db.Decimal(10, 4)
+  reservedKg              Decimal                   @default(0) @db.Decimal(10, 4)
+  availablePieces         Int                       @default(0)
+  costPerKg               Float?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  BillOfMaterials         BillOfMaterials[]
+  DemandForecast          DemandForecast[]
+  InventoryRawMaterial    InventoryRawMaterial[]
+  MaterialConsumptionLog  MaterialConsumptionLog[]
+  MaterialReceipt         MaterialReceipt[]
+  ProductionOrderMaterial ProductionOrderMaterial[]
+  PurchaseOrderItem       PurchaseOrderItem[]
+  Supplier                Supplier?                 @relation(fields: [supplierId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
+  @@index([organizationId])
+}
+
+model SaleItem {
+  id              String           @id @default(uuid())
+  organizationId  String
+  saleOrderId     String
+  finishedGoodsId String
+  quantity        Int
+  unitPrice       Decimal          @db.Decimal(10, 2)
+  totalPrice      Decimal          @db.Decimal(10, 2)
+  FinishedGoods   FinishedGoods    @relation(fields: [finishedGoodsId], references: [id])
+  ProductionOrder ProductionOrder?
+  SaleOrder       SaleOrder        @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model SaleOrder {
+  id              String            @id @default(uuid())
+  organizationId  String
+  customerId      String?
+  customerName    String
+  totalAmount     Decimal           @db.Decimal(10, 2)
+  status          SaleStatus        @default(PENDING)
+  createdBy       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  SaleItem        SaleItem[]
+  ProductionOrder ProductionOrder[]
+  Customer        Customer?         @relation(fields: [customerId], references: [id])
+  createdByUser   User?             @relation(fields: [createdBy], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model Stage {
+  id                     String                   @id @default(uuid())
+  organizationId         String
+  name                   String
+  department             String
+  sequence               Int
+  specifications         Json?
+  designId               String
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  MaterialConsumptionLog MaterialConsumptionLog[]
+  design                 Design                   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  StageLog               StageLog[]
+  Organization           Organization             @relation(fields: [organizationId], references: [id])
+
+  @@unique([designId, sequence])
+  @@index([organizationId])
+}
+
+model StageLog {
+  id              String          @id @default(uuid())
+  organizationId  String
+  orderId         String
+  stageId         String?
+  stageName       String
+  sequence        Int
+  kgIn            Decimal         @db.Decimal(10, 4)
+  kgOut           Decimal         @db.Decimal(10, 4)
+  kgScrap         Decimal         @db.Decimal(10, 4)
+  piecesIn        Int?
+  piecesOut       Int?
+  scrapReason     String?
+  department      String?
+  operatorId      String
+  notes           String?
+  completedAt     DateTime        @default(now())
+  User            User            @relation(fields: [operatorId], references: [id])
+  ProductionOrder ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  Stage           Stage?          @relation(fields: [stageId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model Supplier {
+  id              String            @id @default(uuid())
+  organizationId  String
+  name            String
+  code            String
+  contactName     String?
+  email           String?
+  phone           String?
+  address         String?
+  taxId           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  MaterialReceipt MaterialReceipt[]
+  PurchaseOrder   PurchaseOrder[]
+  RawMaterial     RawMaterial[]
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model UnitOfMeasure {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  symbol         String
+  category       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model User {
+  id                   String                @id @default(uuid())
+  email                String                @unique
+  password             String?
+  name                 String?
+  role                 Role                  @default(PENDING)
+  department           String?
+  departments          String[]              @default([])
+  organizationId       String?
+  branchId             String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  lastSeenAt           DateTime?
+  AuditLog             AuditLog[]
+  ImportBatch          ImportBatch[]
+  NotificationSettings NotificationSettings?
+  StageLog             StageLog[]
+  OperationLog         OperationLog[]
+  Branch               Branch?               @relation(fields: [branchId], references: [id])
+  Organization         Organization?         @relation(fields: [organizationId], references: [id])
+  SaleOrderCreated     SaleOrder[]
+
+  SentInvitations Invitation[] @relation("Inviter")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+
+enum ImportMode {
+  update
+  ignore
+  replace
+}
+
+enum ImportStatus {
+  uploaded
+  mapping
+  validating
+  preview
+  committing
+  imported
+  failed
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RouteType {
+  FML
+  HML
+}
+
+enum OperationStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+
+enum ProductionStatus {
+  PENDING
+  APPROVED
+  IN_PRODUCTION
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  APPROVED
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum Role {
+  PENDING
+  ADMIN
+  MANAGER
+  OPERATOR
+  WAREHOUSE
+  SALES
+  PACKAGING
+}
+
+enum OrgStatus {
+  PENDING_APPROVAL // signed up, awaiting manual approval
+  ACTIVE // approved, can use the app
+  SUSPENDED // soft-disabled (logins blocked, data preserved)
+  CLOSED // long-term disabled, may be deleted later
+}
+
+enum SaleStatus {
+  PENDING
+  CONFIRMED
+  READY_FOR_DISPATCH
+  SHIPPED
+  CANCELLED
+}
+
+enum StockOrigin {
+  FACTORY_MADE
+  LOCAL_PURCHASE
+  IMPORTED
+}
+
+enum ProductCategory {
+  springs
+  ubolts
+  trailer_parts
+  break_linings
+  center_bolts
+  nuts
+}
+
+enum ProductType {
+  leaf_spring
+  spring_assembly
+  helper_spring
+  auxiliary_spring
+  u_bolt
+  body_bolt
+  centre_bolt
+  bearing
+  seal
+  assembly
+  bush
+  hub
+  brake_lining
+  brake_pad
+  brake_shoe
+  clamp
+  equalizer
+  hardware
+  repair
+  retention
+  rebonding
+  riveting
+  straightening
+  other_service
+}
+
+enum UOM {
+  PCS
+  KGS
+}
+
+enum StockStatus {
+  AVAILABLE
+  LOW_STOCK
+  OUT_OF_STOCK
+  REORDER_NEEDED
+}
+
+model Invitation {
+  id             String       @id @default(uuid())
+  organizationId String
+  email          String
+  role           Role         @default(OPERATOR)
+  branchId       String?
+  token          String       @unique
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  Organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  Branch         Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  InvitedByUser  User         @relation("Inviter", fields: [invitedBy], references: [id])
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([token])
+}
+
+model StockMovement {
+  id             String   @id @default(uuid())
+  organizationId String
+  productId      String
+  branchId       String?
+  movementType   String // 'stock_in', 'stock_out', 'adjustment', 'sale', 'return'
+  quantity       Float
+  reference      String? // Order number, import batch, etc.
+  notes          String?
+  createdAt      DateTime @default(now())
+  Product        Product  @relation(fields: [productId], references: [id])
+  Branch         Branch?  @relation(fields: [branchId], references: [id])
+
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACCOUNTING (double-entry: chart of accounts → journals → ledger → reports)
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+// TJ's 14 user-facing classifications. Each maps to an AccountType and a
+// StatementGroup (see lib/accounting/classifications.ts).
+enum AccountClassification {
+  INCOME
+  EXPENSE
+  FIXED_ASSETS
+  BANK
+  LOAN
+  EQUITY
+  ACCOUNTS_RECEIVABLE
+  OTHER_CURRENT_ASSETS
+  OTHER_ASSETS
+  ACCOUNTS_PAYABLE
+  OTHER_CURRENT_LIABILITY
+  LONG_TERM_LIABILITY
+  COST_OF_GOODS_SOLD
+  OTHER_INCOME
+  OTHER_EXPENSE
+}
+
+// The eleven dashboard headings: five balance-sheet groups then six P&L groups.
+enum StatementGroup {
+  NON_CURRENT_ASSETS
+  CURRENT_ASSETS
+  NON_CURRENT_LIABILITIES
+  CURRENT_LIABILITIES
+  EQUITY
+  REVENUE
+  OTHER_INCOME
+  COST_OF_GOODS_SOLD
+  ADMINISTRATIVE_EXPENSES
+  OTHER_OPERATING_EXPENSES
+  FINANCE_CHARGES
+}
+
+// Normal balance side of an account. Assets & expenses are DEBIT-normal;
+// liabilities, equity & income are CREDIT-normal.
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+// What generated a journal entry — lets us trace auto-posted entries back to
+// their source document and avoid double-posting.
+enum JournalSource {
+  MANUAL
+  SALE
+  PURCHASE
+  PAYMENT_RECEIVED
+  PAYMENT_MADE
+  OPENING_BALANCE
+}
+
+enum PaymentDirection {
+  RECEIVED // money in (from a customer/debtor)
+  PAID     // money out (to a supplier/creditor)
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MPESA
+  CHEQUE
+  CARD
+  OTHER
+}
+
+// The chart of accounts. Hierarchical (an account can have a parent) so you can
+// group e.g. "Current Assets" → "Bank" → "Equity Bank KES".
+model ChartAccount {
+  id             String        @id @default(uuid())
+  organizationId String
+  code           String        // e.g. "1000", "4000"
+  name           String        // e.g. "Cash at Bank", "Sales Revenue"
+  type           AccountType
+  classification AccountClassification?
+  statementGroup StatementGroup?
+  currency       String        @default("KES")
+  normalBalance  NormalBalance
+  parentId       String?
+  isBank         Boolean       @default(false) // true for accounts that map to a BankAccount
+  isSystem       Boolean       @default(false) // seeded/system accounts used by auto-posting
+  isActive       Boolean       @default(true)
+  description    String?
+  note           String?
+  vatApplicable  Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  parent       ChartAccount?  @relation("AccountTree", fields: [parentId], references: [id])
+  children     ChartAccount[] @relation("AccountTree")
+  ledgerLines  LedgerLine[]
+  bankAccount  BankAccount?
+  Organization Organization   @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([organizationId, type])
+}
+
+// A journal entry = a balanced set of ledger lines (total debits = total credits).
+model JournalEntry {
+  id             String        @id @default(uuid())
+  organizationId String
+  entryNumber    String        // e.g. "JE-2026-000123"
+  date           DateTime
+  memo           String?
+  status         JournalStatus @default(POSTED)
+  source         JournalSource @default(MANUAL)
+  // Links back to the document that generated this entry (sale/purchase/payment),
+  // so we never auto-post the same source twice.
+  sourceType     String?
+  sourceId       String?
+  postedAt       DateTime?
+  postedBy       String?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  lines        LedgerLine[]
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, entryNumber])
+  @@unique([organizationId, source, sourceType, sourceId])
+  @@index([organizationId])
+  @@index([organizationId, date])
+  @@index([sourceType, sourceId])
+}
+
+// A single debit or credit line within a journal entry. The general ledger and
+// trial balance are computed entirely from these rows.
+model LedgerLine {
+  id             String       @id @default(uuid())
+  organizationId String
+  journalEntryId String
+  accountId      String
+  debit          Decimal      @default(0) @db.Decimal(14, 2)
+  credit         Decimal      @default(0) @db.Decimal(14, 2)
+  description    String?
+  createdAt      DateTime     @default(now())
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      ChartAccount @relation(fields: [accountId], references: [id])
+  Organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([journalEntryId])
+}
+
+// A bank (or cash/M-Pesa) account, backed by a ChartAccount of type ASSET.
+model BankAccount {
+  id              String        @id @default(uuid())
+  organizationId  String
+  accountId       String        @unique // the ChartAccount this maps to
+  name            String        // e.g. "Equity Bank — Current"
+  bankName        String?
+  accountNumber   String?
+  currency        String        @default("KES")
+  openingBalance  Decimal       @default(0) @db.Decimal(14, 2)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  account      ChartAccount  @relation(fields: [accountId], references: [id])
+  payments     Payment[]
+  Organization Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+// A payment received from a debtor or paid to a creditor. Generates a journal
+// entry and (optionally) is allocated against a sale or purchase.
+model Payment {
+  id             String           @id @default(uuid())
+  organizationId String
+  paymentNumber  String           // e.g. "RCT-2026-000045" or "PMT-..."
+  direction      PaymentDirection
+  method         PaymentMethod    @default(BANK_TRANSFER)
+  date           DateTime
+  amount         Decimal          @db.Decimal(14, 2)
+  reference      String?          // cheque no, M-Pesa code, etc.
+  notes          String?
+
+  // Who it's with (one side will be set depending on direction)
+  customerId     String?
+  supplierId     String?
+
+  // What it settles (optional allocation)
+  saleOrderId    String?
+  purchaseOrderId String?
+
+  // Where the money moved
+  bankAccountId  String?
+
+  journalEntryId String?
+  createdBy      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  bankAccount  BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  Organization Organization  @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, paymentNumber])
+  @@index([organizationId])
+  @@index([organizationId, direction])
+  @@index([customerId])
+  @@index([supplierId])
+}

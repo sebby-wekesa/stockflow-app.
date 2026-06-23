@@ -808,11 +808,16 @@ model ChartAccount {
   name           String
   type           AccountType
   normalBalance  NormalBalance
+  classification AccountClassification?
+  statementGroup StatementGroup?
+  currency       String         @default("KES")
   parentId       String?
   isBank         Boolean        @default(false)
   isSystem       Boolean        @default(false)
   isActive       Boolean        @default(true)
   description    String?
+  note           String?
+  vatApplicable  Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   bankAccount    BankAccount?
@@ -1118,6 +1123,38 @@ enum AccountType {
 enum NormalBalance {
   DEBIT
   CREDIT
+}
+
+enum AccountClassification {
+  INCOME
+  EXPENSE
+  FIXED_ASSETS
+  BANK
+  LOAN
+  EQUITY
+  ACCOUNTS_RECEIVABLE
+  OTHER_CURRENT_ASSETS
+  OTHER_ASSETS
+  ACCOUNTS_PAYABLE
+  OTHER_CURRENT_LIABILITY
+  LONG_TERM_LIABILITY
+  COST_OF_GOODS_SOLD
+  OTHER_INCOME
+  OTHER_EXPENSE
+}
+
+enum StatementGroup {
+  NON_CURRENT_ASSETS
+  CURRENT_ASSETS
+  NON_CURRENT_LIABILITIES
+  CURRENT_LIABILITIES
+  EQUITY
+  REVENUE
+  OTHER_INCOME
+  COST_OF_GOODS_SOLD
+  ADMINISTRATIVE_EXPENSES
+  OTHER_OPERATING_EXPENSES
+  FINANCE_CHARGES
 }
 
 enum JournalStatus {

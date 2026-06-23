@@ -1,0 +1,40 @@
+-- Account classifications and statement groups for the statement-structured
+-- accounting dashboard. This migration is additive.
+
+CREATE TYPE "AccountClassification" AS ENUM (
+  'INCOME',
+  'EXPENSE',
+  'FIXED_ASSETS',
+  'BANK',
+  'LOAN',
+  'EQUITY',
+  'ACCOUNTS_RECEIVABLE',
+  'OTHER_CURRENT_ASSETS',
+  'OTHER_ASSETS',
+  'ACCOUNTS_PAYABLE',
+  'OTHER_CURRENT_LIABILITY',
+  'LONG_TERM_LIABILITY',
+  'COST_OF_GOODS_SOLD',
+  'OTHER_INCOME',
+  'OTHER_EXPENSE'
+);
+
+CREATE TYPE "StatementGroup" AS ENUM (
+  'NON_CURRENT_ASSETS',
+  'CURRENT_ASSETS',
+  'NON_CURRENT_LIABILITIES',
+  'CURRENT_LIABILITIES',
+  'EQUITY',
+  'REVENUE',
+  'OTHER_INCOME',
+  'COST_OF_GOODS_SOLD',
+  'ADMINISTRATIVE_EXPENSES',
+  'OTHER_OPERATING_EXPENSES',
+  'FINANCE_CHARGES'
+);
+
+ALTER TABLE "ChartAccount" ADD COLUMN "classification" "AccountClassification";
+ALTER TABLE "ChartAccount" ADD COLUMN "statementGroup" "StatementGroup";
+ALTER TABLE "ChartAccount" ADD COLUMN "currency" TEXT NOT NULL DEFAULT 'KES';
+ALTER TABLE "ChartAccount" ADD COLUMN "note" TEXT;
+ALTER TABLE "ChartAccount" ADD COLUMN "vatApplicable" BOOLEAN NOT NULL DEFAULT false;
