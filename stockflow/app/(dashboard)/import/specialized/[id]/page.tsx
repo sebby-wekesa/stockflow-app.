@@ -3,14 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { CommitButton } from '../../commit-button'
-
-const SHEET_TYPE_LABELS: Record<string, string> = {
-  sales_quickbooks_v2: 'QuickBooks sales export',
-  sales_simple: 'Simple sales list',
-  springs_master: 'Springs master list',
-  ubolt_master: 'U-bolt master list',
-  consumables_stock: 'Branch consumables stock',
-}
+import { getSheetTypeLabel } from '../../import-routing'
 
 export default async function SpecializedBatchPage({
   params,
@@ -50,7 +43,7 @@ export default async function SpecializedBatchPage({
         </Link>
         <h1 className="font-head text-2xl font-bold mt-2">{batch.file_name}</h1>
         <p className="text-muted text-sm mt-1">
-          {SHEET_TYPE_LABELS[sheetType] ?? sheetType} · {batch.row_count} rows parsed
+          {getSheetTypeLabel(sheetType)} · {batch.row_count} rows parsed
           {batch.target_branch && ` · ${batch.target_branch}`}
         </p>
       </div>

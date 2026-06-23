@@ -3,10 +3,18 @@ import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { QuickImportForm } from './quick-import-form'
+import { getImportBatchHref, isQuickImportSheetType } from './import-routing'
 
-export default async function ImportCentrePage() {
+interface ImportCentrePageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+export default async function ImportCentrePage({ searchParams }: ImportCentrePageProps) {
   const user = await getUser()
   if (!user) redirect('/login')
+
+  const params = searchParams ? await searchParams : {}
+  const showLegacyFlowNotice = params.legacyFlow === 'deprecated'
 
   const db = getTenantPrisma(user.organizationId)
 
@@ -17,11 +25,13 @@ export default async function ImportCentrePage() {
     include: { User: { select: { name: true } } },
   })
 
-  // In-progress batches use the generic /import/[id] flow
+  // Legacy in-progress batches cannot continue through the retired mapping flow.
   const inProgress = recentBatches.filter(
-    (b) => b.status !== 'imported' && b.status !== 'failed' && b.status !== 'preview'
+    (b) => !isQuickImportSheetType(b.sheet_type) && b.status !== 'imported' && b.status !== 'failed'
   )
-  const specializedPreviews = recentBatches.filter((b) => b.status === 'preview')
+  const specializedPreviews = recentBatches.filter(
+    (b) => isQuickImportSheetType(b.sheet_type) && b.status === 'preview'
+  )
 
   return (
     <div>
@@ -37,6 +47,13 @@ export default async function ImportCentrePage() {
         </Link>
       </div>
 
+      {showLegacyFlowNotice && (
+        <div className="import-alert import-alert-error mb-16">
+          The legacy column-mapping import flow has been retired. Start a new Quick Import for
+          QuickBooks sales, springs or U-bolt masters, and consumables stock files.
+        </div>
+      )}
+
       {/* PENDING SPECIALIZED PREVIEWS */}
       {specializedPreviews.length > 0 && (
         <div className="card mb-16">
@@ -51,7 +68,7 @@ export default async function ImportCentrePage() {
             {specializedPreviews.map((b) => (
               <Link
                 key={b.id}
-                href={`/import/specialized/${b.id}`}
+                href={getImportBatchHref(b)}
                 className="card-sm import-batch-row"
               >
                 <div className="import-batch-copy">
@@ -73,16 +90,18 @@ export default async function ImportCentrePage() {
         <div className="card mb-16">
           <div className="section-header mb-16">
             <div>
-              <div className="section-title">In Progress</div>
-              <div className="section-sub">Continue imports that still need attention</div>
+              <div className="section-title">Legacy Imports</div>
+              <div className="section-sub">
+                These were created before Quick Import and must be re-uploaded with the new flow.
+              </div>
             </div>
-            <span className="badge badge-purple">{inProgress.length} active</span>
+            <span className="badge badge-amber">{inProgress.length} needs re-upload</span>
           </div>
           <div className="import-batch-list">
             {inProgress.map((b) => (
               <Link
                 key={b.id}
-                href={`/import/${b.id}`}
+                href={getImportBatchHref(b)}
                 className="card-sm import-batch-row"
               >
                 <div className="import-batch-copy">

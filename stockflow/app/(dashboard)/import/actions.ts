@@ -301,24 +301,27 @@ export async function detectUploadedFile(formData: FormData) {
 // These were referenced by components after the Stage 3/4 merge
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEPRECATED_ERROR = 'Legacy generic/unified import flow (with column mapping) is deprecated after multitenancy merge. Use Quick Import (specialized) from the Import Centre for QuickBooks sales, springs/ubolt masters, and consumables stock files.'
+async function redirectDeprecatedImportFlow(): Promise<never> {
+  await requireImporter()
+  redirect('/import?legacyFlow=deprecated')
+}
 
 export async function approveAndSyncImport(batchId: string) {
-  throw new Error(DEPRECATED_ERROR)
+  return redirectDeprecatedImportFlow()
 }
 
 export async function resolveConflict(rowId: string, resolution: string) {
-  throw new Error(DEPRECATED_ERROR)
+  return redirectDeprecatedImportFlow()
 }
 
 export async function saveColumnMapping(batchId: string, mapping: Record<string, string>) {
-  throw new Error(DEPRECATED_ERROR)
+  return redirectDeprecatedImportFlow()
 }
 
 export async function runUnifiedImport(formData: FormData) {
-  throw new Error(DEPRECATED_ERROR)
+  return redirectDeprecatedImportFlow()
 }
 
 export async function uploadImport(formData: FormData) {
-  throw new Error(DEPRECATED_ERROR)
+  return redirectDeprecatedImportFlow()
 }

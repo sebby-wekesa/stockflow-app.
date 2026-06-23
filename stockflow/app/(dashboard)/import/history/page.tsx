@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
+import { getImportBatchHref, getSheetTypeLabel } from '../import-routing'
 
 export default async function ImportHistoryPage() {
   const user = await getUser()
@@ -49,7 +50,7 @@ export default async function ImportHistoryPage() {
                     <div className="font-medium">{batch.file_name}</div>
                   </td>
                   <td className="p-4">
-                    <span className="text-sm text-muted">{batch.sheet_type}</span>
+                    <span className="text-sm text-muted">{getSheetTypeLabel(batch.sheet_type)}</span>
                   </td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded-full text-xs ${
@@ -75,7 +76,7 @@ export default async function ImportHistoryPage() {
                   </td>
                   <td className="p-4">
                     <Link
-                      href={`/import/${batch.id}`}
+                      href={getImportBatchHref(batch)}
                       className="text-sm text-blue-600 hover:underline"
                     >
                       View details
