@@ -58,7 +58,10 @@ export default async function RootLayout({
       className={`${dmSans.variable} ${dmMono.variable} ${syne.variable}`}
       suppressHydrationWarning
     >
-      <head>
+      <head suppressHydrationWarning>
+        {/* Inline script runs once during HTML parse to set theme before React hydrates,
+            preventing flash of wrong theme. suppressHydrationWarning on <head> silences
+            React's hydration warning about script tags. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
       </head>
       <body>

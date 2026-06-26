@@ -21,6 +21,12 @@ type ParentAccount = {
   name: string;
 };
 
+type BranchOption = {
+  id: string;
+  name: string;
+  code: string;
+};
+
 type EditableAccount = {
   id: string;
   code: string;
@@ -28,6 +34,7 @@ type EditableAccount = {
   currency: string;
   classification: Classification | null;
   statementGroup?: StatementGroup | null;
+  branchId?: string | null;
   parentId?: string | null;
   description?: string | null;
   note?: string | null;
@@ -39,6 +46,7 @@ type FormValues = {
   currency: string;
   classification: Classification;
   statementGroup: StatementGroup;
+  branchId: string | null;
   parentId: string | null;
   description: string | null;
   note: string | null;
@@ -53,11 +61,13 @@ type ActionResult = {
 export function AddAccountForm({
   statementGroup,
   groupLabel,
+  branches,
   parents,
   onDone,
 }: {
   statementGroup: StatementGroup;
   groupLabel: string;
+  branches: BranchOption[];
   parents: ParentAccount[];
   onDone: () => void;
 }) {
@@ -74,11 +84,13 @@ export function AddAccountForm({
         currency: "KES",
         classification: "",
         statementGroup,
+        branchId: "",
         parentId: "",
         description: "",
         note: "",
         vatApplicable: false,
       }}
+      branches={branches}
       parents={parents}
       submitLabel="Save account"
       pendingLabel="Saving..."
@@ -90,6 +102,7 @@ export function AddAccountForm({
           currency: values.currency,
           classification: values.classification,
           statementGroup: values.statementGroup,
+          branchId: values.branchId,
           parentId: values.parentId,
           description: values.description,
           note: values.note,
@@ -103,11 +116,13 @@ export function AddAccountForm({
 export function EditAccountForm({
   account,
   groupLabel,
+  branches,
   parents,
   onDone,
 }: {
   account: EditableAccount;
   groupLabel: string;
+  branches: BranchOption[];
   parents: ParentAccount[];
   onDone: () => void;
 }) {
@@ -127,11 +142,13 @@ export function EditAccountForm({
         currency: account.currency,
         classification: account.classification ?? "",
         statementGroup: account.statementGroup ?? "",
+        branchId: account.branchId ?? "",
         parentId: account.parentId ?? "",
         description: account.description ?? "",
         note: account.note ?? "",
         vatApplicable: account.vatApplicable,
       }}
+      branches={branches}
       parents={parents.filter((parent) => parent.id !== account.id)}
       submitLabel="Update account"
       pendingLabel="Updating..."
@@ -144,6 +161,7 @@ export function EditAccountForm({
           currency: values.currency,
           classification: values.classification,
           statementGroup: values.statementGroup,
+          branchId: values.branchId,
           parentId: values.parentId,
           description: values.description,
           note: values.note,
@@ -157,6 +175,7 @@ export function EditAccountForm({
 function ClassifiedAccountForm({
   title,
   initialValues,
+  branches,
   parents,
   submitLabel,
   pendingLabel,
@@ -170,11 +189,13 @@ function ClassifiedAccountForm({
     currency: string;
     classification: Classification | "";
     statementGroup: StatementGroup | "";
+    branchId: string;
     parentId: string;
     description: string;
     note: string;
     vatApplicable: boolean;
   };
+  branches: BranchOption[];
   parents: ParentAccount[];
   submitLabel: string;
   pendingLabel: string;
@@ -192,6 +213,7 @@ function ClassifiedAccountForm({
   const [statementGroup, setStatementGroup] = useState<StatementGroup | "">(
     initialValues.statementGroup,
   );
+  const [branchId, setBranchId] = useState(initialValues.branchId);
   const [parentId, setParentId] = useState(initialValues.parentId);
   const [description, setDescription] = useState(initialValues.description);
   const [note, setNote] = useState(initialValues.note);
@@ -231,6 +253,7 @@ function ClassifiedAccountForm({
         currency,
         classification,
         statementGroup,
+        branchId: branchId || null,
         parentId: parentId || null,
         description: description || null,
         note: note || null,
@@ -329,6 +352,20 @@ function ClassifiedAccountForm({
             </select>
           </Field>
         )}
+        <Field label="Branch">
+          <select
+            style={inputStyle}
+            value={branchId}
+            onChange={(event) => setBranchId(event.target.value)}
+          >
+            <option value="">Unassigned</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name} ({branch.code})
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Sub-account of">
           <select
             style={inputStyle}

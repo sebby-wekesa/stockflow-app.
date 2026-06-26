@@ -16,7 +16,8 @@ function money(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return value < 0 ? `(${formatted})` : formatted;
+  const signed = value < 0 ? `(${formatted})` : formatted;
+  return `KES ${signed}`;
 }
 
 export default async function BalanceSheetPage({

@@ -86,6 +86,18 @@ function revalidateAccountingPaths() {
   revalidatePath("/accounting/balance-sheet");
 }
 
+async function resolveBranchId(tx: any, branchId?: string | null) {
+  const trimmed = branchId?.trim();
+  if (!trimmed) return null;
+
+  const branch = await tx.branch.findFirst({
+    where: { id: trimmed },
+    select: { id: true },
+  });
+  if (!branch) throw new Error("Selected branch not found");
+  return branch.id;
+}
+
 async function nextAccountCode(tx: any, type: AccountType) {
   const band: Record<AccountType, number> = {
     ASSET: 1000,
@@ -127,6 +139,7 @@ export async function createClassifiedAccount(input: {
   currency?: string;
   classification: Classification;
   statementGroup?: StatementGroup | null;
+  branchId?: string | null;
   parentId?: string | null;
   description?: string | null;
   note?: string | null;
@@ -148,6 +161,8 @@ export async function createClassifiedAccount(input: {
     );
 
     const account = await withTenantTransaction(user.organizationId, async (tx) => {
+      const branchId = await resolveBranchId(tx, input.branchId);
+
       if (input.parentId) {
         const parent = await tx.chartAccount.findFirst({
           where: { id: input.parentId, isActive: true },
@@ -166,6 +181,7 @@ export async function createClassifiedAccount(input: {
           classification: input.classification,
           statementGroup,
           currency: input.currency?.trim() || "KES",
+          branchId,
           parentId: input.parentId || null,
           description: input.description?.trim() || null,
           note: input.note?.trim() || null,
@@ -205,6 +221,7 @@ export async function updateClassifiedAccount(input: {
   currency?: string;
   classification: Classification;
   statementGroup?: StatementGroup | null;
+  branchId?: string | null;
   parentId?: string | null;
   description?: string | null;
   note?: string | null;
@@ -231,6 +248,7 @@ export async function updateClassifiedAccount(input: {
     const parentId = input.parentId || null;
 
     await withTenantTransaction(user.organizationId, async (tx) => {
+      const branchId = await resolveBranchId(tx, input.branchId);
       const account = await tx.chartAccount.findFirst({
         where: { id, isActive: true },
         select: {
@@ -276,6 +294,7 @@ export async function updateClassifiedAccount(input: {
           classification: input.classification,
           statementGroup,
           currency,
+          branchId,
           parentId,
           description: input.description?.trim() || null,
           note: input.note?.trim() || null,
@@ -318,11 +337,50 @@ export async function updateClassifiedAccount(input: {
   }
 }
 
+export async function updateAccountBranch(input: {
+  accountId: string;
+  branchId?: string | null;
+}) {
+  const user = await requireRole(...ACCOUNTING_ROLES);
+  const accountId = input.accountId.trim();
+  if (!accountId) return { success: false, error: "Account is required" };
+
+  try {
+    await withTenantTransaction(user.organizationId, async (tx) => {
+      const [account, branchId] = await Promise.all([
+        tx.chartAccount.findFirst({
+          where: { id: accountId, isActive: true },
+          select: { id: true },
+        }),
+        resolveBranchId(tx, input.branchId),
+      ]);
+
+      if (!account) throw new Error("Account not found");
+
+      await tx.chartAccount.update({
+        where: { id: accountId },
+        data: { branchId },
+      });
+    });
+
+    revalidateAccountingPaths();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not update account branch",
+    };
+  }
+}
+
 export async function getAccountTree() {
   const user = await requireRole(...ACCOUNTING_ROLES);
   const db = getTenantPrisma(user.organizationId);
 
-  const [accounts, lines] = await Promise.all([
+  const [accounts, lines, branches] = await Promise.all([
     db.chartAccount.findMany({
       where: { isActive: true },
       orderBy: { code: "asc" },
@@ -335,31 +393,45 @@ export async function getAccountTree() {
         classification: true,
         statementGroup: true,
         currency: true,
+        branchId: true,
         vatApplicable: true,
         parentId: true,
         description: true,
         note: true,
         isSystem: true,
+        Branch: { select: { id: true, name: true, code: true } },
       },
     }),
     db.ledgerLine.findMany({
       where: { journalEntry: { status: "POSTED" } },
-      select: { accountId: true, debit: true, credit: true },
+      select: {
+        accountId: true,
+        debit: true,
+        credit: true,
+      },
+    }),
+    db.branch.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, code: true },
     }),
   ]);
 
+  // Per-account totals (all branches)
   const totalsByAccount = new Map<string, { debit: number; credit: number }>();
+
   for (const line of lines) {
-    const totals = totalsByAccount.get(line.accountId) ?? {
-      debit: 0,
-      credit: 0,
-    };
-    totals.debit += Number(line.debit);
-    totals.credit += Number(line.credit);
-    totalsByAccount.set(line.accountId, totals);
+    const at = totalsByAccount.get(line.accountId) ?? { debit: 0, credit: 0 };
+    at.debit  += Number(line.debit);
+    at.credit += Number(line.credit);
+    totalsByAccount.set(line.accountId, at);
   }
 
   const byGroup = new Map<StatementGroup, any[]>();
+  const branchTotals = new Map<
+    string,
+    { net: number; accountIds: Set<string> }
+  >();
+
   for (const account of accounts) {
     const group = resolveGroup(account);
     const totals = totalsByAccount.get(account.id) ?? { debit: 0, credit: 0 };
@@ -370,7 +442,7 @@ export async function getAccountTree() {
     );
 
     const rows = byGroup.get(group) ?? [];
-    rows.push({
+    const row = {
       id: account.id,
       code: account.code,
       name: account.name,
@@ -383,17 +455,32 @@ export async function getAccountTree() {
           account.classification
         : account.type,
       currency: account.currency ?? "KES",
+      branchId: account.branchId,
+      branchName: account.Branch?.name ?? null,
+      branchCode: account.Branch?.code ?? null,
       vatApplicable: account.vatApplicable,
       parentId: account.parentId,
       description: account.description,
       note: account.note,
       isSystem: account.isSystem,
       balance: Math.round(balance * 100) / 100,
-    });
+    };
+
+    if (row.branchId) {
+      const branchTotal = branchTotals.get(row.branchId) ?? {
+        net: 0,
+        accountIds: new Set<string>(),
+      };
+      branchTotal.net += row.balance;
+      branchTotal.accountIds.add(row.id);
+      branchTotals.set(row.branchId, branchTotal);
+    }
+
+    rows.push(row);
     byGroup.set(group, rows);
   }
 
-  return STATEMENT_GROUPS.map((group) => {
+  const groups = STATEMENT_GROUPS.map((group) => {
     const accountsInGroup = byGroup.get(group.key) ?? [];
     const total = accountsInGroup.reduce(
       (sum, account) => sum + account.balance,
@@ -407,6 +494,20 @@ export async function getAccountTree() {
       total: Math.round(total * 100) / 100,
     };
   });
+
+  // Summarise assigned account balances by branch for the top overview.
+  const branchSummary = branches.map((b) => {
+    const bt = branchTotals.get(b.id) ?? { net: 0, accountIds: new Set() };
+    return {
+      id: b.id,
+      name: b.name,
+      code: b.code,
+      net: Math.round(bt.net * 100) / 100,
+      accountCount: bt.accountIds.size,
+    };
+  });
+
+  return { groups, branchSummary, branches };
 }
 
 export async function getParentAccountOptions() {

@@ -53,6 +53,7 @@ model Branch {
   managerId              String?
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
+  ChartAccount           ChartAccount[]
   Organization           Organization             @relation(fields: [organizationId], references: [id])
   InventoryFinishedGoods InventoryFinishedGoods[]
   InventoryRawMaterial   InventoryRawMaterial[]
@@ -812,6 +813,7 @@ model ChartAccount {
   classification AccountClassification?
   statementGroup StatementGroup?
   currency       String         @default("KES")
+  branchId       String?
   parentId       String?
   isBank         Boolean        @default(false)
   isSystem       Boolean        @default(false)
@@ -822,6 +824,7 @@ model ChartAccount {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   bankAccount    BankAccount?
+  Branch         Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
   Organization   Organization   @relation(fields: [organizationId], references: [id])
   parent         ChartAccount?  @relation("AccountTree", fields: [parentId], references: [id])
   children       ChartAccount[] @relation("AccountTree")
@@ -829,6 +832,7 @@ model ChartAccount {
 
   @@unique([organizationId, code])
   @@index([organizationId])
+  @@index([organizationId, branchId])
   @@index([organizationId, type])
 }
 

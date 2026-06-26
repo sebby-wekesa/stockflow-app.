@@ -17,7 +17,7 @@ async function seedAction() {
 export default async function AccountingPage() {
   await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
 
-  const [groups, parents] = await Promise.all([
+  const [{ groups, branchSummary, branches }, parents] = await Promise.all([
     getAccountTree(),
     getParentAccountOptions(),
   ]);
@@ -86,7 +86,12 @@ export default async function AccountingPage() {
         </div>
       )}
 
-      <AccountTree groups={groups} parents={parents} />
+      <AccountTree
+        groups={groups}
+        branches={branches}
+        branchSummary={branchSummary}
+        parents={parents}
+      />
     </div>
   );
 }
