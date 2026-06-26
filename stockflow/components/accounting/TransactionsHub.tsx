@@ -15,6 +15,7 @@ type AccountOption = { id: string; code: string; name: string };
 type BranchClass = { id: string; code: string; name: string };
 type FormData = {
   branchClass: BranchClass | null;
+  branches: BranchClass[];
   expense: AccountOption[];
   income: AccountOption[];
   defaultSalesAccountId?: string | null;
@@ -43,6 +44,10 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export function TransactionsHub({ data }: { data: FormData }) {
   const [tab, setTab] = useState<TabKey>("expense");
+  const [branchId, setBranchId] = useState(
+    data.branchClass?.id ?? data.branches[0]?.id ?? "",
+  );
+  const branchProps = { branchId, setBranchId };
 
   return (
     <div>
@@ -74,15 +79,21 @@ export function TransactionsHub({ data }: { data: FormData }) {
         balanced double-entry journal.
       </p>
 
-      {tab === "expense" && <ExpenseForm data={data} />}
-      {tab === "income" && <IncomeForm data={data} />}
-      {tab === "invoice" && <InvoiceForm data={data} />}
-      {tab === "bill" && <BillForm data={data} />}
-      {tab === "transfer" && <TransferForm data={data} />}
-      {tab === "equity" && <EquityForm data={data} />}
+      {tab === "expense" && <ExpenseForm data={data} {...branchProps} />}
+      {tab === "income" && <IncomeForm data={data} {...branchProps} />}
+      {tab === "invoice" && <InvoiceForm data={data} {...branchProps} />}
+      {tab === "bill" && <BillForm data={data} {...branchProps} />}
+      {tab === "transfer" && <TransferForm data={data} {...branchProps} />}
+      {tab === "equity" && <EquityForm data={data} {...branchProps} />}
     </div>
   );
 }
+
+type TransactionFormProps = {
+  data: FormData;
+  branchId: string;
+  setBranchId: (value: string) => void;
+};
 
 function useSubmit() {
   const router = useRouter();
@@ -194,17 +205,33 @@ function BankPicker({
   );
 }
 
-function ClassField({ branchClass }: { branchClass: BranchClass | null }) {
+function ClassField({
+  branches,
+  value,
+  onChange,
+}: {
+  branches: BranchClass[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <Field label="Class">
-      <input
-        readOnly
+      <select
+        required
         style={{
           ...inputStyle,
-          color: branchClass ? "var(--text)" : "#fca5a5",
+          color: value ? "var(--text)" : "#fca5a5",
         }}
-        value={branchClass ? branchClass.name : "No branch assigned"}
-      />
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Select branch class...</option>
+        {branches.map((branch) => (
+          <option key={branch.id} value={branch.id}>
+            {branch.name} ({branch.code})
+          </option>
+        ))}
+      </select>
     </Field>
   );
 }
@@ -236,7 +263,7 @@ function PostButton({
   );
 }
 
-function ExpenseForm({ data }: { data: FormData }) {
+function ExpenseForm({ data, branchId, setBranchId }: TransactionFormProps) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -257,6 +284,7 @@ function ExpenseForm({ data }: { data: FormData }) {
             postExpense({
               date,
               amount: Number.parseFloat(amount),
+              branchId,
               expenseAccountId: accountId,
               bankAccountId: bankId || null,
               hasVat,
@@ -275,7 +303,7 @@ function ExpenseForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
-        <ClassField branchClass={data.branchClass} />
+        <ClassField branches={data.branches} value={branchId} onChange={setBranchId} />
         <Field label="Expense account">
           <AccountPicker accounts={data.expense} value={accountId} onChange={setAccountId} placeholder="Select expense..." />
         </Field>
@@ -287,12 +315,12 @@ function ExpenseForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="What was this for?" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Record expense" disabled={!data.branchClass} />
+      <PostButton pending={pending} label="Record expense" disabled={!branchId} />
     </form>
   );
 }
 
-function IncomeForm({ data }: { data: FormData }) {
+function IncomeForm({ data, branchId, setBranchId }: TransactionFormProps) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -313,6 +341,7 @@ function IncomeForm({ data }: { data: FormData }) {
             postIncome({
               date,
               amount: Number.parseFloat(amount),
+              branchId,
               incomeAccountId: accountId,
               bankAccountId: bankId || null,
               hasVat,
@@ -331,7 +360,7 @@ function IncomeForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
-        <ClassField branchClass={data.branchClass} />
+        <ClassField branches={data.branches} value={branchId} onChange={setBranchId} />
         <Field label="Income account">
           <AccountPicker accounts={data.income} value={accountId} onChange={setAccountId} placeholder="Select income..." />
         </Field>
@@ -343,12 +372,12 @@ function IncomeForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Income source" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Record income" disabled={!data.branchClass} />
+      <PostButton pending={pending} label="Record income" disabled={!branchId} />
     </form>
   );
 }
 
-function InvoiceForm({ data }: { data: FormData }) {
+function InvoiceForm({ data, branchId, setBranchId }: TransactionFormProps) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -369,6 +398,7 @@ function InvoiceForm({ data }: { data: FormData }) {
             postInvoice({
               date,
               amount: Number.parseFloat(amount),
+              branchId,
               salesAccountId: accountId || null,
               customerName,
               hasVat,
@@ -389,7 +419,7 @@ function InvoiceForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
-        <ClassField branchClass={data.branchClass} />
+        <ClassField branches={data.branches} value={branchId} onChange={setBranchId} />
         <Field label="Revenue / income account">
           <AccountPicker accounts={data.income} value={accountId} onChange={setAccountId} placeholder="Select income..." />
         </Field>
@@ -399,12 +429,12 @@ function InvoiceForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Invoice description" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Post invoice" disabled={!data.branchClass} />
+      <PostButton pending={pending} label="Post invoice" disabled={!branchId} />
     </form>
   );
 }
 
-function BillForm({ data }: { data: FormData }) {
+function BillForm({ data, branchId, setBranchId }: TransactionFormProps) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -425,6 +455,7 @@ function BillForm({ data }: { data: FormData }) {
             postBill({
               date,
               amount: Number.parseFloat(amount),
+              branchId,
               purchaseAccountId: accountId,
               supplierName,
               hasVat,
@@ -444,7 +475,7 @@ function BillForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
-        <ClassField branchClass={data.branchClass} />
+        <ClassField branches={data.branches} value={branchId} onChange={setBranchId} />
         <Field label="Expense or asset account">
           <AccountPicker accounts={data.purchase} value={accountId} onChange={setAccountId} placeholder="Select account..." />
         </Field>
@@ -454,12 +485,12 @@ function BillForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Purchase description" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Post bill" disabled={!data.branchClass} />
+      <PostButton pending={pending} label="Post bill" disabled={!branchId} />
     </form>
   );
 }
 
-function TransferForm({ data }: { data: FormData }) {
+function TransferForm({ data, branchId, setBranchId }: TransactionFormProps) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -479,6 +510,7 @@ function TransferForm({ data }: { data: FormData }) {
             postTransfer({
               date,
               amount: Number.parseFloat(amount),
+              branchId,
               fromAccountId,
               toAccountId,
               reference,
@@ -496,7 +528,7 @@ function TransferForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
-        <ClassField branchClass={data.branchClass} />
+        <ClassField branches={data.branches} value={branchId} onChange={setBranchId} />
         <Field label="From account">
           <AccountPicker accounts={data.transferAccounts} value={fromAccountId} onChange={setFromAccountId} placeholder="Select source..." />
         </Field>
@@ -506,12 +538,12 @@ function TransferForm({ data }: { data: FormData }) {
         <TextField label="Reference" value={reference} onChange={setReference} placeholder="Transfer reference" />
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Transfer reason" />
       </div>
-      <PostButton pending={pending} label="Post transfer" disabled={!data.branchClass} />
+      <PostButton pending={pending} label="Post transfer" disabled={!branchId} />
     </form>
   );
 }
 
-function EquityForm({ data }: { data: FormData }) {
+function EquityForm({ data, branchId, setBranchId }: TransactionFormProps) {
   const { pending, message, run } = useSubmit();
   const [kind, setKind] = useState<"CAPITAL" | "DRAWINGS">("CAPITAL");
   const [date, setDate] = useState(today);
@@ -534,6 +566,7 @@ function EquityForm({ data }: { data: FormData }) {
               kind,
               date,
               amount: Number.parseFloat(amount),
+              branchId,
               equityAccountId: accountId,
               bankAccountId: bankId || null,
               reference,
@@ -576,7 +609,7 @@ function EquityForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
-        <ClassField branchClass={data.branchClass} />
+        <ClassField branches={data.branches} value={branchId} onChange={setBranchId} />
         <Field label={kind === "CAPITAL" ? "Capital account" : "Drawings account"}>
           <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} placeholder="Select equity account..." />
         </Field>
@@ -586,7 +619,7 @@ function EquityForm({ data }: { data: FormData }) {
         <TextField label="Reference" value={reference} onChange={setReference} placeholder="Reference" />
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Note" />
       </div>
-      <PostButton pending={pending} label={kind === "CAPITAL" ? "Record capital" : "Record drawings"} disabled={!data.branchClass} />
+      <PostButton pending={pending} label={kind === "CAPITAL" ? "Record capital" : "Record drawings"} disabled={!branchId} />
     </form>
   );
 }

@@ -237,6 +237,7 @@ export async function updateAccount(
 
 export async function createManualJournal(input: {
   date: string;
+  branchId?: string | null;
   memo?: string;
   lines: {
     accountId: string;
@@ -251,7 +252,17 @@ export async function createManualJournal(input: {
 
   try {
     const entry = await withTenantTransaction(user.organizationId, async (tx) => {
-      const branchClass = await requireUserBranchClass(tx, user);
+      const branchClass = input.branchId?.trim()
+        ? await tx.branch.findFirst({
+            where: { id: input.branchId.trim() },
+            select: { id: true, code: true, name: true },
+          })
+        : await requireUserBranchClass(tx, user);
+
+      if (!branchClass) {
+        throw new Error("Pick a valid transaction class from your organization");
+      }
+
       return postJournalEntry(
         tx,
         user.organizationId,

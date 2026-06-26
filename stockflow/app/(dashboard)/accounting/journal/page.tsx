@@ -1,13 +1,25 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { listAccounts } from "@/actions/accounting";
+import { getTenantPrisma } from "@/lib/tenant-prisma";
 import { JournalForm } from "@/components/accounting/JournalForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function JournalPage() {
-  await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
-  const accounts = await listAccounts();
+  const user = await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
+  const db = getTenantPrisma(user.organizationId);
+  const [accounts, branches] = await Promise.all([
+    listAccounts(),
+    db.branch.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, code: true, name: true },
+    }),
+  ]);
+  const defaultBranchId =
+    branches.find((branch) => branch.id === user.branches[0]?.id)?.id ??
+    branches[0]?.id ??
+    "";
 
   return (
     <div className="dashboard-content">
@@ -25,7 +37,11 @@ export default async function JournalPage() {
           Seed the chart of accounts first.
         </div>
       ) : (
-        <JournalForm accounts={accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }))} />
+        <JournalForm
+          accounts={accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }))}
+          branches={branches}
+          defaultBranchId={defaultBranchId}
+        />
       )}
     </div>
   );

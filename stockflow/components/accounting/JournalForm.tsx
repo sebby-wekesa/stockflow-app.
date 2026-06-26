@@ -6,14 +6,24 @@ import { createManualJournal } from "@/actions/accounting";
 import { Plus, Trash2 } from "lucide-react";
 
 type Account = { id: string; code: string; name: string };
+type Branch = { id: string; code: string; name: string };
 type Line = { accountId: string; debit: string; credit: string; description: string };
 
 const emptyLine = (): Line => ({ accountId: "", debit: "", credit: "", description: "" });
 
-export function JournalForm({ accounts }: { accounts: Account[] }) {
+export function JournalForm({
+  accounts,
+  branches,
+  defaultBranchId,
+}: {
+  accounts: Account[];
+  branches: Branch[];
+  defaultBranchId: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [branchId, setBranchId] = useState(defaultBranchId);
   const [memo, setMemo] = useState("");
   const [lines, setLines] = useState<Line[]>([emptyLine(), emptyLine()]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -36,11 +46,17 @@ export function JournalForm({ accounts }: { accounts: Account[] }) {
         credit: parseFloat(l.credit) || 0,
         description: l.description || undefined,
       }));
+    if (!branchId) return setMsg({ ok: false, text: "Pick a class" });
     if (payload.length < 2) return setMsg({ ok: false, text: "Add at least two lines" });
     if (!balanced) return setMsg({ ok: false, text: "Debits must equal credits" });
 
     startTransition(async () => {
-      const res = await createManualJournal({ date, memo: memo || undefined, lines: payload });
+      const res = await createManualJournal({
+        date,
+        branchId,
+        memo: memo || undefined,
+        lines: payload,
+      });
       if (res.success) {
         setMsg({ ok: true, text: `Posted ${res.entryNumber}` });
         setLines([emptyLine(), emptyLine()]); setMemo("");
@@ -61,10 +77,26 @@ export function JournalForm({ accounts }: { accounts: Account[] }) {
         }}>{msg.text}</div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
         <div>
           <label style={lbl}>Date</label>
           <input type="date" style={inp} value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>Class</label>
+          <select
+            required
+            style={{ ...inp, color: branchId ? "var(--text)" : "#fca5a5" }}
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+          >
+            <option value="">Select branch class...</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name} ({branch.code})
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label style={lbl}>Memo</label>
@@ -101,7 +133,7 @@ export function JournalForm({ accounts }: { accounts: Account[] }) {
             {balanced ? "Balanced ✓" : "Not balanced"}
           </span>
         </div>
-        <button type="button" className="btn btn-primary" disabled={pending || !balanced} onClick={submit}>
+        <button type="button" className="btn btn-primary" disabled={pending || !balanced || !branchId} onClick={submit}>
           {pending ? "Posting…" : "Post entry"}
         </button>
       </div>
