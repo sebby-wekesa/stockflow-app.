@@ -60,6 +60,32 @@ function resolveGroup(account: {
   }
 }
 
+function isStatementGroup(value: string): value is StatementGroup {
+  return STATEMENT_GROUPS.some((group) => group.key === value);
+}
+
+function resolveStatementGroup(
+  value: StatementGroup | null | undefined,
+  fallback: StatementGroup,
+) {
+  if (!value) return fallback;
+  if (!isStatementGroup(value)) {
+    throw new Error("Pick a valid report category");
+  }
+  return value;
+}
+
+function revalidateAccountingPaths() {
+  revalidatePath("/accounting");
+  revalidatePath("/accounting/chart");
+  revalidatePath("/accounting/banking");
+  revalidatePath("/accounting/transactions");
+  revalidatePath("/accounting/ledger");
+  revalidatePath("/accounting/trial-balance");
+  revalidatePath("/accounting/profit-loss");
+  revalidatePath("/accounting/balance-sheet");
+}
+
 async function nextAccountCode(tx: any, type: AccountType) {
   const band: Record<AccountType, number> = {
     ASSET: 1000,
@@ -116,6 +142,11 @@ export async function createClassifiedAccount(input: {
   }
 
   try {
+    const statementGroup = resolveStatementGroup(
+      input.statementGroup,
+      mapping.group,
+    );
+
     const account = await withTenantTransaction(user.organizationId, async (tx) => {
       if (input.parentId) {
         const parent = await tx.chartAccount.findFirst({
@@ -133,7 +164,7 @@ export async function createClassifiedAccount(input: {
           type: mapping.type,
           normalBalance: mapping.normalBalance,
           classification: input.classification,
-          statementGroup: input.statementGroup || mapping.group,
+          statementGroup,
           currency: input.currency?.trim() || "KES",
           parentId: input.parentId || null,
           description: input.description?.trim() || null,
@@ -157,15 +188,132 @@ export async function createClassifiedAccount(input: {
       return created;
     });
 
-    revalidatePath("/accounting");
-    revalidatePath("/accounting/chart");
-    revalidatePath("/accounting/banking");
+    revalidateAccountingPaths();
     return { success: true, accountId: account.id, code: account.code };
   } catch (error) {
     return {
       success: false,
       error:
         error instanceof Error ? error.message : "Could not create account",
+    };
+  }
+}
+
+export async function updateClassifiedAccount(input: {
+  id: string;
+  name: string;
+  currency?: string;
+  classification: Classification;
+  statementGroup?: StatementGroup | null;
+  parentId?: string | null;
+  description?: string | null;
+  note?: string | null;
+  vatApplicable?: boolean;
+}) {
+  const user = await requireRole(...ACCOUNTING_ROLES);
+  const id = input.id.trim();
+  const name = input.name.trim();
+
+  if (!id) return { success: false, error: "Account is required" };
+  if (!name) return { success: false, error: "Account name is required" };
+
+  const mapping = CLASSIFICATION_MAP[input.classification];
+  if (!mapping) {
+    return { success: false, error: "Pick a valid classification" };
+  }
+
+  try {
+    const statementGroup = resolveStatementGroup(
+      input.statementGroup,
+      mapping.group,
+    );
+    const currency = input.currency?.trim() || "KES";
+    const parentId = input.parentId || null;
+
+    await withTenantTransaction(user.organizationId, async (tx) => {
+      const account = await tx.chartAccount.findFirst({
+        where: { id, isActive: true },
+        select: {
+          id: true,
+          isSystem: true,
+          isBank: true,
+          bankAccount: { select: { id: true } },
+        },
+      });
+      if (!account) throw new Error("Account not found");
+      if (account.isSystem) {
+        throw new Error("System accounts cannot be edited here");
+      }
+
+      if (parentId) {
+        if (parentId === id) {
+          throw new Error("An account cannot be its own sub-account");
+        }
+
+        let parent = await tx.chartAccount.findFirst({
+          where: { id: parentId, isActive: true },
+          select: { id: true, parentId: true },
+        });
+        if (!parent) throw new Error("Selected parent account not found");
+
+        while (parent?.parentId) {
+          if (parent.parentId === id) {
+            throw new Error("An account cannot be moved below one of its sub-accounts");
+          }
+          parent = await tx.chartAccount.findFirst({
+            where: { id: parent.parentId },
+            select: { id: true, parentId: true },
+          });
+        }
+      }
+
+      await tx.chartAccount.update({
+        where: { id },
+        data: {
+          name,
+          type: mapping.type,
+          normalBalance: mapping.normalBalance,
+          classification: input.classification,
+          statementGroup,
+          currency,
+          parentId,
+          description: input.description?.trim() || null,
+          note: input.note?.trim() || null,
+          vatApplicable: Boolean(input.vatApplicable),
+          isBank: input.classification === "BANK",
+        },
+      });
+
+      if (input.classification === "BANK") {
+        if (account.bankAccount) {
+          await tx.bankAccount.update({
+            where: { id: account.bankAccount.id },
+            data: { name, currency, isActive: true },
+          });
+        } else {
+          await tx.bankAccount.create({
+            data: {
+              accountId: id,
+              name,
+              currency,
+            },
+          });
+        }
+      } else if (account.isBank && account.bankAccount) {
+        await tx.bankAccount.update({
+          where: { id: account.bankAccount.id },
+          data: { isActive: false },
+        });
+      }
+    });
+
+    revalidateAccountingPaths();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Could not update account",
     };
   }
 }
@@ -189,6 +337,9 @@ export async function getAccountTree() {
         currency: true,
         vatApplicable: true,
         parentId: true,
+        description: true,
+        note: true,
+        isSystem: true,
       },
     }),
     db.ledgerLine.findMany({
@@ -226,6 +377,7 @@ export async function getAccountTree() {
       type: account.type,
       normalBalance: account.normalBalance,
       classification: account.classification,
+      statementGroup: account.statementGroup,
       classificationLabel: account.classification
         ? CLASSIFICATION_MAP[account.classification as Classification]?.label ??
           account.classification
@@ -233,6 +385,9 @@ export async function getAccountTree() {
       currency: account.currency ?? "KES",
       vatApplicable: account.vatApplicable,
       parentId: account.parentId,
+      description: account.description,
+      note: account.note,
+      isSystem: account.isSystem,
       balance: Math.round(balance * 100) / 100,
     });
     byGroup.set(group, rows);

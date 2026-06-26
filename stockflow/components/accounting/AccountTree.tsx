@@ -1,23 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
-import { AddAccountForm } from "@/components/accounting/AddAccountForm";
+import { ChevronDown, ChevronRight, Pencil, Plus } from "lucide-react";
+import {
+  AddAccountForm,
+  EditAccountForm,
+} from "@/components/accounting/AddAccountForm";
+import type {
+  Classification,
+  StatementGroup,
+} from "@/lib/accounting/classifications";
 
 type Account = {
   id: string;
   code: string;
   name: string;
   type: string;
+  classification: Classification | null;
+  statementGroup?: StatementGroup | null;
   classificationLabel: string;
   currency: string;
   vatApplicable: boolean;
+  parentId?: string | null;
+  description?: string | null;
+  note?: string | null;
+  isSystem: boolean;
   balance: number;
 };
 
 type AccountGroup = {
-  key: string;
+  key: StatementGroup;
   label: string;
   statement: "BALANCE_SHEET" | "INCOME_STATEMENT";
   accounts: Account[];
@@ -48,6 +61,7 @@ export function AccountTree({
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
 
   function toggle(key: string) {
     setExpanded((previous) => {
@@ -63,6 +77,7 @@ export function AccountTree({
 
   function openAddAccount(key: string) {
     setAdding((current) => (current === key ? null : key));
+    setEditing(null);
     setExpanded((previous) => {
       const next = new Set(previous);
       next.add(key);
@@ -178,58 +193,87 @@ export function AccountTree({
                         Balance
                       </th>
                       <th style={{ padding: "6px 16px", textAlign: "right" }}>
-                        Report
+                        Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {group.accounts.map((account) => (
-                      <tr
-                        key={account.id}
-                        style={{ borderTop: "1px solid var(--border2)" }}
-                      >
-                        <td style={{ padding: "8px 16px 8px 42px" }}>
-                          <span
+                      <Fragment key={account.id}>
+                        <tr style={{ borderTop: "1px solid var(--border2)" }}>
+                          <td style={{ padding: "8px 16px 8px 42px" }}>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                color: "var(--muted)",
+                                fontSize: 12,
+                                marginRight: 8,
+                              }}
+                            >
+                              {account.code}
+                            </span>
+                            {account.name}
+                            {account.vatApplicable && <span style={tagStyle}>VAT</span>}
+                          </td>
+                          <td
                             style={{
-                              fontFamily: "var(--font-mono)",
+                              padding: "8px 16px",
+                              fontSize: 13,
                               color: "var(--muted)",
-                              fontSize: 12,
-                              marginRight: 8,
                             }}
                           >
-                            {account.code}
-                          </span>
-                          {account.name}
-                          {account.vatApplicable && <span style={tagStyle}>VAT</span>}
-                        </td>
-                        <td
-                          style={{
-                            padding: "8px 16px",
-                            fontSize: 13,
-                            color: "var(--muted)",
-                          }}
-                        >
-                          {account.classificationLabel}
-                        </td>
-                        <td
-                          style={{
-                            padding: "8px 16px",
-                            textAlign: "right",
-                            fontFamily: "var(--font-mono)",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {money(account.balance, account.currency)}
-                        </td>
-                        <td style={{ padding: "8px 16px", textAlign: "right" }}>
-                          <Link
-                            href={`/accounting/ledger?account=${account.id}`}
-                            className="btn btn-ghost btn-sm"
+                            {account.classificationLabel}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 16px",
+                              textAlign: "right",
+                              fontFamily: "var(--font-mono)",
+                              whiteSpace: "nowrap",
+                            }}
                           >
-                            Report
-                          </Link>
-                        </td>
-                      </tr>
+                            {money(account.balance, account.currency)}
+                          </td>
+                          <td style={{ padding: "8px 16px" }}>
+                            <div style={rowActionStyle}>
+                              {!account.isSystem && (
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => {
+                                    setAdding(null);
+                                    setEditing((current) =>
+                                      current === account.id ? null : account.id,
+                                    );
+                                  }}
+                                  aria-label={`Edit ${account.name}`}
+                                  style={rowActionButtonStyle}
+                                >
+                                  <Pencil size={14} /> Edit
+                                </button>
+                              )}
+                              <Link
+                                href={`/accounting/ledger?account=${account.id}`}
+                                className="btn btn-ghost btn-sm"
+                              >
+                                Report
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                        {editing === account.id && (
+                          <tr style={{ borderTop: "1px solid var(--border2)" }}>
+                            <td colSpan={4} style={{ padding: 0 }}>
+                              <EditAccountForm
+                                account={account}
+                                groupLabel={group.label}
+                                parents={parents}
+                                onDone={() => setEditing(null)}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -306,4 +350,18 @@ const tagStyle: React.CSSProperties = {
   marginLeft: 8,
   background: "rgba(46,84,150,0.15)",
   color: "var(--blue)",
+};
+
+const rowActionStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+  gap: 6,
+  flexWrap: "wrap",
+};
+
+const rowActionButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
 };

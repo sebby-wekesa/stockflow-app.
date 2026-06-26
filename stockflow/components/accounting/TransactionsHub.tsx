@@ -15,6 +15,7 @@ type AccountOption = { id: string; code: string; name: string };
 type FormData = {
   expense: AccountOption[];
   income: AccountOption[];
+  defaultSalesAccountId?: string | null;
   purchase: AccountOption[];
   capital: AccountOption[];
   drawings: AccountOption[];
@@ -73,7 +74,7 @@ export function TransactionsHub({ data }: { data: FormData }) {
 
       {tab === "expense" && <ExpenseForm data={data} />}
       {tab === "income" && <IncomeForm data={data} />}
-      {tab === "invoice" && <InvoiceForm />}
+      {tab === "invoice" && <InvoiceForm data={data} />}
       {tab === "bill" && <BillForm data={data} />}
       {tab === "transfer" && <TransferForm data={data} />}
       {tab === "equity" && <EquityForm data={data} />}
@@ -320,10 +321,11 @@ function IncomeForm({ data }: { data: FormData }) {
   );
 }
 
-function InvoiceForm() {
+function InvoiceForm({ data }: { data: FormData }) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
+  const [accountId, setAccountId] = useState(data.defaultSalesAccountId ?? "");
   const [customerName, setCustomerName] = useState("");
   const [hasVat, setHasVat] = useState(true);
   const [reference, setReference] = useState("");
@@ -340,6 +342,7 @@ function InvoiceForm() {
             postInvoice({
               date,
               amount: Number.parseFloat(amount),
+              salesAccountId: accountId || null,
               customerName,
               hasVat,
               reference,
@@ -347,6 +350,7 @@ function InvoiceForm() {
             }),
           () => {
             setAmount("");
+            setAccountId(data.defaultSalesAccountId ?? "");
             setCustomerName("");
             setReference("");
             setMemo("");
@@ -358,6 +362,9 @@ function InvoiceForm() {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <Field label="Revenue / income account">
+          <AccountPicker accounts={data.income} value={accountId} onChange={setAccountId} placeholder="Select income..." />
+        </Field>
         <TextField label="Customer" value={customerName} onChange={setCustomerName} placeholder="Customer name" />
         <VatToggle value={hasVat} onChange={setHasVat} />
         <TextField label="Invoice number" value={reference} onChange={setReference} placeholder="INV-001" />

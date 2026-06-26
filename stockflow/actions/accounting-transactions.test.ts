@@ -1,6 +1,11 @@
 import { requireRole } from "@/lib/auth";
 import { withTenantTransaction } from "@/lib/tenant-prisma";
-import { postBill, postExpense, postTransfer } from "./accounting-transactions";
+import {
+  postBill,
+  postExpense,
+  postInvoice,
+  postTransfer,
+} from "./accounting-transactions";
 
 jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
@@ -170,4 +175,71 @@ test("rejects transfers involving a non-bank asset account", async () => {
     success: false,
     error: "Pick a valid source cash or bank account from your organization",
   });
+});
+
+test("posts a sales invoice to the selected income account", async () => {
+  const create = jest.fn().mockResolvedValue({
+    id: "journal-1",
+    entryNumber: "JE-2026-000001",
+  });
+  const db = {
+    chartAccount: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: "custom-sales",
+        type: "INCOME",
+        isBank: false,
+        normalBalance: "CREDIT",
+      }),
+      findMany: jest
+        .fn()
+        .mockResolvedValueOnce([
+          { id: "receivable", description: "key:accounts_receivable" },
+          { id: "sales", description: "key:sales_revenue" },
+        ])
+        .mockResolvedValueOnce([
+          { id: "receivable" },
+          { id: "custom-sales" },
+        ]),
+    },
+    bankAccount: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    journalEntry: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create,
+    },
+  };
+  mockedWithTenantTransaction.mockImplementation(async (_organizationId, fn) =>
+    fn(db as never),
+  );
+
+  const result = await postInvoice({
+    date: "2026-06-15",
+    amount: 116,
+    salesAccountId: "custom-sales",
+    hasVat: false,
+  });
+
+  expect(result).toEqual({
+    success: true,
+    entryNumber: "JE-2026-000001",
+  });
+  expect(db.chartAccount.findFirst).toHaveBeenCalledWith({
+    where: { id: "custom-sales", isActive: true },
+    select: { id: true, type: true, isBank: true, normalBalance: true },
+  });
+  expect(create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        lines: {
+          create: expect.arrayContaining([
+            expect.objectContaining({
+              accountId: "custom-sales",
+              credit: 116,
+            }),
+          ]),
+        },
+      }),
+    }),
+  );
 });

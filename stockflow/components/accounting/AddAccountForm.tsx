@@ -3,9 +3,14 @@
 import type { FormEvent } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClassifiedAccount } from "@/actions/accounting-tree";
 import {
+  createClassifiedAccount,
+  updateClassifiedAccount,
+} from "@/actions/accounting-tree";
+import {
+  CLASSIFICATION_MAP,
   CLASSIFICATION_OPTIONS,
+  STATEMENT_GROUPS,
   type Classification,
   type StatementGroup,
 } from "@/lib/accounting/classifications";
@@ -16,27 +21,192 @@ type ParentAccount = {
   name: string;
 };
 
+type EditableAccount = {
+  id: string;
+  code: string;
+  name: string;
+  currency: string;
+  classification: Classification | null;
+  statementGroup?: StatementGroup | null;
+  parentId?: string | null;
+  description?: string | null;
+  note?: string | null;
+  vatApplicable: boolean;
+};
+
+type FormValues = {
+  name: string;
+  currency: string;
+  classification: Classification;
+  statementGroup: StatementGroup;
+  parentId: string | null;
+  description: string | null;
+  note: string | null;
+  vatApplicable: boolean;
+};
+
+type ActionResult = {
+  success: boolean;
+  error?: string;
+};
+
 export function AddAccountForm({
   statementGroup,
   groupLabel,
   parents,
   onDone,
 }: {
-  statementGroup: string;
+  statementGroup: StatementGroup;
   groupLabel: string;
   parents: ParentAccount[];
   onDone: () => void;
 }) {
+  return (
+    <ClassifiedAccountForm
+      title={
+        <>
+          Add account under{" "}
+          <span style={{ color: "var(--accent)" }}>{groupLabel}</span>
+        </>
+      }
+      initialValues={{
+        name: "",
+        currency: "KES",
+        classification: "",
+        statementGroup,
+        parentId: "",
+        description: "",
+        note: "",
+        vatApplicable: false,
+      }}
+      parents={parents}
+      submitLabel="Save account"
+      pendingLabel="Saving..."
+      allowStatementGroupEdit={false}
+      onDone={onDone}
+      onSubmit={(values) =>
+        createClassifiedAccount({
+          name: values.name,
+          currency: values.currency,
+          classification: values.classification,
+          statementGroup: values.statementGroup,
+          parentId: values.parentId,
+          description: values.description,
+          note: values.note,
+          vatApplicable: values.vatApplicable,
+        })
+      }
+    />
+  );
+}
+
+export function EditAccountForm({
+  account,
+  groupLabel,
+  parents,
+  onDone,
+}: {
+  account: EditableAccount;
+  groupLabel: string;
+  parents: ParentAccount[];
+  onDone: () => void;
+}) {
+  return (
+    <ClassifiedAccountForm
+      title={
+        <>
+          Edit{" "}
+          <span style={{ color: "var(--accent)" }}>
+            {account.code} - {account.name}
+          </span>{" "}
+          in {groupLabel}
+        </>
+      }
+      initialValues={{
+        name: account.name,
+        currency: account.currency,
+        classification: account.classification ?? "",
+        statementGroup: account.statementGroup ?? "",
+        parentId: account.parentId ?? "",
+        description: account.description ?? "",
+        note: account.note ?? "",
+        vatApplicable: account.vatApplicable,
+      }}
+      parents={parents.filter((parent) => parent.id !== account.id)}
+      submitLabel="Update account"
+      pendingLabel="Updating..."
+      allowStatementGroupEdit
+      onDone={onDone}
+      onSubmit={(values) =>
+        updateClassifiedAccount({
+          id: account.id,
+          name: values.name,
+          currency: values.currency,
+          classification: values.classification,
+          statementGroup: values.statementGroup,
+          parentId: values.parentId,
+          description: values.description,
+          note: values.note,
+          vatApplicable: values.vatApplicable,
+        })
+      }
+    />
+  );
+}
+
+function ClassifiedAccountForm({
+  title,
+  initialValues,
+  parents,
+  submitLabel,
+  pendingLabel,
+  allowStatementGroupEdit,
+  onDone,
+  onSubmit,
+}: {
+  title: React.ReactNode;
+  initialValues: {
+    name: string;
+    currency: string;
+    classification: Classification | "";
+    statementGroup: StatementGroup | "";
+    parentId: string;
+    description: string;
+    note: string;
+    vatApplicable: boolean;
+  };
+  parents: ParentAccount[];
+  submitLabel: string;
+  pendingLabel: string;
+  allowStatementGroupEdit: boolean;
+  onDone: () => void;
+  onSubmit: (values: FormValues) => Promise<ActionResult>;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [name, setName] = useState("");
-  const [currency, setCurrency] = useState("KES");
-  const [classification, setClassification] = useState("");
-  const [parentId, setParentId] = useState("");
-  const [description, setDescription] = useState("");
-  const [note, setNote] = useState("");
-  const [vatApplicable, setVatApplicable] = useState(false);
+  const [name, setName] = useState(initialValues.name);
+  const [currency, setCurrency] = useState(initialValues.currency);
+  const [classification, setClassification] = useState<Classification | "">(
+    initialValues.classification,
+  );
+  const [statementGroup, setStatementGroup] = useState<StatementGroup | "">(
+    initialValues.statementGroup,
+  );
+  const [parentId, setParentId] = useState(initialValues.parentId);
+  const [description, setDescription] = useState(initialValues.description);
+  const [note, setNote] = useState(initialValues.note);
+  const [vatApplicable, setVatApplicable] = useState(
+    initialValues.vatApplicable,
+  );
   const [error, setError] = useState<string | null>(null);
+
+  function changeClassification(value: string) {
+    const nextClassification = value as Classification | "";
+    setClassification(nextClassification);
+    if (allowStatementGroupEdit && nextClassification) {
+      setStatementGroup(CLASSIFICATION_MAP[nextClassification].group);
+    }
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,13 +220,17 @@ export function AddAccountForm({
       setError("Pick a classification");
       return;
     }
+    if (!statementGroup) {
+      setError("Pick a report category");
+      return;
+    }
 
     startTransition(async () => {
-      const result = await createClassifiedAccount({
+      const result = await onSubmit({
         name,
         currency,
-        classification: classification as Classification,
-        statementGroup: statementGroup as StatementGroup,
+        classification,
+        statementGroup,
         parentId: parentId || null,
         description: description || null,
         note: note || null,
@@ -68,7 +242,7 @@ export function AddAccountForm({
         router.refresh();
         return;
       }
-      setError(result.error || "Could not create account");
+      setError(result.error || "Could not save account");
     });
   }
 
@@ -82,8 +256,7 @@ export function AddAccountForm({
       }}
     >
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>
-        Add account under{" "}
-        <span style={{ color: "var(--accent)" }}>{groupLabel}</span>
+        {title}
       </div>
 
       {error && (
@@ -128,7 +301,7 @@ export function AddAccountForm({
           <select
             style={inputStyle}
             value={classification}
-            onChange={(event) => setClassification(event.target.value)}
+            onChange={(event) => changeClassification(event.target.value)}
           >
             <option value="">Select...</option>
             {CLASSIFICATION_OPTIONS.map((option) => (
@@ -138,6 +311,24 @@ export function AddAccountForm({
             ))}
           </select>
         </Field>
+        {allowStatementGroupEdit && (
+          <Field label="Report category *">
+            <select
+              style={inputStyle}
+              value={statementGroup}
+              onChange={(event) =>
+                setStatementGroup(event.target.value as StatementGroup)
+              }
+            >
+              <option value="">Select...</option>
+              {STATEMENT_GROUPS.map((group) => (
+                <option key={group.key} value={group.key}>
+                  {group.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Sub-account of">
           <select
             style={inputStyle}
@@ -203,7 +394,7 @@ export function AddAccountForm({
           Cancel
         </button>
         <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
-          {pending ? "Saving..." : "Save account"}
+          {pending ? pendingLabel : submitLabel}
         </button>
       </div>
     </form>

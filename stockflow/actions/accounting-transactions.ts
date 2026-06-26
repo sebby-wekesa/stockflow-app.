@@ -326,6 +326,7 @@ export async function postBill(input: {
 export async function postInvoice(input: {
   date: string;
   amount: number;
+  salesAccountId?: string | null;
   customerName?: string;
   hasVat?: boolean;
   memo?: string;
@@ -342,10 +343,21 @@ export async function postInvoice(input: {
     const entry = await withTenantTransaction(user.organizationId, async (tx) => {
       const systemAccounts = await getSystemAccounts(tx);
       const receivableId = systemAccounts[K.ACCOUNTS_RECEIVABLE];
-      const salesId = systemAccounts[K.SALES_REVENUE];
-      if (!receivableId || !salesId) {
-        throw new Error("Receivable or Sales account is missing. Set up the chart of accounts.");
+      const salesId =
+        input.salesAccountId === undefined
+          ? systemAccounts[K.SALES_REVENUE]
+          : input.salesAccountId;
+      if (!receivableId) {
+        throw new Error("Accounts Receivable is missing. Set up the chart of accounts.");
       }
+      if (!salesId) {
+        throw new Error("Pick a revenue or income account");
+      }
+      await requireAccount(tx, salesId, {
+        types: ["INCOME"],
+        normalBalance: "CREDIT",
+        label: "revenue or income account",
+      });
       await ensureUniqueReference(tx, "SALE", "ManualInvoice", reference);
       return postJournalEntry(
         tx,
@@ -541,6 +553,7 @@ export async function getTransactionFormData() {
     seeded: accounts.length > 0,
     expense: byType(["EXPENSE"], "DEBIT"),
     income: byType(["INCOME"], "CREDIT"),
+    defaultSalesAccountId: systemAccounts[K.SALES_REVENUE] ?? null,
     purchase: accounts
       .filter(
         (account) =>
