@@ -79,6 +79,10 @@ function money(amount: number, currency = "KES") {
   return `${currency} ${signed}`;
 }
 
+function roundMoney(amount: number) {
+  return Math.round(amount * 100) / 100;
+}
+
 // A palette of colours to cycle through for branch cards
 const BRANCH_COLORS = [
   { color: "#2563eb", dim: "rgba(37,99,235,0.10)" },
@@ -205,6 +209,9 @@ export function AccountTree({
     const isOpen = expanded.has(group.key);
     const isAdding = adding === group.key;
     const branchGroups = groupAccountsByBranch(group.accounts, branches);
+    const categoryTotal = roundMoney(
+      branchGroups.reduce((sum, branchGroup) => sum + branchGroup.total, 0),
+    );
 
     return (
       <div
@@ -255,7 +262,7 @@ export function AccountTree({
               whiteSpace: "nowrap",
             }}
           >
-            {money(group.total)}
+            {money(categoryTotal)}
           </span>
           <button
             type="button"
@@ -434,7 +441,7 @@ export function AccountTree({
                     <tfoot>
                       <tr>
                         <td colSpan={3} style={branchTotalLabelStyle}>
-                          Total {branchGroup.name}
+                          {branchGroup.name} Total
                         </td>
                         <td style={branchTotalAmountStyle}>
                           {money(branchGroup.total)}
@@ -446,6 +453,15 @@ export function AccountTree({
                 </div>
               </div>
             ))}
+
+            {branchGroups.length > 0 && (
+              <div style={categoryTotalRowStyle}>
+                <span>Total {group.label}</span>
+                <span style={categoryTotalAmountStyle}>
+                  {money(categoryTotal)}
+                </span>
+              </div>
+            )}
 
             {isAdding && (
               <AddAccountForm
@@ -595,7 +611,7 @@ function groupAccountsByBranch(
 
     const target = branchGroup ?? unassigned;
     target.accounts.push(account);
-    target.total = Math.round((target.total + account.balance) * 100) / 100;
+    target.total = roundMoney(target.total + account.balance);
   }
 
   return [
@@ -725,6 +741,22 @@ const branchTotalAmountStyle: React.CSSProperties = {
   fontFamily: "var(--font-mono)",
   fontWeight: 800,
   borderTop: "1px solid var(--border2)",
+  whiteSpace: "nowrap",
+};
+
+const categoryTotalRowStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "12px 16px 12px 42px",
+  borderTop: "2px solid var(--border2)",
+  background: "rgba(240,192,64,0.08)",
+  color: "var(--text)",
+  fontWeight: 900,
+};
+
+const categoryTotalAmountStyle: React.CSSProperties = {
+  fontFamily: "var(--font-mono)",
   whiteSpace: "nowrap",
 };
 
