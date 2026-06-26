@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { requireUserBranchClass } from "@/lib/accounting/branch-class";
 import {
   getSystemAccounts,
   postJournalEntry,
@@ -337,6 +338,7 @@ export async function recordPayment(input: {
         }
 
         const paymentNumber = await nextPaymentNumber(tx, input.direction);
+        const branchClass = await requireUserBranchClass(tx, user);
         const lines =
           input.direction === "RECEIVED"
             ? [
@@ -376,6 +378,7 @@ export async function recordPayment(input: {
                 : "PAYMENT_MADE",
             sourceType: "Payment",
             sourceId: paymentNumber,
+            branchId: branchClass.id,
             lines,
           },
           user.id,

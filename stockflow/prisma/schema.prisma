@@ -60,6 +60,7 @@ model Branch {
   MaterialReceipt        MaterialReceipt[]
   Product                Product[]
   ProductReceipt         ProductReceipt[]
+  JournalEntry           JournalEntry[]
   StockMovement          StockMovement[]
   User                   User[]
 
@@ -841,11 +842,13 @@ model JournalEntry {
   source         JournalSource @default(MANUAL)
   sourceType     String?
   sourceId       String?
+  branchId       String?
   postedAt       DateTime?
   postedBy       String?
   createdBy      String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  Branch         Branch?       @relation(fields: [branchId], references: [id])
   Organization   Organization  @relation(fields: [organizationId], references: [id])
   lines          LedgerLine[]
   payments       Payment[]
@@ -854,6 +857,7 @@ model JournalEntry {
   @@unique([organizationId, source, sourceType, sourceId], map: "JournalEntry_org_source_sourcetype_sourceid_key")
   @@index([organizationId])
   @@index([organizationId, date])
+  @@index([organizationId, branchId])
   @@index([sourceType, sourceId])
 }
 

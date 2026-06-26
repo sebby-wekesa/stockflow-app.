@@ -42,6 +42,13 @@ function transactionDb(account: {
     bankAccount: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    branch: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: "branch-1",
+        code: "mombasa",
+        name: "Mombasa",
+      }),
+    },
     journalEntry: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn(),
@@ -54,6 +61,7 @@ beforeEach(() => {
   mockedRequireRole.mockResolvedValue({
     id: "user-1",
     organizationId: "org-1",
+    branches: [{ id: "branch-1", name: "Mombasa" }],
   } as never);
 });
 
@@ -204,6 +212,13 @@ test("posts a sales invoice to the selected income account", async () => {
     bankAccount: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    branch: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: "branch-1",
+        code: "mombasa",
+        name: "Mombasa",
+      }),
+    },
     journalEntry: {
       findFirst: jest.fn().mockResolvedValue(null),
       create,
@@ -231,6 +246,7 @@ test("posts a sales invoice to the selected income account", async () => {
   expect(create).toHaveBeenCalledWith(
     expect.objectContaining({
       data: expect.objectContaining({
+        branchId: "branch-1",
         lines: {
           create: expect.arrayContaining([
             expect.objectContaining({

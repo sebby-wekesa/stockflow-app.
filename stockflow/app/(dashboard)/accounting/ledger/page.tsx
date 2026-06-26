@@ -70,6 +70,7 @@ export default async function GeneralLedgerPage({
               <tr style={{ borderBottom: "1px solid var(--border2)", textAlign: "left", fontSize: 12 }}>
                 <th style={{ padding: "8px 16px" }}>Date</th>
                 <th style={{ padding: "8px 16px" }}>Entry</th>
+                <th style={{ padding: "8px 16px" }}>Class</th>
                 <th style={{ padding: "8px 16px" }}>Memo</th>
                 <th style={{ padding: "8px 16px", textAlign: "right" }}>Debit</th>
                 <th style={{ padding: "8px 16px", textAlign: "right" }}>Credit</th>
@@ -78,12 +79,13 @@ export default async function GeneralLedgerPage({
             </thead>
             <tbody>
               {data.lines.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>No transactions in this period.</td></tr>
+                <tr><td colSpan={7} style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>No transactions in this period.</td></tr>
               ) : (
                 data.lines.map((l: any, i: number) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--border2)" }}>
                     <td style={{ padding: "7px 16px", fontFamily: "monospace", fontSize: 13 }}>{fmtDate(l.date)}</td>
                     <td style={{ padding: "7px 16px", fontFamily: "monospace", fontSize: 12 }}>{l.entryNumber}</td>
+                    <td style={{ padding: "7px 16px", fontSize: 13 }}>{l.branchClass?.name ?? "—"}</td>
                     <td style={{ padding: "7px 16px", fontSize: 13 }}>{l.memo ?? "—"}</td>
                     <td style={{ padding: "7px 16px", textAlign: "right", fontFamily: "monospace" }}>{money(l.debit)}</td>
                     <td style={{ padding: "7px 16px", textAlign: "right", fontFamily: "monospace" }}>{money(l.credit)}</td>

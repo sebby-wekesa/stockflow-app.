@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { requireUserBranchClass } from "@/lib/accounting/branch-class";
 import { KENYA_SME_CHART } from "@/lib/accounting/chart-of-accounts";
 import { postJournalEntry } from "@/lib/accounting/posting";
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
@@ -249,19 +250,21 @@ export async function createManualJournal(input: {
   if (!date) return { success: false, error: "Enter a valid journal date" };
 
   try {
-    const entry = await withTenantTransaction(user.organizationId, (tx) =>
-      postJournalEntry(
+    const entry = await withTenantTransaction(user.organizationId, async (tx) => {
+      const branchClass = await requireUserBranchClass(tx, user);
+      return postJournalEntry(
         tx,
         user.organizationId,
         {
           date,
           memo: input.memo,
           source: "MANUAL",
+          branchId: branchClass.id,
           lines: input.lines,
         },
         user.id,
-      ),
-    );
+      );
+    });
     revalidatePath("/accounting");
     revalidatePath("/accounting/journal");
     revalidatePath("/accounting/ledger");
@@ -402,7 +405,13 @@ export async function getGeneralLedger(input: {
     },
     include: {
       journalEntry: {
-        select: { entryNumber: true, date: true, memo: true, source: true },
+        select: {
+          entryNumber: true,
+          date: true,
+          memo: true,
+          source: true,
+          Branch: { select: { code: true, name: true } },
+        },
       },
     },
     orderBy: [{ journalEntry: { date: "asc" } }, { createdAt: "asc" }],
@@ -419,6 +428,12 @@ export async function getGeneralLedger(input: {
       entryNumber: line.journalEntry.entryNumber,
       memo: line.description ?? line.journalEntry.memo,
       source: line.journalEntry.source,
+      branchClass: line.journalEntry.Branch
+        ? {
+            code: line.journalEntry.Branch.code,
+            name: line.journalEntry.Branch.name,
+          }
+        : null,
       debit,
       credit,
       balance: Math.round(running * 100) / 100,

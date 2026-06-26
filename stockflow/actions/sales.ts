@@ -268,6 +268,7 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
         id: order.id,
         totalAmount: Number(order.totalAmount),
         date: order.createdAt,
+        branchId: user.branches[0]?.id ?? null,
       }, user.id)
     }
 
@@ -318,6 +319,7 @@ export async function confirmDraft(orderId: string) {
       id: order.id,
       totalAmount: Number(order.totalAmount),
       date: order.createdAt,
+      branchId: user.branches[0]?.id ?? null,
     }, user.id)
   }, { maxWait: 10000, timeout: 30000 })
 
@@ -415,6 +417,7 @@ export async function updateDraftSalesOrder(formData: FormData) {
           id: updated.id,
           totalAmount: Number(updated.totalAmount),
           date: updated.createdAt,
+          branchId: user.branches[0]?.id ?? null,
         }, user.id)
       }
     }, { maxWait: 10000, timeout: 30000 })

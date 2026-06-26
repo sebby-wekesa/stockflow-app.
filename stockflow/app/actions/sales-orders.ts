@@ -331,6 +331,7 @@ export async function confirmSalesOrder(orderId: string) {
       id: order.id,
       totalAmount: Number(order.totalAmount),
       date: order.createdAt,
+      branchId: user.branches[0]?.id ?? null,
     }, user.id);
   });
 

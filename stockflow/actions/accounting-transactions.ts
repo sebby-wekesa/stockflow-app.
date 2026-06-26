@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { requireUserBranchClass } from "@/lib/accounting/branch-class";
 import {
   alreadyPosted,
   getSystemAccounts,
@@ -176,6 +177,7 @@ export async function postExpense(input: {
       });
       const systemAccounts = await getSystemAccounts(tx);
       const bankGlId = await resolveBankGl(tx, systemAccounts, input.bankAccountId);
+      const branchClass = await requireUserBranchClass(tx, user);
       await ensureUniqueReference(tx, "MANUAL", "Expense", reference);
       return postJournalEntry(
         tx,
@@ -186,6 +188,7 @@ export async function postExpense(input: {
           source: "MANUAL",
           sourceType: "Expense",
           sourceId: reference,
+          branchId: branchClass.id,
           lines: buildExpenseLines({
             amount: base.amount,
             hasVat: Boolean(input.hasVat),
@@ -229,6 +232,7 @@ export async function postIncome(input: {
       });
       const systemAccounts = await getSystemAccounts(tx);
       const bankGlId = await resolveBankGl(tx, systemAccounts, input.bankAccountId);
+      const branchClass = await requireUserBranchClass(tx, user);
       await ensureUniqueReference(tx, "MANUAL", "Income", reference);
       return postJournalEntry(
         tx,
@@ -239,6 +243,7 @@ export async function postIncome(input: {
           source: "MANUAL",
           sourceType: "Income",
           sourceId: reference,
+          branchId: branchClass.id,
           lines: buildIncomeLines({
             amount: base.amount,
             hasVat: Boolean(input.hasVat),
@@ -289,6 +294,7 @@ export async function postBill(input: {
       ) {
         throw new Error("Pick an expense, inventory, or fixed asset account");
       }
+      const branchClass = await requireUserBranchClass(tx, user);
       const payableId = systemAccounts[K.ACCOUNTS_PAYABLE];
       if (!payableId) {
         throw new Error("Accounts Payable is missing. Set up the chart of accounts.");
@@ -303,6 +309,7 @@ export async function postBill(input: {
           source: "PURCHASE",
           sourceType: "ManualBill",
           sourceId: reference,
+          branchId: branchClass.id,
           lines: buildBillLines({
             amount: base.amount,
             hasVat: Boolean(input.hasVat),
@@ -358,6 +365,7 @@ export async function postInvoice(input: {
         normalBalance: "CREDIT",
         label: "revenue or income account",
       });
+      const branchClass = await requireUserBranchClass(tx, user);
       await ensureUniqueReference(tx, "SALE", "ManualInvoice", reference);
       return postJournalEntry(
         tx,
@@ -368,6 +376,7 @@ export async function postInvoice(input: {
           source: "SALE",
           sourceType: "ManualInvoice",
           sourceId: reference,
+          branchId: branchClass.id,
           lines: buildInvoiceLines({
             amount: base.amount,
             hasVat: Boolean(input.hasVat),
@@ -419,6 +428,7 @@ export async function postTransfer(input: {
           label: "destination cash or bank account",
         }),
       ]);
+      const branchClass = await requireUserBranchClass(tx, user);
       await ensureUniqueReference(tx, "MANUAL", "BankTransfer", reference);
       return postJournalEntry(
         tx,
@@ -429,6 +439,7 @@ export async function postTransfer(input: {
           source: "MANUAL",
           sourceType: "BankTransfer",
           sourceId: reference,
+          branchId: branchClass.id,
           lines: buildTransferLines({
             amount: base.amount,
             fromAccountId: input.fromAccountId,
@@ -473,6 +484,7 @@ export async function postEquityMovement(input: {
       });
       const systemAccounts = await getSystemAccounts(tx);
       const bankGlId = await resolveBankGl(tx, systemAccounts, input.bankAccountId);
+      const branchClass = await requireUserBranchClass(tx, user);
       await ensureUniqueReference(tx, "MANUAL", "EquityMovement", reference);
       return postJournalEntry(
         tx,
@@ -487,6 +499,7 @@ export async function postEquityMovement(input: {
           source: "MANUAL",
           sourceType: "EquityMovement",
           sourceId: reference,
+          branchId: branchClass.id,
           lines: buildEquityLines({
             kind: input.kind,
             amount: base.amount,
@@ -508,8 +521,9 @@ export async function postEquityMovement(input: {
 export async function getTransactionFormData() {
   const user = await requireRole(...ACCOUNTING_ROLES);
   const db = getTenantPrisma(user.organizationId);
+  const userBranchId = user.branches[0]?.id ?? null;
 
-  const [accounts, banks, systemAccounts] = await Promise.all([
+  const [accounts, banks, systemAccounts, branchClass] = await Promise.all([
     db.chartAccount.findMany({
       where: { isActive: true },
       orderBy: { code: "asc" },
@@ -533,6 +547,12 @@ export async function getTransactionFormData() {
       },
     }),
     getSystemAccounts(db),
+    userBranchId
+      ? db.branch.findFirst({
+          where: { id: userBranchId },
+          select: { id: true, code: true, name: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   const byType = (types: AccountType[], normalBalance: NormalBalance) =>
@@ -551,6 +571,7 @@ export async function getTransactionFormData() {
 
   return {
     seeded: accounts.length > 0,
+    branchClass,
     expense: byType(["EXPENSE"], "DEBIT"),
     income: byType(["INCOME"], "CREDIT"),
     defaultSalesAccountId: systemAccounts[K.SALES_REVENUE] ?? null,

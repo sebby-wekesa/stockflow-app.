@@ -12,7 +12,9 @@ import {
 } from "@/actions/accounting-transactions";
 
 type AccountOption = { id: string; code: string; name: string };
+type BranchClass = { id: string; code: string; name: string };
 type FormData = {
+  branchClass: BranchClass | null;
   expense: AccountOption[];
   income: AccountOption[];
   defaultSalesAccountId?: string | null;
@@ -192,6 +194,21 @@ function BankPicker({
   );
 }
 
+function ClassField({ branchClass }: { branchClass: BranchClass | null }) {
+  return (
+    <Field label="Class">
+      <input
+        readOnly
+        style={{
+          ...inputStyle,
+          color: branchClass ? "var(--text)" : "#fca5a5",
+        }}
+        value={branchClass ? branchClass.name : "No branch assigned"}
+      />
+    </Field>
+  );
+}
+
 function VatToggle({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
   return (
     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", marginTop: 22 }}>
@@ -201,10 +218,18 @@ function VatToggle({ value, onChange }: { value: boolean; onChange: (value: bool
   );
 }
 
-function PostButton({ pending, label }: { pending: boolean; label: string }) {
+function PostButton({
+  pending,
+  label,
+  disabled = false,
+}: {
+  pending: boolean;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
     <div style={{ marginTop: 14, textAlign: "right" }}>
-      <button type="submit" className="btn btn-primary" disabled={pending}>
+      <button type="submit" className="btn btn-primary" disabled={pending || disabled}>
         {pending ? "Posting..." : label}
       </button>
     </div>
@@ -250,6 +275,7 @@ function ExpenseForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <ClassField branchClass={data.branchClass} />
         <Field label="Expense account">
           <AccountPicker accounts={data.expense} value={accountId} onChange={setAccountId} placeholder="Select expense..." />
         </Field>
@@ -261,7 +287,7 @@ function ExpenseForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="What was this for?" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Record expense" />
+      <PostButton pending={pending} label="Record expense" disabled={!data.branchClass} />
     </form>
   );
 }
@@ -305,6 +331,7 @@ function IncomeForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <ClassField branchClass={data.branchClass} />
         <Field label="Income account">
           <AccountPicker accounts={data.income} value={accountId} onChange={setAccountId} placeholder="Select income..." />
         </Field>
@@ -316,7 +343,7 @@ function IncomeForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Income source" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Record income" />
+      <PostButton pending={pending} label="Record income" disabled={!data.branchClass} />
     </form>
   );
 }
@@ -362,6 +389,7 @@ function InvoiceForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <ClassField branchClass={data.branchClass} />
         <Field label="Revenue / income account">
           <AccountPicker accounts={data.income} value={accountId} onChange={setAccountId} placeholder="Select income..." />
         </Field>
@@ -371,7 +399,7 @@ function InvoiceForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Invoice description" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Post invoice" />
+      <PostButton pending={pending} label="Post invoice" disabled={!data.branchClass} />
     </form>
   );
 }
@@ -416,6 +444,7 @@ function BillForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <ClassField branchClass={data.branchClass} />
         <Field label="Expense or asset account">
           <AccountPicker accounts={data.purchase} value={accountId} onChange={setAccountId} placeholder="Select account..." />
         </Field>
@@ -425,7 +454,7 @@ function BillForm({ data }: { data: FormData }) {
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Purchase description" />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Post bill" />
+      <PostButton pending={pending} label="Post bill" disabled={!data.branchClass} />
     </form>
   );
 }
@@ -467,6 +496,7 @@ function TransferForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <ClassField branchClass={data.branchClass} />
         <Field label="From account">
           <AccountPicker accounts={data.transferAccounts} value={fromAccountId} onChange={setFromAccountId} placeholder="Select source..." />
         </Field>
@@ -476,7 +506,7 @@ function TransferForm({ data }: { data: FormData }) {
         <TextField label="Reference" value={reference} onChange={setReference} placeholder="Transfer reference" />
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Transfer reason" />
       </div>
-      <PostButton pending={pending} label="Post transfer" />
+      <PostButton pending={pending} label="Post transfer" disabled={!data.branchClass} />
     </form>
   );
 }
@@ -546,6 +576,7 @@ function EquityForm({ data }: { data: FormData }) {
       <div style={gridStyle}>
         <DateField value={date} onChange={setDate} />
         <AmountField value={amount} onChange={setAmount} />
+        <ClassField branchClass={data.branchClass} />
         <Field label={kind === "CAPITAL" ? "Capital account" : "Drawings account"}>
           <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} placeholder="Select equity account..." />
         </Field>
@@ -555,7 +586,7 @@ function EquityForm({ data }: { data: FormData }) {
         <TextField label="Reference" value={reference} onChange={setReference} placeholder="Reference" />
         <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Note" />
       </div>
-      <PostButton pending={pending} label={kind === "CAPITAL" ? "Record capital" : "Record drawings"} />
+      <PostButton pending={pending} label={kind === "CAPITAL" ? "Record capital" : "Record drawings"} disabled={!data.branchClass} />
     </form>
   );
 }

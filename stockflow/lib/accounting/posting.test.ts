@@ -7,6 +7,9 @@ function accountingDb(accountIds = ["cash", "sales"]) {
         accountIds.map((id) => ({ id })),
       ),
     },
+    branch: {
+      findFirst: jest.fn().mockResolvedValue({ id: "branch-1" }),
+    },
     journalEntry: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({
@@ -44,6 +47,36 @@ test("posts a balanced journal using active tenant accounts", async () => {
             expect.objectContaining({ accountId: "sales", credit: 250 }),
           ],
         },
+      }),
+    }),
+  );
+});
+
+test("stores the branch class when supplied", async () => {
+  const db = accountingDb();
+
+  await postJournalEntry(
+    db as never,
+    "org-1",
+    {
+      date: new Date("2026-06-11T00:00:00.000Z"),
+      branchId: "branch-1",
+      lines: [
+        { accountId: "cash", debit: 250 },
+        { accountId: "sales", credit: 250 },
+      ],
+    },
+    "user-1",
+  );
+
+  expect(db.branch.findFirst).toHaveBeenCalledWith({
+    where: { id: "branch-1" },
+    select: { id: true },
+  });
+  expect(db.journalEntry.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        branchId: "branch-1",
       }),
     }),
   );

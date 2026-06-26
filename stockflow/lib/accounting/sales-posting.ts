@@ -8,7 +8,7 @@ import {
 
 type AccountingDb = Pick<
   Prisma.TransactionClient,
-  "chartAccount" | "journalEntry"
+  "branch" | "chartAccount" | "journalEntry"
 >;
 
 type PostedSale = {
@@ -16,6 +16,7 @@ type PostedSale = {
   totalAmount: number;
   date: Date;
   orderNumber?: string;
+  branchId?: string | null;
 };
 
 export async function postSaleToLedger(
@@ -50,6 +51,7 @@ export async function postSaleToLedger(
       source: "SALE",
       sourceType: "SaleOrder",
       sourceId: sale.id,
+      branchId: sale.branchId ?? null,
       lines: [
         {
           accountId: receivableId,

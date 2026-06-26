@@ -3,7 +3,7 @@ import { SYSTEM_ACCOUNT_KEYS } from "./chart-of-accounts";
 
 type AccountingDb = Pick<
   Prisma.TransactionClient,
-  "chartAccount" | "journalEntry"
+  "branch" | "chartAccount" | "journalEntry"
 >;
 
 export type PostingLine = {
@@ -25,6 +25,7 @@ export type PostJournalInput = {
     | "OPENING_BALANCE";
   sourceType?: string | null;
   sourceId?: string | null;
+  branchId?: string | null;
   lines: PostingLine[];
 };
 
@@ -88,6 +89,16 @@ export async function postJournalEntry(
     );
   }
 
+  if (input.branchId) {
+    const branch = await db.branch.findFirst({
+      where: { id: input.branchId },
+      select: { id: true },
+    });
+    if (!branch) {
+      throw new Error("Journal class must be a branch in your organization");
+    }
+  }
+
   const totalDebit = round2(
     lines.reduce((sum, line) => sum + line.debit, 0),
   );
@@ -115,6 +126,7 @@ export async function postJournalEntry(
       source: input.source ?? "MANUAL",
       sourceType: input.sourceType ?? null,
       sourceId: input.sourceId ?? null,
+      branchId: input.branchId ?? null,
       postedAt: new Date(),
       postedBy: userId ?? null,
       createdBy: userId ?? null,
