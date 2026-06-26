@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { signUpUser } from '@/actions/signup'
+import { PasswordInput } from '@/components/ui/password-input'
 
 type SignupBranch = {
   id: string
@@ -177,13 +178,11 @@ export function SignupForm({
 
           <div className="form-group">
             <label className="form-label">Password</label>
-            <input
-              type="password"
+            <PasswordInput
               name="password"
               required
               minLength={8}
               maxLength={128}
-              className="form-input"
               placeholder="At least 8 characters"
               disabled={isPending}
             />

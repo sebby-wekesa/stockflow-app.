@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from '@/actions/auth';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +91,8 @@ export default function LoginPage() {
 
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label className="form-label">Password</label>
-            <input
-              type="password"
+            <PasswordInput
               name="password"
-              className="form-input"
               placeholder="Enter your password"
               required
             />
