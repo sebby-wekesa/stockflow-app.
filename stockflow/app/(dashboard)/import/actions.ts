@@ -56,7 +56,7 @@ async function getImporterBranch(user: AuthUser): Promise<{
     : null
 
   if (!branch || !code) {
-    throw new Error('Your assigned branch must be Nairobi, Mombasa, or Bunje before importing data')
+    throw new Error('Your assigned branch must be Nairobi, Mombasa, or Bonje before importing data')
   }
 
   return { id: branch.id, code, name: branch.name }

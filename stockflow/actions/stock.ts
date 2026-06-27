@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma, withTenantTransaction } from '@/lib/tenant-prisma'
 import { withRetry } from '@/lib/prisma'
+import { normalizeBranchCode } from '@/lib/branches'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STOCK TRANSFER
@@ -35,7 +36,16 @@ export async function dispatchTransfer(formData: FormData) {
   if (!parsed.success) throw new Error(parsed.error.issues[0].message)
 
   const data = parsed.data
-  if (data.source_branch === data.dest_branch) {
+  const sourceBranchCode = normalizeBranchCode(data.source_branch)
+  const destBranchCode = normalizeBranchCode(data.dest_branch)
+
+  if (!sourceBranchCode) {
+    throw new Error(`Source branch "${data.source_branch}" not found`)
+  }
+  if (!destBranchCode) {
+    throw new Error(`Destination branch "${data.dest_branch}" not found`)
+  }
+  if (sourceBranchCode === destBranchCode) {
     throw new Error('Source and destination branches must be different')
   }
 
@@ -43,25 +53,16 @@ export async function dispatchTransfer(formData: FormData) {
   const db = getTenantPrisma(user.organizationId)
 
   // Resolve branches in our org (wrapped for pooler resilience)
-  const [sourceBranch, destBranch] = await withRetry(() =>
-    Promise.all([
-      db.branch.findFirst({
-        where: {
-          OR: [
-            { code: { equals: data.source_branch, mode: 'insensitive' } },
-            { name: { equals: data.source_branch, mode: 'insensitive' } },
-          ],
-        },
-      }),
-      db.branch.findFirst({
-        where: {
-          OR: [
-            { code: { equals: data.dest_branch, mode: 'insensitive' } },
-            { name: { equals: data.dest_branch, mode: 'insensitive' } },
-          ],
-        },
-      }),
-    ])
+  const branches = await withRetry(() =>
+    db.branch.findMany({
+      select: { id: true, name: true, code: true, location: true },
+    })
+  )
+  const sourceBranch = branches.find(
+    (branch) => normalizeBranchCode(branch.code, branch.name, branch.location) === sourceBranchCode
+  )
+  const destBranch = branches.find(
+    (branch) => normalizeBranchCode(branch.code, branch.name, branch.location) === destBranchCode
   )
 
   if (!sourceBranch) {

@@ -75,7 +75,7 @@ export function InviteModal({ onClose }: InviteModalProps) {
           <div>
             <label className="block text-sm mb-2">Branches</label>
             <div className="space-y-2">
-              {(['mombasa', 'nairobi', 'bunje'] as const).map((branch) => (
+              {(['mombasa', 'nairobi', 'bonje'] as const).map((branch) => (
                 <label key={branch} className="flex items-center gap-2">
                   <input
                     type="checkbox"

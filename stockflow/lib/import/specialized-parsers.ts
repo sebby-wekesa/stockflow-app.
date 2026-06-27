@@ -19,7 +19,7 @@
 import * as XLSX from 'xlsx'
 
 /** Branch codes — matches the strings used elsewhere in the app */
-export type BranchCode = 'mombasa' | 'nairobi' | 'bunje'
+export type BranchCode = 'mombasa' | 'nairobi' | 'bonje'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NORMALIZED OUTPUT TYPES
@@ -224,7 +224,7 @@ function normaliseBranch(value: unknown): BranchCode | null {
   const lower = str.toLowerCase()
   if (lower.includes('mombasa')) return 'mombasa'
   if (lower.includes('nairobi')) return 'nairobi'
-  if (lower.includes('bunje') || lower.includes('bonje')) return 'bunje'
+  if (lower.includes('bonje')) return 'bonje'
   // Handle "Upcountry" as Mombasa
   if (lower.includes('upcountry')) return 'mombasa'
   return null

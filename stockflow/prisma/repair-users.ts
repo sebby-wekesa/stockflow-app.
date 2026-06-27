@@ -36,12 +36,12 @@ async function main() {
     const seedBranches = [
       { id: 'branch-mombasa', name: 'Mombasa Branch', code: 'MSA', location: 'Mombasa' },
       { id: 'branch-nairobi', name: 'Nairobi Branch',  code: 'NBO', location: 'Nairobi' },
-      { id: 'branch-bunje',   name: 'Bunje Branch',    code: 'BNJ', location: 'Bunje'   },
+      { id: 'branch-bonje',   name: 'Bonje Branch',    code: 'BNJ', location: 'Bonje'   },
     ]
     for (const b of seedBranches) {
       await prisma.branch.upsert({
         where: { id: b.id },
-        update: { location: b.location },
+        update: { name: b.name, code: b.code, location: b.location },
         create: { ...b, organizationId: org.id, updatedAt: new Date() },
       })
     }

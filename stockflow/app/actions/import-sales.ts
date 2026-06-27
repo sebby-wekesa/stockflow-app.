@@ -34,7 +34,7 @@ export async function importSalesData(rawText: string) {
     throw new Error("Your assigned branch was not found for this organization");
   }
   const branchCode = normalizeBranchCode(branch.code, branch.name, branch.location);
-  if (!branchCode) throw new Error("Your assigned branch must be Nairobi, Mombasa, or Bunje");
+  if (!branchCode) throw new Error("Your assigned branch must be Nairobi, Mombasa, or Bonje");
 
   const lines = rawText.trim().split(/\r?\n/);
   if (lines.length < 2) {

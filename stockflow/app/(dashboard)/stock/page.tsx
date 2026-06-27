@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { redirect } from 'next/navigation'
-import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES } from '@/lib/branches'
+import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES, normalizeBranchCode } from '@/lib/branches'
 import ExportStockButton from './_components/ExportStockButton'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABELS, CATEGORY_SHORT, isProductCategory } from '@/lib/products'
 import type { BranchCode as Branch } from '@/lib/branches'
@@ -85,22 +85,26 @@ export default async function BranchStockPage({
     db.inventoryRawMaterial.findMany({
       where: { availableKg: { gt: 0 } },
       include: {
-        Branch: { select: { code: true } },
+        Branch: { select: { code: true, name: true, location: true } },
         RawMaterial: { select: { id: true, costPerKg: true } },
       },
     }),
     db.inventoryFinishedGoods.findMany({
       where: { availableQty: { gt: 0 } },
       include: {
-        Branch: { select: { code: true } },
+        Branch: { select: { code: true, name: true, location: true } },
         FinishedGoods: { select: { id: true, unitCost: true } },
       },
     }),
   ])
 
   const branchSummaries = ALL_BRANCHES.map((branch) => {
-    const rawStock = allRawStock.filter((stock) => stock.Branch.code === branch)
-    const finishedStock = allFinishedStock.filter((stock) => stock.Branch.code === branch)
+    const rawStock = allRawStock.filter(
+      (stock) => normalizeBranchCode(stock.Branch.code, stock.Branch.name, stock.Branch.location) === branch
+    )
+    const finishedStock = allFinishedStock.filter(
+      (stock) => normalizeBranchCode(stock.Branch.code, stock.Branch.name, stock.Branch.location) === branch
+    )
     const rawValue = rawStock.reduce(
       (sum, stock) => sum + Number(stock.availableKg) * (Number(stock.RawMaterial?.costPerKg) || 0),
       0
@@ -132,20 +136,22 @@ export default async function BranchStockPage({
     const stockByBranch: Record<Branch, number> = {
       mombasa: 0,
       nairobi: 0,
-      bunje: 0,
+      bonje: 0,
     }
 
     // Add raw material stock
     allRawStock.forEach(stock => {
       if (stock.RawMaterial.id === productId) {
-        stockByBranch[stock.Branch.code as Branch] = Number(stock.availableKg)
+        const branch = normalizeBranchCode(stock.Branch.code, stock.Branch.name, stock.Branch.location)
+        if (branch) stockByBranch[branch] = Number(stock.availableKg)
       }
     })
 
     // Add finished goods stock
     allFinishedStock.forEach(stock => {
       if (stock.FinishedGoods.id === productId) {
-        stockByBranch[stock.Branch.code as Branch] = Number(stock.availableQty)
+        const branch = normalizeBranchCode(stock.Branch.code, stock.Branch.name, stock.Branch.location)
+        if (branch) stockByBranch[branch] = Number(stock.availableQty)
       }
     })
 

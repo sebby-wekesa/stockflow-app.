@@ -69,7 +69,7 @@ describe('specialized consumables parser', () => {
           'BRAKE LINING CA 33 DNA 10 (BRAKE LINING CA 33 DNA 10)',
           'Brake lining',
           'kg',
-          'Bunje',
+          'Bonje',
           -0.5,
         ],
         [
@@ -77,13 +77,13 @@ describe('specialized consumables parser', () => {
           'BRAKE LINING CA33 DNA380 (BRAKE LINING CA33 DNA 380)',
           'Brake lining',
           'kg',
-          'Bunje',
+          'Bonje',
           22,
         ],
       ],
     })
 
-    const result = parseConsumablesWorkbook(buffer, 'bunje')
+    const result = parseConsumablesWorkbook(buffer, 'bonje')
 
     expect(result.rows).toEqual([
       expect.objectContaining({

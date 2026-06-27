@@ -86,14 +86,14 @@ async function main() {
   const branches = [
     { id: 'branch-mombasa', name: 'Mombasa Branch', code: 'MSA', location: 'Mombasa', organizationId: org.id },
     { id: 'branch-nairobi', name: 'Nairobi Branch', code: 'NBO', location: 'Nairobi', organizationId: org.id },
-    { id: 'branch-bunje', name: 'Bunje Branch', code: 'BNJ', location: 'Bunje', organizationId: org.id },
+    { id: 'branch-bonje', name: 'Bonje Branch', code: 'BNJ', location: 'Bonje', organizationId: org.id },
   ];
 
   const seededBranches = [];
   for (const branch of branches) {
     const b = await prisma.branch.upsert({
       where: { id: branch.id },
-      update: { location: branch.location },
+      update: { name: branch.name, code: branch.code, location: branch.location },
       create: {
         ...branch,
         updatedAt: new Date(),

@@ -47,7 +47,7 @@ export function processStockArrivals(items: string[]): ProcessedItem[] {
       branch = 'Mombasa Finished Goods';
     } else if (upperDesc.includes('(LOCAL)') || upperDesc.includes('(JUA KALI)')) {
       originType = 'LOCAL_PURCHASE';
-      branch = upperDesc.includes('BUNJE') ? 'Bunje Branch' : 'Nairobi';
+      branch = /B[OU]NJE/.test(upperDesc) ? 'Bonje Branch' : 'Nairobi';
     }
 
     // 3. Landing Cost Calculation
