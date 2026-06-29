@@ -53,9 +53,11 @@ const SCRAP_REASONS = [
 export function ProductionFlowDiagram({
   orderId,
   stages,
+  interactive = true,
 }: {
   orderId: string;
   stages: ProductionFlowStage[];
+  interactive?: boolean;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -120,7 +122,7 @@ export function ProductionFlowDiagram({
                     <div><dt>Completed</dt><dd>{formatTimestamp(stage.completedAt)}</dd></div>
                   </dl>
 
-                  {stage.canComplete && (
+                  {interactive && stage.canComplete && (
                     <button
                       className="btn btn-primary btn-sm production-flow-complete"
                       onClick={() => setSelectedStage(stage)}

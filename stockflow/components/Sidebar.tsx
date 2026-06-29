@@ -42,6 +42,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
       return [
         { section: "Overview" },
         { label: "Dashboard", href: "/dashboard" },
+        { label: "Demo flow", href: "/demo-flow" },
         { section: "System" },
         { label: "User management", href: "/users" },
         { label: "Departments", href: "/departments" },
@@ -69,6 +70,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
       return [
         { section: "Production Control" },
         { label: "Production dashboard", href: "/dashboard" },
+        { label: "Demo flow", href: "/demo-flow" },
         { label: "Approval queue", href: "/approvals" },
         { label: "Department monitoring", href: "/jobs" },
         { label: "Production orders", href: "/orders" },
