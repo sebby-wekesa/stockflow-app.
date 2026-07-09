@@ -21,6 +21,8 @@ export type SeedAccount = {
 export const SYSTEM_ACCOUNT_KEYS = {
   ACCOUNTS_RECEIVABLE: "accounts_receivable",
   ACCOUNTS_PAYABLE: "accounts_payable",
+  EMPLOYEE_RECEIVABLES: "employee_receivables",
+  EMPLOYEE_PAYABLES: "employee_payables",
   SALES_REVENUE: "sales_revenue",
   COST_OF_SALES: "cost_of_sales",
   INVENTORY: "inventory",
@@ -40,6 +42,7 @@ export const KENYA_SME_CHART: SeedAccount[] = [
   { code: "1100", name: "Bank — Current Account", type: "ASSET", normalBalance: "DEBIT", isBank: true },
   { code: "1110", name: "M-Pesa Paybill / Till", type: "ASSET", normalBalance: "DEBIT", isBank: true },
   { code: "1200", name: "Accounts Receivable (Debtors)", type: "ASSET", normalBalance: "DEBIT", key: K.ACCOUNTS_RECEIVABLE },
+  { code: "1210", name: "Employee Receivables", type: "ASSET", normalBalance: "DEBIT", key: K.EMPLOYEE_RECEIVABLES },
   { code: "1300", name: "Inventory — Finished Goods", type: "ASSET", normalBalance: "DEBIT", key: K.INVENTORY },
   { code: "1310", name: "Inventory — Raw Materials", type: "ASSET", normalBalance: "DEBIT", key: K.RAW_MATERIALS },
   { code: "1400", name: "VAT Input (Receivable)", type: "ASSET", normalBalance: "DEBIT", key: K.VAT_INPUT },
@@ -53,6 +56,7 @@ export const KENYA_SME_CHART: SeedAccount[] = [
   { code: "2120", name: "NHIF Payable", type: "LIABILITY", normalBalance: "CREDIT" },
   { code: "2130", name: "NSSF Payable", type: "LIABILITY", normalBalance: "CREDIT" },
   { code: "2200", name: "Accrued Expenses", type: "LIABILITY", normalBalance: "CREDIT" },
+  { code: "2210", name: "Employee Payables", type: "LIABILITY", normalBalance: "CREDIT", key: K.EMPLOYEE_PAYABLES },
   { code: "2300", name: "Loans Payable", type: "LIABILITY", normalBalance: "CREDIT" },
 
   // ── 3000 EQUITY (credit-normal) ─────────────────────────────────────────

@@ -131,3 +131,71 @@ export function buildEquityLines(input: {
         { accountId: input.bankAccountId, credit: amount, description: "Withdrawn" },
       ];
 }
+
+export type EmployeeCashBookKind =
+  | "ADVANCE_PAID"
+  | "ADVANCE_REPAID"
+  | "REIMBURSEMENT_PAID";
+
+export function buildEmployeeCashBookLines(input: {
+  kind: EmployeeCashBookKind;
+  amount: number;
+  bankAccountId: string;
+  employeeReceivableAccountId?: string;
+  employeePayableAccountId?: string;
+  memo?: string;
+}): PostingLine[] {
+  const amount = round2(input.amount);
+
+  if (input.kind === "ADVANCE_PAID") {
+    if (!input.employeeReceivableAccountId) {
+      throw new Error("Employee receivables account is missing");
+    }
+    return [
+      {
+        accountId: input.employeeReceivableAccountId,
+        debit: amount,
+        description: input.memo || "Employee advance",
+      },
+      {
+        accountId: input.bankAccountId,
+        credit: amount,
+        description: "Paid from cash account",
+      },
+    ];
+  }
+
+  if (input.kind === "ADVANCE_REPAID") {
+    if (!input.employeeReceivableAccountId) {
+      throw new Error("Employee receivables account is missing");
+    }
+    return [
+      {
+        accountId: input.bankAccountId,
+        debit: amount,
+        description: "Received into cash account",
+      },
+      {
+        accountId: input.employeeReceivableAccountId,
+        credit: amount,
+        description: input.memo || "Employee advance repayment",
+      },
+    ];
+  }
+
+  if (!input.employeePayableAccountId) {
+    throw new Error("Employee payables account is missing");
+  }
+  return [
+    {
+      accountId: input.employeePayableAccountId,
+      debit: amount,
+      description: input.memo || "Employee reimbursement paid",
+    },
+    {
+      accountId: input.bankAccountId,
+      credit: amount,
+      description: "Paid from cash account",
+    },
+  ];
+}

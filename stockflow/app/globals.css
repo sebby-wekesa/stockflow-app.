@@ -102,6 +102,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .topbar { height: 52px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 16px; flex-shrink: 0; }
 .content { flex: 1; overflow-y: auto; padding: 28px; }
+.app:has(.accountingWorkspacePage) .sidebar { display: none; }
+.app:has(.accountingWorkspacePage) .content { padding: 24px; }
 
 /* SIDEBAR */
 .sidebar-logo { min-width: 0; overflow: hidden; padding: 20px 18px 16px; border-bottom: 1px solid var(--border); }

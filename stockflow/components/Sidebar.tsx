@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { UserRole as Role } from "@/lib/types";
 import type { UserRole } from "@/lib/types";
 import { ROLE_NAMES, ROLE_COLORS } from "@/lib/types";
@@ -88,19 +88,12 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
 
     case 'ACCOUNTS':
       return [
-        { section: "Accounting" },
-        { label: "Accounting overview", href: "/accounting" },
-        { label: "Record transactions", href: "/accounting/transactions" },
-        { label: "Financial insights", href: "/accounting/insights" },
-        { label: "Profit and loss", href: "/accounting/profit-loss" },
-        { label: "Balance sheet", href: "/accounting/balance-sheet" },
+        { label: "Home", href: "/dashboard" },
+        { label: "Accountant", href: "/accounting" },
         { label: "Trial balance", href: "/accounting/trial-balance" },
         { label: "General ledger", href: "/accounting/ledger" },
-        { label: "Banking", href: "/accounting/banking" },
-        { label: "Debtors", href: "/accounting/debtors" },
-        { label: "Creditors", href: "/accounting/creditors" },
-        { label: "Chart of accounts", href: "/accounting/chart" },
-        { label: "Journal entry", href: "/accounting/journal" },
+        { label: "Creditor/Debtor", href: "/accounting?view=ledgers" },
+        { label: "Reports", href: "/accounting?view=reports" },
       ];
 
     case 'OPERATOR':
@@ -161,9 +154,28 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
 
 export function Sidebar({ role, counts = {} }: { role: UserRole; counts?: SidebarCounts }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const navItems = getRoleNavItems(role, counts);
   const roleColor = ROLE_COLORS[role];
   const roleNameDisplay = ROLE_NAMES[role];
+  const query = searchParams.toString();
+  const currentHref = query ? `${pathname}?${query}` : pathname;
+
+  function isActiveHref(href: string) {
+    if (href.includes("?")) {
+      return currentHref === href;
+    }
+
+    if (href === "/accounting") {
+      return pathname === href && query === "";
+    }
+
+    if (pathname === href) {
+      return true;
+    }
+
+    return pathname.startsWith(`${href}/`);
+  }
 
   return (
     <div className="sidebar">
@@ -186,7 +198,7 @@ export function Sidebar({ role, counts = {} }: { role: UserRole; counts?: Sideba
             );
           }
 
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isActive = isActiveHref(item.href!);
           const bc = item.badgeColor ? ` ${item.badgeColor}` : "";
           const badge = item.badge ? <span className={`nav-badge${bc}`}>{item.badge}</span> : null;
 

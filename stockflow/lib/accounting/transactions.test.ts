@@ -1,5 +1,6 @@
 import {
   buildBillLines,
+  buildEmployeeCashBookLines,
   buildEquityLines,
   buildExpenseLines,
   buildIncomeLines,
@@ -77,6 +78,24 @@ test.each([
     equityAccountId: "drawings",
     bankAccountId: "bank",
   })],
+  [buildEmployeeCashBookLines({
+    kind: "ADVANCE_PAID",
+    amount: 1_160,
+    employeeReceivableAccountId: "employee-receivable",
+    bankAccountId: "bank",
+  })],
+  [buildEmployeeCashBookLines({
+    kind: "ADVANCE_REPAID",
+    amount: 1_160,
+    employeeReceivableAccountId: "employee-receivable",
+    bankAccountId: "bank",
+  })],
+  [buildEmployeeCashBookLines({
+    kind: "REIMBURSEMENT_PAID",
+    amount: 1_160,
+    employeePayableAccountId: "employee-payable",
+    bankAccountId: "bank",
+  })],
 ])("builds a balanced transaction journal", (lines) => {
   expect(totals(lines)).toEqual({ debit: 1_160, credit: 1_160 });
 });
@@ -90,4 +109,30 @@ test("requires the relevant VAT account when VAT is enabled", () => {
       bankAccountId: "bank",
     }),
   ).toThrow("required VAT account");
+});
+
+test("posts employee advances as receivables and reimbursements as payables", () => {
+  expect(
+    buildEmployeeCashBookLines({
+      kind: "ADVANCE_PAID",
+      amount: 500,
+      employeeReceivableAccountId: "employee-receivable",
+      bankAccountId: "bank",
+    }),
+  ).toEqual([
+    expect.objectContaining({ accountId: "employee-receivable", debit: 500 }),
+    expect.objectContaining({ accountId: "bank", credit: 500 }),
+  ]);
+
+  expect(
+    buildEmployeeCashBookLines({
+      kind: "REIMBURSEMENT_PAID",
+      amount: 500,
+      employeePayableAccountId: "employee-payable",
+      bankAccountId: "bank",
+    }),
+  ).toEqual([
+    expect.objectContaining({ accountId: "employee-payable", debit: 500 }),
+    expect.objectContaining({ accountId: "bank", credit: 500 }),
+  ]);
 });
