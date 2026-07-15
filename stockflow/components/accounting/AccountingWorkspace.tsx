@@ -607,10 +607,10 @@ function OverviewKpi({
   accent: keyof typeof OVERVIEW_ACCENT_CLASSES;
 }) {
   return (
-    <div className={`${styles.overviewKpi} ${OVERVIEW_ACCENT_CLASSES[accent]}`}>
-      <div className={styles.overviewKpiLabel}>{label}</div>
-      <div className={styles.overviewKpiValue}>{value}</div>
-      <div className={styles.overviewKpiSub}>{sub}</div>
+    <div className={`${styles.metric} ${styles.overviewKpi} ${OVERVIEW_ACCENT_CLASSES[accent]}`}>
+      <div className={styles.metricLabel}>{label}</div>
+      <div className={styles.metricValue}>{value}</div>
+      <div className={styles.metricSub}>{sub}</div>
     </div>
   );
 }
@@ -629,11 +629,18 @@ function OverviewCard({
   children: ReactNode;
 }) {
   return (
-    <article className={`${styles.overviewCard} ${OVERVIEW_ACCENT_CLASSES[accent]}`}>
-      <div className={styles.overviewCardEyebrow}>{eyebrow}</div>
-      <h2 className={styles.overviewCardTitle}>{title}</h2>
-      <div className={styles.overviewCardValue}>{value}</div>
-      {children}
+    <article className={`${styles.card} ${styles.overviewCard} ${OVERVIEW_ACCENT_CLASSES[accent]}`}>
+      <div className={styles.cardHeader}>
+        <div>
+          <div className={styles.overviewCardEyebrow}>{eyebrow}</div>
+          <h2 className={styles.cardTitle}>{title}</h2>
+        </div>
+        <div className={styles.groupBalance}>
+          <div className={styles.groupBalanceLabel}>Balance</div>
+          <div className={styles.groupBalanceValue}>{value}</div>
+        </div>
+      </div>
+      <div className={styles.overviewCardBody}>{children}</div>
     </article>
   );
 }

@@ -102,30 +102,12 @@
 .overviewKpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .overviewKpi {
-  position: relative;
-  min-height: 154px;
-  overflow: hidden;
-  border: 1px solid var(--accounting-line);
-  border-top: 3px solid var(--overview-accent);
-  border-radius: 18px;
-  background: var(--surface);
-  padding: 22px 28px;
-}
-
-.overviewKpi::after {
-  position: absolute;
-  top: -50px;
-  right: -25px;
-  width: 108px;
-  height: 108px;
-  border: 18px solid color-mix(in srgb, var(--overview-accent) 18%, transparent);
-  border-radius: 50%;
-  content: "";
+  min-height: 0;
 }
 
 .overviewAccentGreen {
@@ -144,7 +126,6 @@
   --overview-accent: #d49a24;
 }
 
-.overviewKpiLabel,
 .overviewCardEyebrow,
 .overviewPrepareLabel {
   color: var(--accounting-muted);
@@ -154,62 +135,25 @@
   text-transform: uppercase;
 }
 
-.overviewKpiValue {
-  position: relative;
-  z-index: 1;
-  margin-top: 16px;
-  color: var(--accounting-ink);
-  font-family: var(--font-head);
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.overviewKpiSub {
-  position: relative;
-  z-index: 1;
-  margin-top: 28px;
-  color: var(--accounting-muted);
-  font-size: 12px;
-}
-
 .overviewGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px;
+  gap: 14px;
 }
 
 .overviewCard {
   min-height: 360px;
-  border: 1px solid var(--accounting-line);
-  border-top: 3px solid var(--overview-accent);
-  border-radius: 18px;
-  background: var(--surface);
-  padding: 28px;
 }
 
-.overviewCardTitle {
-  margin: 14px 0 0;
-  color: var(--accounting-ink);
-  font-family: var(--font-head);
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.overviewCardValue {
-  margin-top: 12px;
-  color: var(--accounting-ink);
-  font-family: var(--font-head);
-  font-size: 30px;
-  font-weight: 800;
-  line-height: 1;
+.overviewCardBody {
+  padding: 16px;
 }
 
 .overviewSplit {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 26px;
+  margin-top: 0;
 }
 
 .overviewSplitItem {
@@ -236,7 +180,7 @@
 }
 
 .overviewRows {
-  margin-top: 18px;
+  margin-top: 0;
   border-top: 1px solid var(--accounting-line);
 }
 
