@@ -65,7 +65,7 @@
   margin: 0;
   color: var(--accounting-ink);
   font-family: var(--font-head);
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 800;
 }
 
@@ -160,7 +160,7 @@
   margin-top: 16px;
   color: var(--accounting-ink);
   font-family: var(--font-head);
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
 }
@@ -192,7 +192,7 @@
   margin: 14px 0 0;
   color: var(--accounting-ink);
   font-family: var(--font-head);
-  font-size: 23px;
+  font-size: 20px;
   font-weight: 800;
 }
 
@@ -200,7 +200,7 @@
   margin-top: 12px;
   color: var(--accounting-ink);
   font-family: var(--font-head);
-  font-size: 38px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1;
 }
@@ -232,7 +232,7 @@
 .overviewSplitItem strong {
   color: var(--accounting-ink);
   font-family: var(--font-head);
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .overviewRows {
@@ -248,7 +248,7 @@
   min-height: 49px;
   border-bottom: 1px solid var(--accounting-line);
   color: var(--accounting-ink);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .overviewRow span {
@@ -270,7 +270,7 @@
   flex: none;
   color: var(--accounting-ink);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .overviewEmpty {
