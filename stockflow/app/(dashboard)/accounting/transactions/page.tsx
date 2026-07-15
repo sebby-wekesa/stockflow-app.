@@ -5,9 +5,40 @@ import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default async function TransactionsPage() {
+type TransactionTab =
+  | "expense"
+  | "income"
+  | "invoice"
+  | "credit-note"
+  | "bill"
+  | "debit-note"
+  | "transfer"
+  | "equity";
+
+function resolveTransactionTab(value: string | undefined): TransactionTab {
+  const tabs: TransactionTab[] = [
+    "expense",
+    "income",
+    "invoice",
+    "credit-note",
+    "bill",
+    "debit-note",
+    "transfer",
+    "equity",
+  ];
+  return value && tabs.includes(value as TransactionTab)
+    ? (value as TransactionTab)
+    : "expense";
+}
+
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
   const data = await getTransactionFormData();
+  const params = await searchParams;
 
   return (
     <div className="dashboard-content">
@@ -29,7 +60,7 @@ export default async function TransactionsPage() {
           transactions.
         </div>
       ) : (
-        <TransactionsHub data={data} />
+        <TransactionsHub data={data} initialTab={resolveTransactionTab(params.tab)} />
       )}
     </div>
   );

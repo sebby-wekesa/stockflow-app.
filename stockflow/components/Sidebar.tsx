@@ -22,8 +22,8 @@ type NavItem = {
 }
 
 const ACCOUNTING_NAV_ITEMS: NavItem[] = [
-  { label: "Home", href: "/dashboard" },
-  { label: "Accountant", href: "/accounting" },
+  { label: "Home", href: "/accounting" },
+  { label: "Accountant", href: "/accounting?view=workspace" },
   { label: "Trial balance", href: "/accounting/trial-balance" },
   { label: "General ledger", href: "/accounting/ledger" },
   { label: "Creditor/Debtor", href: "/accounting?view=ledgers" },

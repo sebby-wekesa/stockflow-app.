@@ -48,6 +48,417 @@
   line-height: 1.45;
 }
 
+.overview {
+  --overview-accent: var(--teal);
+}
+
+.overviewHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.overviewTitle {
+  margin: 0;
+  color: var(--accounting-ink);
+  font-family: var(--font-head);
+  font-size: 32px;
+  font-weight: 850;
+}
+
+.overviewSubtitle {
+  max-width: 680px;
+  margin-top: 6px;
+  color: var(--accounting-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.overviewLink {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accounting-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--accounting-ink);
+  padding: 8px 13px;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.overviewLink:hover {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #fff;
+}
+
+.overviewKpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.overviewKpi {
+  position: relative;
+  min-height: 154px;
+  overflow: hidden;
+  border: 1px solid var(--accounting-line);
+  border-top: 3px solid var(--overview-accent);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 22px 28px;
+}
+
+.overviewKpi::after {
+  position: absolute;
+  top: -50px;
+  right: -25px;
+  width: 108px;
+  height: 108px;
+  border: 18px solid color-mix(in srgb, var(--overview-accent) 18%, transparent);
+  border-radius: 50%;
+  content: "";
+}
+
+.overviewAccentGreen {
+  --overview-accent: #5d9f24;
+}
+
+.overviewAccentBlue {
+  --overview-accent: #5f9cc2;
+}
+
+.overviewAccentRed {
+  --overview-accent: #d97969;
+}
+
+.overviewAccentAmber {
+  --overview-accent: #d49a24;
+}
+
+.overviewKpiLabel,
+.overviewCardEyebrow,
+.overviewPrepareLabel {
+  color: var(--accounting-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.overviewKpiValue {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  color: var(--accounting-ink);
+  font-family: var(--font-head);
+  font-size: 30px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.overviewKpiSub {
+  position: relative;
+  z-index: 1;
+  margin-top: 28px;
+  color: var(--accounting-muted);
+  font-size: 12px;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.overviewCard {
+  min-height: 360px;
+  border: 1px solid var(--accounting-line);
+  border-top: 3px solid var(--overview-accent);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 28px;
+}
+
+.overviewCardTitle {
+  margin: 14px 0 0;
+  color: var(--accounting-ink);
+  font-size: 23px;
+  font-weight: 850;
+}
+
+.overviewCardValue {
+  margin-top: 12px;
+  color: var(--accounting-ink);
+  font-family: var(--font-head);
+  font-size: 38px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.overviewSplit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.overviewSplitItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--teal) 5%, var(--surface2));
+  padding: 15px 17px;
+}
+
+.overviewSplitItem span {
+  color: var(--accounting-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.overviewSplitItem strong {
+  color: var(--accounting-ink);
+  font-size: 17px;
+}
+
+.overviewRows {
+  margin-top: 18px;
+  border-top: 1px solid var(--accounting-line);
+}
+
+.overviewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 49px;
+  border-bottom: 1px solid var(--accounting-line);
+  color: var(--accounting-ink);
+  font-size: 13px;
+}
+
+.overviewRow span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+
+.overviewRow b {
+  min-width: 36px;
+  color: var(--accounting-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.overviewRow strong {
+  flex: none;
+  color: var(--accounting-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.overviewEmpty {
+  padding: 18px 0;
+  color: var(--accounting-muted);
+  font-size: 13px;
+}
+
+.overviewPrepare {
+  margin-top: 24px;
+}
+
+.overviewPrepareLabel {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--accounting-line);
+}
+
+.overviewPrepare p {
+  margin-top: 14px;
+  color: var(--accounting-muted);
+  font-size: 13px;
+}
+
+.revenuePage {
+  color: var(--accounting-ink);
+}
+
+.revenueTitle {
+  margin: 0 0 22px;
+  color: var(--accounting-ink);
+  font-family: var(--font-head);
+  font-size: 29px;
+  font-weight: 850;
+}
+
+.revenueGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.revenueCard {
+  min-height: 216px;
+  border: 1px solid var(--accounting-line);
+  border-top: 4px solid color-mix(in srgb, var(--teal) 14%, var(--accounting-line));
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 20px;
+}
+
+.revenueEyebrow,
+.revenueLabel {
+  color: var(--accounting-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.revenueCardTitle {
+  margin: 10px 0 0;
+  color: var(--accounting-ink);
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.revenueDescription {
+  margin-top: 7px;
+  color: var(--accounting-muted);
+  font-size: 13px;
+}
+
+.revenueLabel {
+  margin-top: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--accounting-line);
+}
+
+.revenueButton {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  margin-top: 12px;
+  border: 1px solid var(--accounting-line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--accounting-ink);
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.revenueButton:hover {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #fff;
+}
+
+.purchasesPage {
+  color: var(--accounting-ink);
+}
+
+.purchasesTitle {
+  margin: 0 0 22px;
+  color: var(--accounting-ink);
+  font-family: var(--font-head);
+  font-size: 29px;
+  font-weight: 850;
+}
+
+.purchasesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.purchaseCard {
+  min-height: 178px;
+  border: 1px solid var(--accounting-line);
+  border-top: 4px solid color-mix(in srgb, var(--teal) 14%, var(--accounting-line));
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 18px 20px;
+}
+
+.purchaseCardFeatured {
+  border: 2px solid var(--accounting-ink);
+  border-top-width: 4px;
+  background: color-mix(in srgb, var(--teal) 5%, var(--surface));
+}
+
+.purchaseCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.purchaseEyebrow,
+.purchaseCount {
+  color: var(--accounting-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.purchaseButton {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin-top: -2px;
+  border: 1px solid var(--accounting-ink);
+  border-radius: 12px;
+  background: var(--accounting-ink);
+  color: var(--surface);
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.purchaseButton:hover {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #fff;
+}
+
+.purchaseValue {
+  margin-top: 8px;
+  color: var(--accounting-ink);
+  font-family: var(--font-head);
+  font-size: 29px;
+  font-weight: 850;
+}
+
+.purchaseDescription {
+  margin-top: 10px;
+  color: var(--accounting-muted);
+  font-size: 13px;
+}
+
+.purchaseCount {
+  margin-top: 25px;
+  letter-spacing: 0.06em;
+}
+
 .statusPill {
   display: inline-flex;
   align-items: center;
@@ -452,6 +863,11 @@
 
 .menu summary {
   list-style: none;
+}
+
+.menu summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .menu summary::-webkit-details-marker {
@@ -906,6 +1322,10 @@
   .formGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .overviewKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -924,8 +1344,17 @@
   .reportsGrid,
   .formGrid,
   .optionGrid,
-  .previewGrid {
+  .previewGrid,
+  .revenueGrid,
+  .purchasesGrid,
+  .overviewKpis,
+  .overviewGrid {
     grid-template-columns: 1fr;
+  }
+
+  .overviewHeading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .groupBalance {

@@ -4,11 +4,13 @@ import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-type AccountingView = "workspace" | "ledgers" | "reports";
+type AccountingView = "overview" | "workspace" | "ledgers" | "reports";
 
 function resolveAccountingView(value: string | string[] | undefined): AccountingView {
   const view = Array.isArray(value) ? value[0] : value;
-  return view === "ledgers" || view === "reports" ? view : "workspace";
+  return view === "workspace" || view === "ledgers" || view === "reports"
+    ? view
+    : "overview";
 }
 
 export default async function AccountingPage({

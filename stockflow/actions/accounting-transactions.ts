@@ -293,6 +293,7 @@ export async function postBill(input: {
   hasVat?: boolean;
   memo?: string;
   reference?: string;
+  documentType?: "BILL" | "DEBIT_NOTE";
 }): Promise<TransactionResult> {
   const user = await requireRole(...ACCOUNTING_ROLES);
   const base = validateBase(input.amount, input.date);
@@ -300,6 +301,7 @@ export async function postBill(input: {
   const reference = clean(input.reference);
   const memo = clean(input.memo);
   const supplierName = clean(input.supplierName);
+  const isDebitNote = input.documentType === "DEBIT_NOTE";
 
   try {
     const entry = await withTenantTransaction(user.organizationId, async (tx) => {
@@ -321,26 +323,44 @@ export async function postBill(input: {
       if (!payableId) {
         throw new Error("Accounts Payable is missing. Set up the chart of accounts.");
       }
-      await ensureUniqueReference(tx, "PURCHASE", "ManualBill", reference);
+      await ensureUniqueReference(
+        tx,
+        "PURCHASE",
+        isDebitNote ? "ManualDebitNote" : "ManualBill",
+        reference,
+      );
+      const billLines = buildBillLines({
+        amount: base.amount,
+        hasVat: Boolean(input.hasVat),
+        purchaseAccountId: input.purchaseAccountId,
+        payableAccountId: payableId,
+        vatInputAccountId: systemAccounts[K.VAT_INPUT],
+        memo,
+        supplierName,
+      });
       return postJournalEntry(
         tx,
         user.organizationId,
         {
           date: base.date,
-          memo: memo || (reference ? `Bill ${reference}` : "Supplier bill"),
+          memo:
+            memo ||
+            (reference
+              ? `${isDebitNote ? "Debit note" : "Bill"} ${reference}`
+              : isDebitNote
+                ? "Supplier debit note"
+                : "Supplier bill"),
           source: "PURCHASE",
-          sourceType: "ManualBill",
+          sourceType: isDebitNote ? "ManualDebitNote" : "ManualBill",
           sourceId: reference,
           branchId: branchClass.id,
-          lines: buildBillLines({
-            amount: base.amount,
-            hasVat: Boolean(input.hasVat),
-            purchaseAccountId: input.purchaseAccountId,
-            payableAccountId: payableId,
-            vatInputAccountId: systemAccounts[K.VAT_INPUT],
-            memo,
-            supplierName,
-          }),
+          lines: isDebitNote
+            ? billLines.map((line) => ({
+                ...line,
+                debit: line.credit,
+                credit: line.debit,
+              }))
+            : billLines,
         },
         user.id,
       );
@@ -352,6 +372,19 @@ export async function postBill(input: {
   }
 }
 
+export async function postDebitNote(input: {
+  date: string;
+  amount: number;
+  branchId?: string | null;
+  purchaseAccountId: string;
+  supplierName?: string;
+  hasVat?: boolean;
+  memo?: string;
+  reference?: string;
+}): Promise<TransactionResult> {
+  return postBill({ ...input, documentType: "DEBIT_NOTE" });
+}
+
 export async function postInvoice(input: {
   date: string;
   amount: number;
@@ -361,6 +394,7 @@ export async function postInvoice(input: {
   hasVat?: boolean;
   memo?: string;
   reference?: string;
+  documentType?: "INVOICE" | "CREDIT_NOTE";
 }): Promise<TransactionResult> {
   const user = await requireRole(...ACCOUNTING_ROLES);
   const base = validateBase(input.amount, input.date);
@@ -368,6 +402,7 @@ export async function postInvoice(input: {
   const reference = clean(input.reference);
   const memo = clean(input.memo);
   const customerName = clean(input.customerName);
+  const isCreditNote = input.documentType === "CREDIT_NOTE";
 
   try {
     const entry = await withTenantTransaction(user.organizationId, async (tx) => {
@@ -389,26 +424,44 @@ export async function postInvoice(input: {
         label: "revenue or income account",
       });
       const branchClass = await resolveBranchClass(tx, user, input.branchId);
-      await ensureUniqueReference(tx, "SALE", "ManualInvoice", reference);
+      await ensureUniqueReference(
+        tx,
+        "SALE",
+        isCreditNote ? "ManualCreditNote" : "ManualInvoice",
+        reference,
+      );
+      const invoiceLines = buildInvoiceLines({
+        amount: base.amount,
+        hasVat: Boolean(input.hasVat),
+        receivableAccountId: receivableId,
+        salesAccountId: salesId,
+        vatOutputAccountId: systemAccounts[K.VAT_OUTPUT],
+        memo,
+        customerName,
+      });
       return postJournalEntry(
         tx,
         user.organizationId,
         {
           date: base.date,
-          memo: memo || (reference ? `Invoice ${reference}` : "Sales invoice"),
+          memo:
+            memo ||
+            (reference
+              ? `${isCreditNote ? "Credit note" : "Invoice"} ${reference}`
+              : isCreditNote
+                ? "Customer credit note"
+                : "Sales invoice"),
           source: "SALE",
-          sourceType: "ManualInvoice",
+          sourceType: isCreditNote ? "ManualCreditNote" : "ManualInvoice",
           sourceId: reference,
           branchId: branchClass.id,
-          lines: buildInvoiceLines({
-            amount: base.amount,
-            hasVat: Boolean(input.hasVat),
-            receivableAccountId: receivableId,
-            salesAccountId: salesId,
-            vatOutputAccountId: systemAccounts[K.VAT_OUTPUT],
-            memo,
-            customerName,
-          }),
+          lines: isCreditNote
+            ? invoiceLines.map((line) => ({
+                ...line,
+                debit: line.credit,
+                credit: line.debit,
+              }))
+            : invoiceLines,
         },
         user.id,
       );
@@ -418,6 +471,19 @@ export async function postInvoice(input: {
   } catch (error) {
     return errorResult(error, "Could not post invoice");
   }
+}
+
+export async function postCreditNote(input: {
+  date: string;
+  amount: number;
+  branchId?: string | null;
+  salesAccountId?: string | null;
+  customerName?: string;
+  hasVat?: boolean;
+  memo?: string;
+  reference?: string;
+}): Promise<TransactionResult> {
+  return postInvoice({ ...input, documentType: "CREDIT_NOTE" });
 }
 
 export async function postTransfer(input: {

@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   postBill,
+  postCreditNote,
+  postDebitNote,
   postEquityMovement,
   postExpense,
   postIncome,
@@ -35,15 +37,23 @@ const TABS = [
   { key: "expense", label: "Expense", hint: "Money paid out now" },
   { key: "income", label: "Income", hint: "Money received now, excluding customer sales" },
   { key: "invoice", label: "Sales Invoice", hint: "Post a manual credit sale to the ledger" },
+  { key: "credit-note", label: "Credit Note", hint: "Reverse a customer sales invoice" },
   { key: "bill", label: "Bill / Purchase", hint: "Post a manual supplier bill to the ledger" },
+  { key: "debit-note", label: "Debit Note", hint: "Reverse a supplier purchase bill" },
   { key: "transfer", label: "Bank Transfer", hint: "Move money between cash and bank accounts" },
   { key: "equity", label: "Capital / Drawings", hint: "Record owner money moving in or out" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function TransactionsHub({ data }: { data: FormData }) {
-  const [tab, setTab] = useState<TabKey>("expense");
+export function TransactionsHub({
+  data,
+  initialTab = "expense",
+}: {
+  data: FormData;
+  initialTab?: TabKey;
+}) {
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const [branchId, setBranchId] = useState(
     data.branchClass?.id ?? data.branches[0]?.id ?? "",
   );
@@ -82,7 +92,9 @@ export function TransactionsHub({ data }: { data: FormData }) {
       {tab === "expense" && <ExpenseForm data={data} {...branchProps} />}
       {tab === "income" && <IncomeForm data={data} {...branchProps} />}
       {tab === "invoice" && <InvoiceForm data={data} {...branchProps} />}
+      {tab === "credit-note" && <InvoiceForm data={data} {...branchProps} creditNote />}
       {tab === "bill" && <BillForm data={data} {...branchProps} />}
+      {tab === "debit-note" && <BillForm data={data} {...branchProps} debitNote />}
       {tab === "transfer" && <TransferForm data={data} {...branchProps} />}
       {tab === "equity" && <EquityForm data={data} {...branchProps} />}
     </div>
@@ -377,7 +389,12 @@ function IncomeForm({ data, branchId, setBranchId }: TransactionFormProps) {
   );
 }
 
-function InvoiceForm({ data, branchId, setBranchId }: TransactionFormProps) {
+function InvoiceForm({
+  data,
+  branchId,
+  setBranchId,
+  creditNote = false,
+}: TransactionFormProps & { creditNote?: boolean }) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -395,7 +412,7 @@ function InvoiceForm({ data, branchId, setBranchId }: TransactionFormProps) {
         event.preventDefault();
         run(
           () =>
-            postInvoice({
+            (creditNote ? postCreditNote : postInvoice)({
               date,
               amount: Number.parseFloat(amount),
               branchId,
@@ -425,16 +442,26 @@ function InvoiceForm({ data, branchId, setBranchId }: TransactionFormProps) {
         </Field>
         <TextField label="Customer" value={customerName} onChange={setCustomerName} placeholder="Customer name" />
         <VatToggle value={hasVat} onChange={setHasVat} />
-        <TextField label="Invoice number" value={reference} onChange={setReference} placeholder="INV-001" />
-        <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Invoice description" />
+        <TextField
+          label={creditNote ? "Credit note number" : "Invoice number"}
+          value={reference}
+          onChange={setReference}
+          placeholder={creditNote ? "CN-001" : "INV-001"}
+        />
+        <TextField label="Memo" value={memo} onChange={setMemo} placeholder={creditNote ? "Credit note description" : "Invoice description"} />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Post invoice" disabled={!branchId} />
+      <PostButton pending={pending} label={creditNote ? "Post credit note" : "Post invoice"} disabled={!branchId} />
     </form>
   );
 }
 
-function BillForm({ data, branchId, setBranchId }: TransactionFormProps) {
+function BillForm({
+  data,
+  branchId,
+  setBranchId,
+  debitNote = false,
+}: TransactionFormProps & { debitNote?: boolean }) {
   const { pending, message, run } = useSubmit();
   const [date, setDate] = useState(today);
   const [amount, setAmount] = useState("");
@@ -452,7 +479,7 @@ function BillForm({ data, branchId, setBranchId }: TransactionFormProps) {
         event.preventDefault();
         run(
           () =>
-            postBill({
+            (debitNote ? postDebitNote : postBill)({
               date,
               amount: Number.parseFloat(amount),
               branchId,
@@ -481,11 +508,16 @@ function BillForm({ data, branchId, setBranchId }: TransactionFormProps) {
         </Field>
         <TextField label="Supplier" value={supplierName} onChange={setSupplierName} placeholder="Supplier name" />
         <VatToggle value={hasVat} onChange={setHasVat} />
-        <TextField label="Bill number" value={reference} onChange={setReference} placeholder="BILL-001" />
-        <TextField label="Memo" value={memo} onChange={setMemo} placeholder="Purchase description" />
+        <TextField
+          label={debitNote ? "Debit note number" : "Bill number"}
+          value={reference}
+          onChange={setReference}
+          placeholder={debitNote ? "DN-001" : "BILL-001"}
+        />
+        <TextField label="Memo" value={memo} onChange={setMemo} placeholder={debitNote ? "Debit note description" : "Purchase description"} />
       </div>
       <VatPreview amount={amount} hasVat={hasVat} />
-      <PostButton pending={pending} label="Post bill" disabled={!branchId} />
+      <PostButton pending={pending} label={debitNote ? "Post debit note" : "Post bill"} disabled={!branchId} />
     </form>
   );
 }

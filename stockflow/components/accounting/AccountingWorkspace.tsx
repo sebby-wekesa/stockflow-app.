@@ -49,7 +49,7 @@ import {
 } from "@/lib/accounting/workspace";
 import styles from "./AccountingWorkspace.module.css";
 
-type PrimaryView = "workspace" | "recent" | "ledgers" | "reports";
+type PrimaryView = "overview" | "workspace" | "recent" | "ledgers" | "reports";
 type PostTab = "cash-book" | "revenue" | "purchases";
 type RecentTab =
   | "All"
@@ -187,6 +187,13 @@ function sourceTypeLabel(type: SourceType | null) {
   return type ?? "Unclassified";
 }
 
+function formatKsh(value: number) {
+  return `Ksh ${value.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export function AccountingWorkspace({
   data,
   initialView = "workspace",
@@ -202,6 +209,9 @@ export function AccountingWorkspace({
   const [modal, setModal] = useState<ModalState>(null);
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const showWorkspaceChrome =
+    primaryView !== "overview" &&
+    !(primaryView === "workspace" && (postTab === "revenue" || postTab === "purchases"));
 
   const filteredRecent = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -266,7 +276,7 @@ export function AccountingWorkspace({
 
   return (
     <div className={`${styles.shell} dashboard-content accountingWorkspacePage`}>
-      <header className={styles.header}>
+      {showWorkspaceChrome && <header className={styles.header}>
         <div>
           <div className={styles.eyebrow}>Double-entry accounting</div>
           <h1 className={styles.title}>Accounting</h1>
@@ -283,9 +293,10 @@ export function AccountingWorkspace({
           )}
           Trial balance {data.trialBalance.balanced ? "balanced" : "out of balance"}
         </div>
-      </header>
+      </header>}
 
-      <div className={styles.accountingNav}>
+      {showWorkspaceChrome && <>
+        <div className={styles.accountingNav}>
         <section className={styles.navSection} aria-label="Post">
           <div className={styles.navLabel}>Post</div>
           <div className={styles.pillRow}>
@@ -321,9 +332,9 @@ export function AccountingWorkspace({
             ))}
           </div>
         </section>
-      </div>
+        </div>
 
-      <section className={styles.metrics} aria-label="Accounting totals">
+        <section className={styles.metrics} aria-label="Accounting totals">
         <Metric
           label="Cash at Bank"
           value={groupedMoney(data.cashBook.bank.balances)}
@@ -340,11 +351,11 @@ export function AccountingWorkspace({
           value={plainMoney(data.trialBalance.totalDebit)}
           sub={`Credits ${plainMoney(data.trialBalance.totalCredit)}`}
         />
-      </section>
+        </section>
 
-      {toast && <Toast value={toast} />}
+        {toast && <Toast value={toast} />}
 
-      {!data.seeded && (
+        {!data.seeded && (
         <section className={`${styles.panel} ${styles.fullWidth}`}>
           <div className={styles.panelHeader}>
             <div>
@@ -364,7 +375,10 @@ export function AccountingWorkspace({
             </button>
           </div>
         </section>
-      )}
+        )}
+      </>}
+
+      {primaryView === "overview" && <AccountingOverview data={data} />}
 
       {primaryView === "workspace" && postTab === "cash-book" && (
         <CashBookPanel
@@ -377,25 +391,11 @@ export function AccountingWorkspace({
       )}
 
       {primaryView === "workspace" && postTab === "revenue" && (
-        <PostingPanel
-          mode="deposit"
-          title="Revenue"
-          description="Post money received into a selected cash or bank account."
-          data={data}
-          pending={pending}
-          runAction={runAction}
-        />
+        <RevenuePanel />
       )}
 
       {primaryView === "workspace" && postTab === "purchases" && (
-        <PostingPanel
-          mode="cheque"
-          title="Purchases"
-          description="Post supplier payments or cash purchases from a selected account."
-          data={data}
-          pending={pending}
-          runAction={runAction}
-        />
+        <PurchasesPanel data={data} />
       )}
 
       {primaryView === "recent" && (
@@ -474,6 +474,334 @@ export function AccountingWorkspace({
         />
       )}
     </div>
+  );
+}
+
+const OVERVIEW_LOAN_ACCOUNTS = [
+  { code: "2300", name: "Loans Payable" },
+  { code: "2310", name: "Customer Deposits" },
+  { code: "2590", name: "Deferred Tax Liability" },
+] as const;
+
+const OVERVIEW_ACCENT_CLASSES = {
+  green: styles.overviewAccentGreen,
+  blue: styles.overviewAccentBlue,
+  red: styles.overviewAccentRed,
+  amber: styles.overviewAccentAmber,
+};
+
+function AccountingOverview({ data }: { data: AccountingWorkspaceData }) {
+  const cashBankAccounts = data.accountBalances.filter(
+    (account) =>
+      account.type === "ASSET" &&
+      (account.code.startsWith("10") || account.code.startsWith("11")),
+  );
+  const bankAccounts = cashBankAccounts.filter((account) => account.code.startsWith("11"));
+  const cashAccounts = cashBankAccounts.filter((account) => account.code.startsWith("10"));
+  const loanAccounts = data.accountBalances.filter((account) => {
+    const code = Number(account.code);
+    return account.type === "LIABILITY" && code >= 2300 && code <= 2590;
+  });
+  const loanRows = [
+    ...OVERVIEW_LOAN_ACCOUNTS.map((overviewAccount) => {
+      const account = loanAccounts.find((item) => item.code === overviewAccount.code);
+      return {
+        code: overviewAccount.code,
+        name: account?.name ?? overviewAccount.name,
+        balance: account?.balance ?? 0,
+      };
+    }),
+    ...loanAccounts
+      .filter((account) => !OVERVIEW_LOAN_ACCOUNTS.some((item) => item.code === account.code))
+      .map((account) => ({
+        code: account.code,
+        name: account.name,
+        balance: account.balance,
+      })),
+  ];
+  const cashBankTotal = cashBankAccounts.reduce((total, account) => total + account.balance, 0);
+  const bankTotal = bankAccounts.reduce((total, account) => total + account.balance, 0);
+  const cashTotal = cashAccounts.reduce((total, account) => total + account.balance, 0);
+  const loansTotal = loanRows.reduce((total, account) => total + account.balance, 0);
+
+  return (
+    <section className={styles.overview} aria-labelledby="accounting-overview-title">
+      <div className={styles.overviewHeading}>
+        <div>
+          <div className={styles.eyebrow}>Accounting home</div>
+          <h1 id="accounting-overview-title" className={styles.overviewTitle}>Overview</h1>
+          <p className={styles.overviewSubtitle}>
+            A clear view of cash, receivables, payables, and liabilities from posted journals.
+          </p>
+        </div>
+        <Link href="/accounting?view=workspace" className={styles.overviewLink}>
+          Open accountant
+        </Link>
+      </div>
+
+      <div className={styles.overviewKpis}>
+        <OverviewKpi
+          label="Cash & bank"
+          value={formatKsh(cashBankTotal)}
+          sub={`Bank ${formatKsh(bankTotal)}`}
+          accent="green"
+        />
+        <OverviewKpi
+          label="Debtors"
+          value={formatKsh(data.debtors.total)}
+          sub="Receipts due"
+          accent="blue"
+        />
+        <OverviewKpi
+          label="Creditors"
+          value={formatKsh(data.creditors.total)}
+          sub={`Accruals ${formatKsh(data.creditors.total)}`}
+          accent="red"
+        />
+        <OverviewKpi
+          label="Loans"
+          value={formatKsh(loansTotal)}
+          sub="0 due in 30 days"
+          accent="amber"
+        />
+      </div>
+
+      <div className={styles.overviewGrid}>
+        <OverviewCard eyebrow="Cash & bank balances" title="Cash & Bank" value={formatKsh(cashBankTotal)} accent="green">
+          <div className={styles.overviewSplit}>
+            <OverviewSplitItem label="At bank" value={formatKsh(bankTotal)} />
+            <OverviewSplitItem label="Cash in hand" value={formatKsh(cashTotal)} />
+          </div>
+          <OverviewAccountRows accounts={cashBankAccounts} />
+        </OverviewCard>
+
+        <OverviewCard eyebrow="Outstanding loans" title="Loans" value={formatKsh(loansTotal)} accent="amber">
+          <OverviewAccountRows accounts={loanRows} />
+          <div className={styles.overviewPrepare}>
+            <div className={styles.overviewPrepareLabel}>To prepare for</div>
+            <p>No repayments due in the next 30 days.</p>
+          </div>
+        </OverviewCard>
+
+        <OverviewCard eyebrow="Debtors & receipts due" title="Debtors" value={formatKsh(data.debtors.total)} accent="green">
+          <OverviewPartyRows rows={data.debtors.rows} empty="No outstanding receipts." />
+        </OverviewCard>
+
+        <OverviewCard eyebrow="Creditors & accruals" title="Creditors" value={formatKsh(data.creditors.total)} accent="red">
+          <OverviewPartyRows rows={data.creditors.rows} empty="No outstanding accruals." />
+        </OverviewCard>
+      </div>
+    </section>
+  );
+}
+
+function OverviewKpi({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent: keyof typeof OVERVIEW_ACCENT_CLASSES;
+}) {
+  return (
+    <div className={`${styles.overviewKpi} ${OVERVIEW_ACCENT_CLASSES[accent]}`}>
+      <div className={styles.overviewKpiLabel}>{label}</div>
+      <div className={styles.overviewKpiValue}>{value}</div>
+      <div className={styles.overviewKpiSub}>{sub}</div>
+    </div>
+  );
+}
+
+function OverviewCard({
+  eyebrow,
+  title,
+  value,
+  accent,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  value: string;
+  accent: keyof typeof OVERVIEW_ACCENT_CLASSES;
+  children: ReactNode;
+}) {
+  return (
+    <article className={`${styles.overviewCard} ${OVERVIEW_ACCENT_CLASSES[accent]}`}>
+      <div className={styles.overviewCardEyebrow}>{eyebrow}</div>
+      <h2 className={styles.overviewCardTitle}>{title}</h2>
+      <div className={styles.overviewCardValue}>{value}</div>
+      {children}
+    </article>
+  );
+}
+
+function OverviewSplitItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.overviewSplitItem}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function OverviewAccountRows({
+  accounts,
+}: {
+  accounts: Array<{ code: string; name: string; balance: number }>;
+}) {
+  return (
+    <div className={styles.overviewRows}>
+      {accounts.length === 0 ? (
+        <div className={styles.overviewEmpty}>No account balances recorded.</div>
+      ) : (
+        accounts.map((account) => (
+          <div className={styles.overviewRow} key={`${account.code}-${account.name}`}>
+            <span>
+              <b>{account.code}</b>
+              {account.name}
+            </span>
+            <strong>{formatKsh(account.balance)}</strong>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function OverviewPartyRows({
+  rows,
+  empty,
+}: {
+  rows: AgeingRow[];
+  empty: string;
+}) {
+  return (
+    <div className={styles.overviewRows}>
+      {rows.length === 0 ? (
+        <div className={styles.overviewEmpty}>{empty}</div>
+      ) : (
+        rows.slice(0, 6).map((row) => (
+          <div className={styles.overviewRow} key={row.id}>
+            <span>{row.name}</span>
+            <strong>{formatKsh(row.total)}</strong>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function RevenuePanel() {
+  return (
+    <section className={styles.revenuePage} aria-labelledby="revenue-title">
+      <h2 id="revenue-title" className={styles.revenueTitle}>Revenue</h2>
+      <div className={styles.revenueGrid}>
+        <RevenueActionCard
+          title="Create invoice"
+          description="Post a customer sales invoice"
+          label="Customer invoice"
+          href="/accounting/transactions?tab=invoice"
+        />
+        <RevenueActionCard
+          title="Create credit note"
+          description="Record a customer revenue reversal"
+          label="Customer credit"
+          href="/accounting/transactions?tab=credit-note"
+        />
+      </div>
+    </section>
+  );
+}
+
+function RevenueActionCard({
+  title,
+  description,
+  label,
+  href,
+}: {
+  title: string;
+  description: string;
+  label: string;
+  href: string;
+}) {
+  return (
+    <article className={styles.revenueCard}>
+      <div className={styles.revenueEyebrow}>Revenue</div>
+      <h3 className={styles.revenueCardTitle}>{title}</h3>
+      <p className={styles.revenueDescription}>{description}</p>
+      <div className={styles.revenueLabel}>{label}</div>
+      <Link className={styles.revenueButton} href={href}>{title}</Link>
+    </article>
+  );
+}
+
+function PurchasesPanel({ data }: { data: AccountingWorkspaceData }) {
+  const billCount = data.recentTransactions.filter(
+    (transaction) => transaction.type === "Bill",
+  ).length;
+  const debitNoteCount = data.recentTransactions.filter(
+    (transaction) => transaction.type === "Debit Note",
+  ).length;
+
+  return (
+    <section className={styles.purchasesPage} aria-labelledby="purchases-title">
+      <h2 id="purchases-title" className={styles.purchasesTitle}>Purchases</h2>
+      <div className={styles.purchasesGrid}>
+        <PurchaseActionCard
+          title="Create bill"
+          eyebrow="Create bills"
+          value={formatKsh(data.creditors.total)}
+          description="Supplier purchase bills posted to payables"
+          transactionCount={billCount}
+          href="/accounting/transactions?tab=bill"
+          featured
+        />
+        <PurchaseActionCard
+          title="Create debit note"
+          eyebrow="Create debit note"
+          value={formatKsh(0)}
+          description="Supplier debit notes reducing purchases and payables"
+          transactionCount={debitNoteCount}
+          href="/accounting/transactions?tab=debit-note"
+        />
+      </div>
+    </section>
+  );
+}
+
+function PurchaseActionCard({
+  title,
+  eyebrow,
+  value,
+  description,
+  transactionCount,
+  href,
+  featured = false,
+}: {
+  title: string;
+  eyebrow: string;
+  value: string;
+  description: string;
+  transactionCount: number;
+  href: string;
+  featured?: boolean;
+}) {
+  return (
+    <article className={`${styles.purchaseCard} ${featured ? styles.purchaseCardFeatured : ""}`}>
+      <div className={styles.purchaseCardHeader}>
+        <div className={styles.purchaseEyebrow}>{eyebrow}</div>
+        <Link className={styles.purchaseButton} href={href}>
+          <Plus size={16} aria-hidden="true" />
+          {title}
+        </Link>
+      </div>
+      <div className={styles.purchaseValue}>{value}</div>
+      <p className={styles.purchaseDescription}>{description}</p>
+      <div className={styles.purchaseCount}>{transactionCount} transactions</div>
+    </article>
   );
 }
 
@@ -668,10 +996,8 @@ function AccountMenu({
 
   return (
     <details className={styles.menu}>
-      <summary>
-        <button type="button" className={styles.iconButton} aria-label={`Actions for ${account.name}`}>
-          <MoreHorizontal size={16} aria-hidden="true" />
-        </button>
+      <summary className={styles.iconButton} aria-label={`Actions for ${account.name}`}>
+        <MoreHorizontal size={16} aria-hidden="true" />
       </summary>
       <div className={styles.menuPanel}>
         <button type="button" onClick={() => onOpenModal({ kind: "transaction", mode: "deposit", account })}>

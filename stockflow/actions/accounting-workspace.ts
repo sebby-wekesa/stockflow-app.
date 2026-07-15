@@ -76,6 +76,16 @@ export type AccountOption = {
   isBank: boolean;
 };
 
+export type AccountBalanceRow = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  normalBalance: string;
+  currency: string;
+  balance: number;
+};
+
 export type PartyOption = {
   id: string;
   name: string;
@@ -148,6 +158,7 @@ export type AccountingWorkspaceData = {
     bank: CashBookGroup;
     cash: CashBookGroup;
   };
+  accountBalances: AccountBalanceRow[];
   recentTransactions: RecentAccountingTransaction[];
   debtors: {
     rows: AgeingRow[];
@@ -233,7 +244,9 @@ function sourceTypeFromJournal(source?: string | null, sourceType?: string | nul
   if (source === "PAYMENT_MADE") return "Write Cheque";
   if (sourceType === "BankTransfer") return "Transfer";
   if (sourceType === "ManualInvoice") return "Invoice";
+  if (sourceType === "ManualCreditNote") return "Credit Note";
   if (sourceType === "ManualBill") return "Bill";
+  if (sourceType === "ManualDebitNote") return "Debit Note";
   if (sourceType === "Expense") return "Expense";
   if (sourceType === "Income") return "Revenue";
   if (sourceType === "CashBookAccount") return "Opening Balance";
@@ -696,6 +709,7 @@ export async function getAccountingWorkspaceData(): Promise<AccountingWorkspaceD
         type: true,
         normalBalance: true,
         isBank: true,
+        currency: true,
       },
     }),
     db.branch.findMany({
@@ -790,6 +804,27 @@ export async function getAccountingWorkspaceData(): Promise<AccountingWorkspaceD
       status: bank.isActive && bank.account.isActive ? "Active" : "Inactive",
       reconciliationStatus: "Unreconciled",
       group,
+    };
+  });
+
+  const openingBalancesByAccount = new Map(
+    bankAccounts.map((bank) => [bank.accountId, Number(bank.openingBalance ?? 0)]),
+  );
+  const accountBalances: AccountBalanceRow[] = accounts.map((account) => {
+    const totals = sumsByAccount.get(account.id) ?? { debit: 0, credit: 0 };
+    const ledgerBalance =
+      account.normalBalance === "CREDIT"
+        ? totals.credit - totals.debit
+        : totals.debit - totals.credit;
+
+    return {
+      id: account.id,
+      code: account.code,
+      name: account.name,
+      type: account.type,
+      normalBalance: account.normalBalance,
+      currency: account.currency,
+      balance: round2(ledgerBalance + (openingBalancesByAccount.get(account.id) ?? 0)),
     };
   });
 
@@ -902,6 +937,7 @@ export async function getAccountingWorkspaceData(): Promise<AccountingWorkspaceD
         accounts: cashRows,
       },
     },
+    accountBalances,
     recentTransactions,
     debtors: ageing.debtors,
     creditors: ageing.creditors,
