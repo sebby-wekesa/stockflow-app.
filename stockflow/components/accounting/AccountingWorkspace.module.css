@@ -12,6 +12,7 @@
   margin: 0 auto;
   background: transparent;
   color: var(--accounting-ink);
+  font-family: var(--font-body);
 }
 
 .header {
@@ -65,7 +66,7 @@
   color: var(--accounting-ink);
   font-family: var(--font-head);
   font-size: 32px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .overviewSubtitle {
@@ -87,7 +88,7 @@
   color: var(--accounting-ink);
   padding: 8px 13px;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   text-decoration: none;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
@@ -148,7 +149,7 @@
 .overviewPrepareLabel {
   color: var(--accounting-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -160,7 +161,7 @@
   color: var(--accounting-ink);
   font-family: var(--font-head);
   font-size: 30px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -190,8 +191,9 @@
 .overviewCardTitle {
   margin: 14px 0 0;
   color: var(--accounting-ink);
+  font-family: var(--font-head);
   font-size: 23px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .overviewCardValue {
@@ -199,7 +201,7 @@
   color: var(--accounting-ink);
   font-family: var(--font-head);
   font-size: 38px;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -222,13 +224,14 @@
 .overviewSplitItem span {
   color: var(--accounting-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .overviewSplitItem strong {
   color: var(--accounting-ink);
+  font-family: var(--font-head);
   font-size: 17px;
 }
 
@@ -300,7 +303,7 @@
   color: var(--accounting-ink);
   font-family: var(--font-head);
   font-size: 29px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .revenueGrid {
@@ -322,7 +325,7 @@
 .revenueLabel {
   color: var(--accounting-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -330,8 +333,9 @@
 .revenueCardTitle {
   margin: 10px 0 0;
   color: var(--accounting-ink);
+  font-family: var(--font-head);
   font-size: 24px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .revenueDescription {
@@ -357,7 +361,7 @@
   color: var(--accounting-ink);
   padding: 9px 13px;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   text-decoration: none;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
@@ -377,7 +381,7 @@
   color: var(--accounting-ink);
   font-family: var(--font-head);
   font-size: 29px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .purchasesGrid {
@@ -412,7 +416,7 @@
 .purchaseCount {
   color: var(--accounting-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -429,7 +433,7 @@
   color: var(--surface);
   padding: 9px 13px;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   text-decoration: none;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -445,7 +449,7 @@
   color: var(--accounting-ink);
   font-family: var(--font-head);
   font-size: 29px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .purchaseDescription {
@@ -524,7 +528,7 @@
   margin-bottom: 8px;
   color: var(--accounting-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
@@ -585,7 +589,7 @@
 .metricLabel {
   color: var(--accounting-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -636,7 +640,7 @@
 
 .toolTitle {
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .toolDescription {
@@ -669,7 +673,7 @@
 .cardTitle {
   color: var(--accounting-ink);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .cardMeta {
@@ -685,7 +689,7 @@
 .groupBalanceLabel {
   color: var(--accounting-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -695,7 +699,7 @@
   color: var(--accounting-green);
   font-family: var(--font-mono);
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .toolbar {
@@ -747,7 +751,7 @@
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, color 0.15s, opacity 0.15s;
 }
@@ -809,7 +813,7 @@
   color: var(--accounting-muted);
   padding: 10px 12px;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.07em;
   text-align: left;
   text-transform: uppercase;
@@ -841,7 +845,7 @@
   align-items: center;
   gap: 8px;
   min-width: 180px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .accountIcon {
@@ -900,7 +904,7 @@
   padding: 9px 10px;
   font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 600;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -944,7 +948,7 @@
 .panelTitle {
   color: var(--accounting-ink);
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .panelSub {
@@ -969,7 +973,7 @@
 .field label {
   color: var(--accounting-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1018,7 +1022,7 @@
 .popoverTitle {
   color: var(--accounting-green);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .popoverQuestion {
@@ -1042,7 +1046,7 @@
   padding: 8px 7px;
   font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -1069,7 +1073,7 @@
   color: var(--accounting-muted);
   padding: 4px 9px;
   font-size: 11px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .statusActive,
@@ -1080,7 +1084,7 @@
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 11px;
-  font-weight: 850;
+  font-weight: 800;
 }
 
 .statusActive {
@@ -1102,7 +1106,7 @@
   min-height: 38px;
   color: var(--accounting-ink);
   font-size: 13px;
-  font-weight: 760;
+  font-weight: 600;
 }
 
 .checkboxRow input {
@@ -1126,7 +1130,7 @@
 .contextLabel {
   color: var(--accounting-muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1135,7 +1139,7 @@
   margin-top: 4px;
   color: var(--accounting-ink);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .contextMeta {
@@ -1156,7 +1160,7 @@
   margin-bottom: 10px;
   color: var(--accounting-green);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .previewGrid {
@@ -1168,12 +1172,12 @@
 
 .previewGrid span {
   color: var(--accounting-muted);
-  font-weight: 760;
+  font-weight: 600;
 }
 
 .previewGrid strong {
   color: var(--accounting-ink);
-  font-weight: 850;
+  font-weight: 800;
   overflow-wrap: anywhere;
 }
 
@@ -1246,7 +1250,7 @@
   background: var(--surface);
   padding: 10px 12px;
   font-size: 13px;
-  font-weight: 760;
+  font-weight: 600;
 }
 
 .toastOk {
@@ -1296,7 +1300,7 @@
 .modalTitle {
   color: var(--accounting-ink);
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .modalBody {
