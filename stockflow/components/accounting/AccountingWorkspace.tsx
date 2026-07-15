@@ -285,36 +285,6 @@ export function AccountingWorkspace({
         </div>
       </header>
 
-      <nav className={styles.primaryNav} aria-label="Primary accounting navigation">
-        <Link href="/dashboard">Home</Link>
-        <button
-          type="button"
-          className={primaryView === "workspace" ? styles.navActive : undefined}
-          onClick={() => {
-            setPrimaryView("workspace");
-            setPostTab("cash-book");
-          }}
-        >
-          Accountant
-        </button>
-        <Link href="/accounting/trial-balance">Trial Balance</Link>
-        <Link href="/accounting/ledger">General Ledger</Link>
-        <button
-          type="button"
-          className={primaryView === "ledgers" ? styles.navActive : undefined}
-          onClick={() => setPrimaryView("ledgers")}
-        >
-          Creditor/Debtors
-        </button>
-        <button
-          type="button"
-          className={primaryView === "reports" ? styles.navActive : undefined}
-          onClick={() => setPrimaryView("reports")}
-        >
-          Reports
-        </button>
-      </nav>
-
       <div className={styles.accountingNav}>
         <section className={styles.navSection} aria-label="Post">
           <div className={styles.navLabel}>Post</div>

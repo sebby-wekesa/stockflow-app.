@@ -63,15 +63,6 @@
   white-space: nowrap;
 }
 
-.primaryNav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.primaryNav a,
-.primaryNav button,
 .pill {
   min-height: 34px;
   border: 1px solid var(--accounting-line);
@@ -87,21 +78,17 @@
   transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
-.primaryNav a,
-.primaryNav button {
+.pill {
   display: inline-flex;
   align-items: center;
   padding: 9px 13px;
 }
 
-.primaryNav a:hover,
-.primaryNav button:hover,
 .pill:hover {
   border-color: var(--accounting-line-strong);
   color: var(--accounting-green);
 }
 
-.navActive,
 .pillActive {
   border-color: var(--teal) !important;
   background: var(--teal) !important;

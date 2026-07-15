@@ -21,6 +21,17 @@ type NavItem = {
   badgeColor?: string
 }
 
+const ACCOUNTING_NAV_ITEMS: NavItem[] = [
+  { label: "Home", href: "/dashboard" },
+  { label: "Accountant", href: "/accounting" },
+  { label: "Trial balance", href: "/accounting/trial-balance" },
+  { label: "General ledger", href: "/accounting/ledger" },
+  { label: "Creditor/Debtor", href: "/accounting?view=ledgers" },
+  { label: "Reports", href: "/accounting?view=reports" },
+]
+
+const ACCOUNTING_ROLES: UserRole[] = ["ADMIN", "MANAGER", "ACCOUNTS"]
+
 // Generate role-specific navigation items
 function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] {
   // Common navigation for all roles
@@ -87,14 +98,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
       ];
 
     case 'ACCOUNTS':
-      return [
-        { label: "Home", href: "/dashboard" },
-        { label: "Accountant", href: "/accounting" },
-        { label: "Trial balance", href: "/accounting/trial-balance" },
-        { label: "General ledger", href: "/accounting/ledger" },
-        { label: "Creditor/Debtor", href: "/accounting?view=ledgers" },
-        { label: "Reports", href: "/accounting?view=reports" },
-      ];
+      return ACCOUNTING_NAV_ITEMS;
 
     case 'OPERATOR':
       return [
@@ -155,7 +159,10 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
 export function Sidebar({ role, counts = {} }: { role: UserRole; counts?: SidebarCounts }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const navItems = getRoleNavItems(role, counts);
+  const isAccountingPage = pathname === "/accounting" || pathname.startsWith("/accounting/");
+  const navItems = isAccountingPage && ACCOUNTING_ROLES.includes(role)
+    ? ACCOUNTING_NAV_ITEMS
+    : getRoleNavItems(role, counts);
   const roleColor = ROLE_COLORS[role];
   const roleNameDisplay = ROLE_NAMES[role];
   const query = searchParams.toString();
