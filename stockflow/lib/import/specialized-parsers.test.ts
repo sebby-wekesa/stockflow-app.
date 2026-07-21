@@ -14,6 +14,10 @@ function workbookBuffer(sheets: Record<string, unknown[][]>): ArrayBuffer {
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
 }
 
+function csvBuffer(csv: string): ArrayBuffer {
+  return new TextEncoder().encode(csv).buffer
+}
+
 describe('specialized consumables parser', () => {
   it('does not reject product names containing "in"', () => {
     const buffer = workbookBuffer({
@@ -118,6 +122,8 @@ describe('specialized consumables parser', () => {
         qty: 12.5,
         pieces_sets: 38,
         direction: 'balance',
+        category: 'break_linings',
+        origin: 'IMPORTED',
       }),
       expect.objectContaining({
         source_row: 3,
@@ -125,12 +131,39 @@ describe('specialized consumables parser', () => {
         qty: 0,
         pieces_sets: 15,
         direction: 'balance',
+        category: 'break_linings',
+        origin: 'IMPORTED',
       }),
       expect.objectContaining({
         source_row: 4,
         raw_product_name: 'Brake lining DNA10C',
         qty: -2,
         pieces_sets: 3,
+        direction: 'balance',
+        category: 'break_linings',
+        origin: 'IMPORTED',
+      }),
+    ])
+  })
+
+  it('reads category and origin from a CSV product snapshot', () => {
+    const buffer = csvBuffer(
+      [
+        'SKU,Product name,Category,Origin,Uom,Branch,Current Stock,pcs/sets',
+        'HUB-001,Wheel hub,Trailer Parts,Local Purchase,Kg,Nairobi,3,2',
+      ].join('\n')
+    )
+
+    const rows = parseConsumablesStock(buffer, 'Sheet1', 'nairobi')
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        product_code: 'HUB-001',
+        raw_product_name: 'Wheel hub',
+        category: 'trailer_parts',
+        origin: 'LOCAL_PURCHASE',
+        qty: 3,
+        pieces_sets: 2,
         direction: 'balance',
       }),
     ])

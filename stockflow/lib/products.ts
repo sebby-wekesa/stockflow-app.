@@ -26,6 +26,76 @@ export function normalizeProductUom(value: unknown): ProductUom | null {
   return null
 }
 
+/**
+ * Convert the labels commonly used in product files into the Product enum
+ * values used by the database.
+ */
+export function normalizeProductCategory(value: unknown): ProductCategory | null {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+
+  if (!normalized) return null
+  if (['spring', 'springs', 'leaf spring', 'manufactured spring'].includes(normalized)) {
+    return 'springs'
+  }
+  if (
+    ['u bolt', 'u bolts', 'ubolt', 'ubolts', 'manufactured ubolt', 'manufactured u bolt'].includes(
+      normalized
+    )
+  ) {
+    return 'ubolts'
+  }
+  if (['trailer', 'trailer part', 'trailer parts', 'imported'].includes(normalized)) {
+    return 'trailer_parts'
+  }
+  if (
+    ['brake', 'brake lining', 'brake linings', 'break lining', 'break linings'].includes(normalized)
+  ) {
+    return 'break_linings'
+  }
+  if (
+    ['center bolt', 'center bolts', 'centre bolt', 'centre bolts', 'center bolt(s)', 'centre bolt(s)'].includes(
+      normalized
+    )
+  ) {
+    return 'center_bolts'
+  }
+  if (['nut', 'nuts'].includes(normalized)) return 'nuts'
+
+  return null
+}
+
+/** Convert human-readable or legacy origin labels into StockOrigin values. */
+export function normalizeProductOrigin(value: unknown): StockOrigin | null {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+
+  if (!normalized) return null
+  if (
+    ['factory', 'factory made', 'factory-made', 'manufactured', 'manufactured product'].includes(
+      normalized
+    )
+  ) {
+    return 'FACTORY_MADE'
+  }
+  if (
+    ['local', 'local purchase', 'locally purchased', 'locally made', 'local supplier'].includes(
+      normalized
+    )
+  ) {
+    return 'LOCAL_PURCHASE'
+  }
+  if (['imported', 'import', 'foreign', 'overseas'].includes(normalized)) return 'IMPORTED'
+
+  return null
+}
+
 // Display labels for the 6 categories
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   springs: 'Springs',

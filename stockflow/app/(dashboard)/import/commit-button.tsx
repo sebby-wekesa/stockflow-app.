@@ -20,14 +20,14 @@ export function CommitButton({
   const [result, setResult] = useState<CommitResult | null>(null)
 
   const isMaster = sheetType === 'springs_master' || sheetType === 'ubolt_master'
-  const isSales = sheetType === 'sales_quickbooks_v2'
+  const isSales = sheetType === 'sales_quickbooks_v2' || sheetType === 'sales_simple'
 
   function handleCommit() {
     const msg = isMaster
       ? `Create or update ${rowCount} products in the master catalogue?`
       : isSales
-      ? `Import ${rowCount} sales line items? This will create invoices and decrement stock.`
-      : `Apply ${rowCount} stock movements?`
+      ? `Import ${rowCount} sales line items? Matching invoices will be updated and stock reconciled.`
+      : `Apply ${rowCount} stock rows? Matching rows will be updated instead of duplicated.`
     if (!confirm(msg)) return
 
     setError(null)
@@ -48,7 +48,7 @@ export function CommitButton({
         <div className="font-head font-bold text-teal mb-2">✓ Committed</div>
         <div className="text-sm space-y-1">
           <div>
-            <span className="text-muted">Written:</span>{' '}
+            <span className="text-muted">Written/updated:</span>{' '}
             <span className="font-mono font-medium">{result.written}</span>
           </div>
           <div>
@@ -117,8 +117,8 @@ export function CommitButton({
             {isMaster
               ? 'Will upsert products by code — existing entries get updated, new ones get created.'
               : isSales
-              ? 'Will create invoices grouped by invoice number, decrement stock per line.'
-              : 'Will apply stock-in and stock-out movements to branch balances.'}
+              ? 'Will create or update invoices grouped by invoice number and reconcile stock per line.'
+              : 'Will update matching stock rows and apply only quantity differences to branch balances.'}
           </p>
         </div>
         <button

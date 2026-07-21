@@ -74,18 +74,36 @@ function mapCategory(
 }
 
 function generateSku(productCode: string | null, name: string): string {
-  if (productCode) return productCode
+  const explicitCode = productCode?.trim()
+  if (explicitCode) return explicitCode
   return name.slice(0, 40).toUpperCase().replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-')
+}
+
+/**
+ * A stock movement import row needs an identity that does not change when its
+ * quantity changes. This lets a later copy of the same CSV update the
+ * movement and apply only the quantity difference to stock.
+ */
+export function buildImportMovementReference(
+  row: Pick<ParsedStockRow, 'source_row' | 'direction' | 'reference' | 'branch'>
+): string {
+  const source = (row.reference ?? 'stock import').trim()
+  return `IMPORT:${source}:${row.branch}:${row.direction}:${row.source_row}`
 }
 
 async function createImportedProduct(
   organizationId: string,
   name: string,
-  branchId: string
+  branchId: string,
+  attributes?: {
+    category?: ParsedStockRow['category']
+    origin?: ParsedStockRow['origin']
+    productCode?: string | null
+  }
 ): Promise<string> {
   const db = getTenantPrisma(organizationId)
   const trimmedName = name.trim()
-  const baseSku = generateSku(null, trimmedName)
+  const baseSku = generateSku(attributes?.productCode ?? null, trimmedName)
   let sku = baseSku
   let suffix = 1
 
@@ -98,8 +116,8 @@ async function createImportedProduct(
     data: {
       name: trimmedName,
       sku,
-      category: 'break_linings',
-      origin: 'LOCAL_PURCHASE',
+      category: attributes?.category ?? 'break_linings',
+      origin: attributes?.origin ?? 'LOCAL_PURCHASE',
       uom: 'KG',
       currentStock: 0,
       organizationId,
@@ -148,8 +166,16 @@ export async function commitProductMaster(
             continue
           }
 
-          // Tenant-scoped lookup — only finds products in OUR org
-          const existing = await tx.product.findFirst({ where: { sku } })
+          // Prefer the stable product code. For older files without a code,
+          // fall back to the tenant-scoped canonical name so re-importing the
+          // same master list still updates the existing product.
+          let existing = await tx.product.findFirst({ where: { sku } })
+          if (!existing && !row.product_code) {
+            const nameMatch = await matchProductName(row.canonical_name, organizationId)
+            if (nameMatch?.product?.id) {
+              existing = await tx.product.findFirst({ where: { id: nameMatch.product.id } })
+            }
+          }
 
           let product
           if (existing) {
@@ -369,12 +395,13 @@ export async function commitSalesImport(
   // Write each order group transactionally
   for (const group of Array.from(orderGroups.values())) {
     try {
-      // Idempotency: skip if this invoice number already exists in our org
-      const existing = await db.saleOrder.findFirst({ where: { id: group.order_number } })
-      if (existing) {
-        result.skipped += group.lines.length
-        continue
-      }
+      // The invoice number is the stable key for a sales import. A later
+      // import of that invoice updates it instead of silently ignoring CSV
+      // changes.
+      const existing = await db.saleOrder.findFirst({
+        where: { id: group.order_number },
+        include: { SaleItem: { include: { FinishedGoods: true } } },
+      })
 
       const totalAmount = group.lines.reduce(
         (sum, l) => sum + l.qty * l.unit_price,
@@ -382,23 +409,32 @@ export async function commitSalesImport(
       )
 
       await withTenantTransaction(organizationId, async (tx) => {
-        const order = await tx.saleOrder.create({
-          data: {
-            id: group.order_number,
-            customerName: group.customer_name,
-            totalAmount,
-            // Imported invoices are historical sales that already left stock.
-            status: 'SHIPPED',
-            createdBy: userId,
-          },
-        })
+        const order = existing
+          ? await tx.saleOrder.update({
+              where: { id: existing.id },
+              data: {
+                customerName: group.customer_name,
+                totalAmount,
+                status: 'SHIPPED',
+              },
+            })
+          : await tx.saleOrder.create({
+              data: {
+                id: group.order_number,
+                customerName: group.customer_name,
+                totalAmount,
+                // Imported invoices are historical sales that already left stock.
+                status: 'SHIPPED',
+                createdBy: userId,
+              },
+            })
 
-        for (const line of group.lines) {
+        const getFinishedGood = async (line: (typeof group.lines)[number]) => {
           const product = await tx.product.findFirst({
             where: { id: line.product_id },
             select: { id: true, name: true, sku: true },
           })
-          if (!product) continue
+          if (!product) return null
 
           const fgSku = product.sku || product.id
           let finishedGood = await tx.finishedGoods.findFirst({
@@ -416,6 +452,109 @@ export async function commitSalesImport(
               },
             })
           }
+
+          return finishedGood
+        }
+
+        if (existing) {
+          // Existing imported sales already reduced stock by the old quantity.
+          // Apply only old quantity minus new quantity so re-imports are
+          // idempotent and edits to the CSV are reflected accurately.
+          const oldQuantityByProduct = new Map<string, number>()
+          for (const item of existing.SaleItem) {
+            let product = await tx.product.findFirst({
+              where: { sku: item.FinishedGoods.sku },
+              select: { id: true },
+            })
+            if (!product) {
+              product = await tx.product.findFirst({
+                where: { id: item.FinishedGoods.sku },
+                select: { id: true },
+              })
+            }
+            if (product) {
+              oldQuantityByProduct.set(
+                product.id,
+                (oldQuantityByProduct.get(product.id) ?? 0) + item.quantity
+              )
+            }
+          }
+
+          const newQuantityByProduct = new Map<string, number>()
+          for (const line of group.lines) {
+            newQuantityByProduct.set(
+              line.product_id,
+              (newQuantityByProduct.get(line.product_id) ?? 0) + line.qty
+            )
+          }
+
+          const affectedProductIds = new Set([
+            ...oldQuantityByProduct.keys(),
+            ...newQuantityByProduct.keys(),
+          ])
+          for (const productId of affectedProductIds) {
+            const oldQty = oldQuantityByProduct.get(productId) ?? 0
+            const newQty = newQuantityByProduct.get(productId) ?? 0
+            const stockDelta = oldQty - newQty
+            if (stockDelta === 0) continue
+
+            await tx.product.update({
+              where: { id: productId },
+              data: { branchId, currentStock: { increment: stockDelta } },
+            })
+            await tx.stockMovement.create({
+              data: {
+                productId,
+                branchId,
+                movementType: 'sale_adjustment',
+                quantity: -stockDelta,
+                reference: group.order_number,
+                notes: `Updated imported sale ${group.order_number}`,
+              },
+            })
+          }
+
+          const currentItems = existing.SaleItem
+          if (currentItems.length !== group.lines.length) {
+            await tx.saleItem.deleteMany({ where: { saleOrderId: order.id } })
+            for (const line of group.lines) {
+              const finishedGood = await getFinishedGood(line)
+              if (!finishedGood) continue
+
+              await tx.saleItem.create({
+                data: {
+                  saleOrderId: order.id,
+                  finishedGoodsId: finishedGood.id,
+                  quantity: line.qty,
+                  unitPrice: line.unit_price,
+                  totalPrice: line.qty * line.unit_price,
+                },
+              })
+            }
+            return
+          }
+
+          for (let index = 0; index < group.lines.length; index++) {
+            const line = group.lines[index]
+            const finishedGood = await getFinishedGood(line)
+            if (!finishedGood) continue
+
+            await tx.saleItem.update({
+              where: { id: currentItems[index].id },
+              data: {
+                finishedGoodsId: finishedGood.id,
+                quantity: line.qty,
+                unitPrice: line.unit_price,
+                totalPrice: line.qty * line.unit_price,
+              },
+            })
+          }
+          return
+        }
+
+        for (const line of group.lines) {
+          const finishedGood = await getFinishedGood(line)
+          if (!finishedGood) continue
 
           await tx.saleItem.create({
             data: {
@@ -494,11 +633,40 @@ export async function commitConsumablesImport(
 
   const nameToProductId = new Map<string, string>()
   const unmatched = new Map<string, { rows: number[]; total_qty: number }>()
+  const attributesByName = new Map<
+    string,
+    {
+      category: ParsedStockRow['category']
+      origin: ParsedStockRow['origin']
+      productCode: string | null
+    }
+  >()
+  const db = getTenantPrisma(organizationId)
+
+  // Keep the first non-empty metadata values for each product. A stock file
+  // can contain multiple rows for the same product, but the product master
+  // only has one category and origin.
+  for (const row of rows) {
+    if (!row.raw_product_name) continue
+    const current = attributesByName.get(row.raw_product_name)
+    attributesByName.set(row.raw_product_name, {
+      category: current?.category ?? row.category ?? null,
+      origin: current?.origin ?? row.origin ?? null,
+      productCode: current?.productCode ?? row.product_code ?? null,
+    })
+  }
 
   for (const name of uniqueNames) {
-    const match = await matchProductName(name, organizationId)
-    if (match?.product?.id) {
-      nameToProductId.set(name, match.product.id)
+    const productCode = attributesByName.get(name)?.productCode
+    const matchByCode = productCode
+      ? await db.product.findFirst({
+          where: { sku: productCode },
+          select: { id: true },
+        })
+      : null
+    const match = matchByCode ?? (await matchProductName(name, organizationId))
+    if (match?.id ?? match?.product?.id) {
+      nameToProductId.set(name, match.id ?? match.product.id)
     } else {
       unmatched.set(name, { rows: [], total_qty: 0 })
     }
@@ -509,7 +677,12 @@ export async function commitConsumablesImport(
 
   for (const name of Array.from(unmatched.keys())) {
     try {
-      const productId = await createImportedProduct(organizationId, name, branchId)
+      const productId = await createImportedProduct(
+        organizationId,
+        name,
+        branchId,
+        attributesByName.get(name)
+      )
       nameToProductId.set(name, productId)
       unmatched.delete(name)
     } catch (err) {
@@ -538,6 +711,31 @@ export async function commitConsumablesImport(
           continue
         }
 
+        const productAttributes = {
+          ...(row.product_code && row.raw_product_name
+            ? { name: row.raw_product_name.trim() }
+            : {}),
+          ...(row.category ? { category: row.category } : {}),
+          ...(row.origin ? { origin: row.origin } : {}),
+        }
+
+        const saveProductAlias = async () => {
+          if (!row.raw_product_name) return
+          await tx.productAlias.upsert({
+            where: {
+              product_id_alias: {
+                product_id: productId,
+                alias: row.raw_product_name.trim(),
+              },
+            },
+            update: {},
+            create: {
+              product_id: productId,
+              alias: row.raw_product_name.trim(),
+            },
+          })
+        }
+
         if (row.direction === 'balance') {
           const current = await tx.product.findUnique({
             where: { id: productId },
@@ -557,7 +755,7 @@ export async function commitConsumablesImport(
                 branchId,
                 movementType: 'adjustment',
                 quantity: stockDelta,
-                reference: row.reference ?? `IMPORT-${importBatchId.slice(0, 8)}`,
+                reference: buildImportMovementReference(row),
                 notes: row.notes ?? `Imported stock snapshot`,
               },
             })
@@ -568,11 +766,13 @@ export async function commitConsumablesImport(
             data: {
               branchId,
               currentStock: targetStock,
+              ...productAttributes,
               ...(row.pieces_sets !== null && row.pieces_sets !== undefined
                 ? { piecesSets: Math.max(0, Math.trunc(row.pieces_sets)) }
-                : {}),
+              : {}),
             },
           })
+          await saveProductAlias()
 
           result.written++
           continue
@@ -581,25 +781,84 @@ export async function commitConsumablesImport(
         const isInbound = row.direction === 'in'
         const signedQty = isInbound ? row.qty : -row.qty
         const movementType = isInbound ? 'stock_in' : 'stock_out'
+        const importReference = buildImportMovementReference(row)
         try {
-          await tx.stockMovement.create({
-            data: {
-              productId,
-              branchId,
-              movementType,
-              quantity: signedQty,
-              reference: row.reference ?? `IMPORT-${importBatchId.slice(0, 8)}`,
-              notes: row.notes ?? `Imported from consumables sheet`,
-            },
+          // First look for the stable reference used by new imports. The
+          // legacy fallback keeps the first re-import of an older batch from
+          // creating another movement when that batch used a generic ref.
+          let existingMovement = await tx.stockMovement.findFirst({
+            where: { reference: importReference, movementType },
           })
+          if (!existingMovement && row.reference) {
+            const legacyMovements = await tx.stockMovement.findMany({
+              where: { reference: row.reference, movementType, productId },
+              orderBy: { createdAt: 'asc' },
+              take: 2,
+            })
+            if (legacyMovements.length === 1) existingMovement = legacyMovements[0]
+          }
 
-          await tx.product.update({
-            where: { id: productId },
-            data: {
-              branchId,
-              currentStock: { increment: signedQty },
-            },
-          })
+          if (existingMovement) {
+            if (existingMovement.productId === productId) {
+              const stockDelta = signedQty - existingMovement.quantity
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  branchId,
+                  ...productAttributes,
+                  ...(stockDelta !== 0
+                    ? { currentStock: { increment: stockDelta } }
+                    : {}),
+                },
+              })
+            } else {
+              await tx.product.update({
+                where: { id: existingMovement.productId },
+                data: { currentStock: { decrement: existingMovement.quantity } },
+              })
+              await tx.product.update({
+                where: { id: productId },
+                data: {
+                  branchId,
+                  currentStock: { increment: signedQty },
+                  ...productAttributes,
+                },
+              })
+            }
+
+            await tx.stockMovement.update({
+              where: { id: existingMovement.id },
+              data: {
+                productId,
+                branchId,
+                quantity: signedQty,
+                reference: importReference,
+                notes: row.notes ?? `Imported from consumables sheet`,
+              },
+            })
+          } else {
+            await tx.stockMovement.create({
+              data: {
+                productId,
+                branchId,
+                movementType,
+                quantity: signedQty,
+                reference: importReference,
+                notes: row.notes ?? `Imported from consumables sheet`,
+              },
+            })
+
+            await tx.product.update({
+              where: { id: productId },
+              data: {
+                branchId,
+                currentStock: { increment: signedQty },
+                ...productAttributes,
+              },
+            })
+          }
+
+          await saveProductAlias()
 
           result.written++
         } catch (err) {

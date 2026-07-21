@@ -225,6 +225,8 @@ function StockPreviewTable({ rows }: { rows: any[] }) {
           <th className="px-4 py-2 font-medium">Date</th>
           <th className="px-4 py-2 font-medium">Product (raw)</th>
           <th className="px-4 py-2 font-medium">Branch</th>
+          <th className="px-4 py-2 font-medium">Category</th>
+          <th className="px-4 py-2 font-medium">Origin</th>
           <th className="px-4 py-2 font-medium">Direction</th>
           <th className="px-4 py-2 font-medium text-right">Qty</th>
           <th className="px-4 py-2 font-medium text-right">PCS/Sets</th>
@@ -242,6 +244,8 @@ function StockPreviewTable({ rows }: { rows: any[] }) {
               {r.raw_product_name}
             </td>
             <td className="px-4 py-2 text-xs capitalize">{r.branch}</td>
+            <td className="px-4 py-2 text-xs">{r.category ?? '—'}</td>
+            <td className="px-4 py-2 text-xs">{r.origin ?? '—'}</td>
             <td className="px-4 py-2">
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full ${

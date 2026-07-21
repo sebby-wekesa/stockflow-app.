@@ -239,7 +239,8 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
 
       <div className="import-form-actions">
         <div className="section-sub">
-          You will review parsed rows before anything is committed.
+          You will review parsed rows before anything is committed. Re-importing the same file
+          updates existing products, stock rows, and invoices instead of duplicating them.
         </div>
         <button type="submit" disabled={isPending || !file || !assignedBranchName} className="btn btn-primary">
           {isPending ? 'Parsing file...' : 'Parse & preview'}

@@ -17,6 +17,8 @@
  */
 
 import * as XLSX from 'xlsx'
+import type { ProductCategory, StockOrigin } from '@prisma/client'
+import { normalizeProductCategory, normalizeProductOrigin } from '@/lib/products'
 
 /** Branch codes — matches the strings used elsewhere in the app */
 export type BranchCode = 'mombasa' | 'nairobi' | 'bonje'
@@ -59,6 +61,7 @@ export type ParsedProductRow = {
 export type ParsedStockRow = {
   source_row: number
   movement_date: Date | null
+  product_code?: string | null
   raw_product_name: string | null
   branch: BranchCode
   qty: number | null
@@ -66,6 +69,8 @@ export type ParsedStockRow = {
   direction: 'in' | 'out' | 'balance'
   reference: string | null
   notes: string | null
+  category?: ProductCategory | null
+  origin?: StockOrigin | null
 }
 
 export type ConsumablesWorkbookParseResult = {
@@ -304,8 +309,11 @@ function isConsumablesHeaderRow(row: unknown[]): boolean {
 type ConsumablesSnapshotColumnMap = {
   headerRow: number
   product: number
+  productCode?: number
   quantity: number
   piecesSets?: number
+  category?: number
+  origin?: number
 }
 
 function normalizeConsumablesHeader(value: unknown): string {
@@ -335,9 +343,11 @@ function findConsumablesSnapshotColumnMap(rows: unknown[][]): ConsumablesSnapsho
     'item',
     'description',
     'particulars',
-    'sku',
   ]
+  const productCodeHeaders = ['sku', 'product code', 'item code', 'code']
   const piecesSetsHeaders = ['pcs sets', 'pieces sets', 'pcs', 'pieces', 'sets']
+  const categoryHeaders = ['category', 'product category']
+  const originHeaders = ['origin', 'stock origin', 'product origin']
 
   for (let headerRow = 0; headerRow < Math.min(20, rows.length); headerRow++) {
     const headers = rows[headerRow].map(normalizeConsumablesHeader)
@@ -347,17 +357,30 @@ function findConsumablesSnapshotColumnMap(rows: unknown[][]): ConsumablesSnapsho
     const product = productHeaderPriority
       .map((header) => headers.findIndex((cell) => cell === header))
       .find((index) => index >= 0)
+    const productCode = productCodeHeaders
+      .map((header) => headers.findIndex((cell) => cell === header))
+      .find((index) => index >= 0)
 
-    if (product !== undefined && product !== quantity) {
+    const effectiveProduct = product ?? productCode
+    if (effectiveProduct !== undefined && effectiveProduct !== quantity) {
       const piecesSets = piecesSetsHeaders
+        .map((header) => headers.findIndex((cell) => cell === header))
+        .find((index) => index >= 0)
+      const category = categoryHeaders
+        .map((header) => headers.findIndex((cell) => cell === header))
+        .find((index) => index >= 0)
+      const origin = originHeaders
         .map((header) => headers.findIndex((cell) => cell === header))
         .find((index) => index >= 0)
 
       return {
         headerRow,
-        product,
+        product: effectiveProduct,
         quantity,
+        ...(productCode !== undefined && productCode >= 0 ? { productCode } : {}),
         ...(piecesSets !== undefined && piecesSets >= 0 ? { piecesSets } : {}),
+        ...(category !== undefined && category >= 0 ? { category } : {}),
+        ...(origin !== undefined && origin >= 0 ? { origin } : {}),
       }
     }
   }
@@ -936,10 +959,19 @@ export function parseConsumablesStock(
     for (let i = snapshotColumns.headerRow + 1; i < rows.length; i++) {
       const row = rows[i]
       const snapshotProduct = toStr(getCell(row, snapshotColumns.product))
+      const productCode = snapshotColumns.productCode === undefined
+        ? null
+        : toStr(getCell(row, snapshotColumns.productCode))
       const snapshotQty = toNumber(getCell(row, snapshotColumns.quantity))
       const piecesSets = snapshotColumns.piecesSets === undefined
         ? null
         : toNumber(getCell(row, snapshotColumns.piecesSets))
+      const category = snapshotColumns.category === undefined
+        ? null
+        : normalizeProductCategory(getCell(row, snapshotColumns.category))
+      const origin = snapshotColumns.origin === undefined
+        ? null
+        : normalizeProductOrigin(getCell(row, snapshotColumns.origin))
 
       if (!snapshotProduct || snapshotQty === null) continue
 
@@ -950,6 +982,7 @@ export function parseConsumablesStock(
         out.push({
           source_row: i + 1,
           movement_date: null,
+          product_code: productCode,
           raw_product_name: snapshotProduct,
           branch,
           qty: snapshotQty,
@@ -957,21 +990,28 @@ export function parseConsumablesStock(
           direction: 'balance',
           reference: `${sheetName} import`,
           notes: `Stock snapshot from ${sheetName}`,
+          category,
+          origin,
         })
         continue
       }
 
-      if (snapshotQty === 0) continue
+      // Keep zero-balance products when the file includes product metadata so
+      // category/origin can still be applied to the product master.
+      if (snapshotQty === 0 && category === null && origin === null) continue
 
       out.push({
         source_row: i + 1,
         movement_date: null,
+        product_code: productCode,
         raw_product_name: snapshotProduct,
         branch,
         qty: Math.abs(snapshotQty),
         direction: snapshotQty > 0 ? 'in' : 'out',
         reference: `${sheetName} import`,
         notes: `Stock snapshot from ${sheetName}`,
+        category,
+        origin,
       })
     }
 
