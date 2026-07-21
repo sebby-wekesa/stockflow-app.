@@ -320,6 +320,15 @@ function normalizeConsumablesHeader(value: unknown): string {
   return (toStr(value) ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
+function findConsumablesHeaderIndex(headers: string[], candidates: string[]): number {
+  return headers.findIndex((header) =>
+    candidates.some((candidate) => {
+      const normalizedCandidate = normalizeConsumablesHeader(candidate)
+      return header === normalizedCandidate || header.startsWith(`${normalizedCandidate} `)
+    })
+  )
+}
+
 /**
  * Find the columns in product-list exports such as:
  * SKU | Product name | Category | Origin | Uom | Branch | Current Stock | pcs/sets
@@ -351,26 +360,26 @@ function findConsumablesSnapshotColumnMap(rows: unknown[][]): ConsumablesSnapsho
 
   for (let headerRow = 0; headerRow < Math.min(20, rows.length); headerRow++) {
     const headers = rows[headerRow].map(normalizeConsumablesHeader)
-    const quantity = headers.findIndex((header) => snapshotQuantityHeaders.has(header))
+    const quantity = findConsumablesHeaderIndex(headers, [...snapshotQuantityHeaders])
     if (quantity < 0) continue
 
     const product = productHeaderPriority
-      .map((header) => headers.findIndex((cell) => cell === header))
+      .map((header) => findConsumablesHeaderIndex(headers, [header]))
       .find((index) => index >= 0)
     const productCode = productCodeHeaders
-      .map((header) => headers.findIndex((cell) => cell === header))
+      .map((header) => findConsumablesHeaderIndex(headers, [header]))
       .find((index) => index >= 0)
 
     const effectiveProduct = product ?? productCode
     if (effectiveProduct !== undefined && effectiveProduct !== quantity) {
       const piecesSets = piecesSetsHeaders
-        .map((header) => headers.findIndex((cell) => cell === header))
+        .map((header) => findConsumablesHeaderIndex(headers, [header]))
         .find((index) => index >= 0)
       const category = categoryHeaders
-        .map((header) => headers.findIndex((cell) => cell === header))
+        .map((header) => findConsumablesHeaderIndex(headers, [header]))
         .find((index) => index >= 0)
       const origin = originHeaders
-        .map((header) => headers.findIndex((cell) => cell === header))
+        .map((header) => findConsumablesHeaderIndex(headers, [header]))
         .find((index) => index >= 0)
 
       return {

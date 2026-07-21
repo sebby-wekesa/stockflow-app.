@@ -168,4 +168,29 @@ describe('specialized consumables parser', () => {
       }),
     ])
   })
+
+  it('parses a CSV snapshot through the workbook importer when stock is zero', () => {
+    const buffer = csvBuffer(
+      [
+        'SKU,Product name,Category,Origin,Uom,Branch,Current Stock,pcs/sets',
+        'BRAKE LINING BC 36 DNA10,BRAKE LINING BC 36 DNA10,Brake Linings,Imported,Kg,Bonje,0,38',
+        'BRAKE LINING BC 37 DNA10,BRAKE LINING BC 37 DNA10,Brake Linings,Imported,Kg,Bonje,0,15',
+      ].join('\n')
+    )
+
+    const result = parseConsumablesWorkbook(buffer, 'bonje')
+
+    expect(result.errors).toEqual([])
+    expect(result.candidateSheetNames).toEqual(['Sheet1'])
+    expect(result.rows).toHaveLength(2)
+    expect(result.rows[0]).toEqual(
+      expect.objectContaining({
+        product_code: 'BRAKE LINING BC 36 DNA10',
+        raw_product_name: 'BRAKE LINING BC 36 DNA10',
+        qty: 0,
+        pieces_sets: 38,
+        direction: 'balance',
+      })
+    )
+  })
 })
