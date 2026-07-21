@@ -62,6 +62,7 @@ export type ParsedStockRow = {
   raw_product_name: string | null
   branch: BranchCode
   qty: number | null
+  pieces_sets?: number | null
   direction: 'in' | 'out' | 'balance'
   reference: string | null
   notes: string | null
@@ -149,6 +150,27 @@ export function detectFile(file: File): Promise<DetectResult> {
             sheetNames,
             reason: 'Found "U BOLT LIST" sheet',
           })
+        }
+
+        // Check for product-list stock snapshots with KG and PCS/Sets balances.
+        if (sheetNames.length === 1) {
+          const ws = wb.Sheets[sheetNames[0]]
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
+          const hasProductSnapshotHeaders = rows.some((row) => {
+            const normalized = row.map((cell) => normalizeConsumablesHeader(cell))
+            return (
+              normalized.some((cell) => cell === 'product name' || cell === 'sku') &&
+              normalized.includes('current stock')
+            )
+          })
+
+          if (hasProductSnapshotHeaders) {
+            return resolve({
+              recommendedSheetType: 'consumables_stock',
+              sheetNames,
+              reason: 'Found product snapshot headers including "Current Stock"',
+            })
+          }
         }
 
         // Check for consumables stock sheets.
@@ -283,6 +305,7 @@ type ConsumablesSnapshotColumnMap = {
   headerRow: number
   product: number
   quantity: number
+  piecesSets?: number
 }
 
 function normalizeConsumablesHeader(value: unknown): string {
@@ -314,6 +337,7 @@ function findConsumablesSnapshotColumnMap(rows: unknown[][]): ConsumablesSnapsho
     'particulars',
     'sku',
   ]
+  const piecesSetsHeaders = ['pcs sets', 'pieces sets', 'pcs', 'pieces', 'sets']
 
   for (let headerRow = 0; headerRow < Math.min(20, rows.length); headerRow++) {
     const headers = rows[headerRow].map(normalizeConsumablesHeader)
@@ -325,7 +349,16 @@ function findConsumablesSnapshotColumnMap(rows: unknown[][]): ConsumablesSnapsho
       .find((index) => index >= 0)
 
     if (product !== undefined && product !== quantity) {
-      return { headerRow, product, quantity }
+      const piecesSets = piecesSetsHeaders
+        .map((header) => headers.findIndex((cell) => cell === header))
+        .find((index) => index >= 0)
+
+      return {
+        headerRow,
+        product,
+        quantity,
+        ...(piecesSets !== undefined && piecesSets >= 0 ? { piecesSets } : {}),
+      }
     }
   }
 
@@ -904,8 +937,31 @@ export function parseConsumablesStock(
       const row = rows[i]
       const snapshotProduct = toStr(getCell(row, snapshotColumns.product))
       const snapshotQty = toNumber(getCell(row, snapshotColumns.quantity))
+      const piecesSets = snapshotColumns.piecesSets === undefined
+        ? null
+        : toNumber(getCell(row, snapshotColumns.piecesSets))
 
-      if (!snapshotProduct || snapshotQty === null || snapshotQty === 0) continue
+      if (!snapshotProduct || snapshotQty === null) continue
+
+      // Product-list exports contain both KG stock and PCS/Sets. A zero KG
+      // balance is still a valid row when PCS/Sets is present and must not be
+      // discarded as an empty movement.
+      if (snapshotColumns.piecesSets !== undefined) {
+        out.push({
+          source_row: i + 1,
+          movement_date: null,
+          raw_product_name: snapshotProduct,
+          branch,
+          qty: snapshotQty,
+          pieces_sets: piecesSets,
+          direction: 'balance',
+          reference: `${sheetName} import`,
+          notes: `Stock snapshot from ${sheetName}`,
+        })
+        continue
+      }
+
+      if (snapshotQty === 0) continue
 
       out.push({
         source_row: i + 1,
@@ -925,6 +981,9 @@ export function parseConsumablesStock(
         headerRow: snapshotColumns.headerRow + 1,
         productColumn: snapshotColumns.product + 1,
         quantityColumn: snapshotColumns.quantity + 1,
+        piecesSetsColumn: snapshotColumns.piecesSets === undefined
+          ? null
+          : snapshotColumns.piecesSets + 1,
         dataRowCount: Math.max(0, rows.length - snapshotColumns.headerRow - 1),
       })
     }

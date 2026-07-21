@@ -116,13 +116,22 @@ describe('specialized consumables parser', () => {
         source_row: 2,
         raw_product_name: 'Brake lining DNA10',
         qty: 12.5,
-        direction: 'in',
+        pieces_sets: 38,
+        direction: 'balance',
+      }),
+      expect.objectContaining({
+        source_row: 3,
+        raw_product_name: 'Brake lining DNA10B',
+        qty: 0,
+        pieces_sets: 15,
+        direction: 'balance',
       }),
       expect.objectContaining({
         source_row: 4,
         raw_product_name: 'Brake lining DNA10C',
-        qty: 2,
-        direction: 'out',
+        qty: -2,
+        pieces_sets: 3,
+        direction: 'balance',
       }),
     ])
   })

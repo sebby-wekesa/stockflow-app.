@@ -227,6 +227,7 @@ function StockPreviewTable({ rows }: { rows: any[] }) {
           <th className="px-4 py-2 font-medium">Branch</th>
           <th className="px-4 py-2 font-medium">Direction</th>
           <th className="px-4 py-2 font-medium text-right">Qty</th>
+          <th className="px-4 py-2 font-medium text-right">PCS/Sets</th>
           <th className="px-4 py-2 font-medium">Ref</th>
         </tr>
       </thead>
@@ -253,6 +254,7 @@ function StockPreviewTable({ rows }: { rows: any[] }) {
               </span>
             </td>
             <td className="px-4 py-2 text-right font-mono">{r.qty}</td>
+            <td className="px-4 py-2 text-right font-mono">{r.pieces_sets ?? '—'}</td>
             <td className="px-4 py-2 text-xs text-muted">{r.reference ?? '—'}</td>
           </tr>
         ))}

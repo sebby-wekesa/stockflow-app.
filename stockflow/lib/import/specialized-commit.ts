@@ -538,6 +538,46 @@ export async function commitConsumablesImport(
           continue
         }
 
+        if (row.direction === 'balance') {
+          const current = await tx.product.findUnique({
+            where: { id: productId },
+            select: { currentStock: true },
+          })
+          if (!current) {
+            result.skipped++
+            continue
+          }
+
+          const targetStock = row.qty
+          const stockDelta = targetStock - current.currentStock
+          if (stockDelta !== 0) {
+            await tx.stockMovement.create({
+              data: {
+                productId,
+                branchId,
+                movementType: 'adjustment',
+                quantity: stockDelta,
+                reference: row.reference ?? `IMPORT-${importBatchId.slice(0, 8)}`,
+                notes: row.notes ?? `Imported stock snapshot`,
+              },
+            })
+          }
+
+          await tx.product.update({
+            where: { id: productId },
+            data: {
+              branchId,
+              currentStock: targetStock,
+              ...(row.pieces_sets !== null && row.pieces_sets !== undefined
+                ? { piecesSets: Math.max(0, Math.trunc(row.pieces_sets)) }
+                : {}),
+            },
+          })
+
+          result.written++
+          continue
+        }
+
         const isInbound = row.direction === 'in'
         const signedQty = isInbound ? row.qty : -row.qty
         const movementType = isInbound ? 'stock_in' : 'stock_out'

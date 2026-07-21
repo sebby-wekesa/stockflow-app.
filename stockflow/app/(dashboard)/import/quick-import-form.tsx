@@ -44,7 +44,7 @@ const SHEET_TYPES: SheetTypeOption[] = [
     value: 'consumables_stock',
     label: 'Branch consumables stock',
     description:
-      'Consumables IN-OUT sheets (must contain "IN-OUT" in sheet name). Requires selecting the branch.',
+      'Consumables IN-OUT sheets or product snapshots with Current Stock / PCS-Sets columns. Requires selecting the branch.',
     needsBranch: true,
   },
 ]
@@ -110,6 +110,10 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
         }
         if (has('u bolt') || has('ubolt')) {
           setSheetType('ubolt_master')
+          return
+        }
+        if ((has('product name') || has('sku')) && has('current stock')) {
+          setSheetType('consumables_stock')
           return
         }
         if (header.some((h) => h.includes('in-out') || h.includes('consumable'))) {
