@@ -107,7 +107,7 @@ describe('specialized consumables parser', () => {
     const buffer = workbookBuffer({
       Sheet1: [
         ['SKU', 'Product name', 'Category', 'Origin', 'Uom', 'Branch', 'Current Stock', 'pcs/sets'],
-        ['BRAKE LINING BC 36 DNA10', 'Brake lining DNA10', 'Brake Linings', 'Imported', 'Kg', 'Bonje', 12.5, 38],
+        ['BRAKE LINING BC 36 DNA10', 'Brake lining DNA10', 'Brake Linings', 'Imported', 'Kg', 'Bonje', 12.5, 38.5],
         ['BRAKE LINING BC 37 DNA10', 'Brake lining DNA10B', 'Brake Linings', 'Imported', 'Kg', 'Bonje', 0, 15],
         ['BRAKE LINING BC 38 DNA10', 'Brake lining DNA10C', 'Brake Linings', 'Imported', 'Kg', 'Bonje', -2, 3],
       ],
@@ -120,7 +120,7 @@ describe('specialized consumables parser', () => {
         source_row: 2,
         raw_product_name: 'Brake lining DNA10',
         qty: 12.5,
-        pieces_sets: 38,
+        pieces_sets: 38.5,
         direction: 'balance',
         category: 'break_linings',
         origin: 'IMPORTED',
@@ -150,7 +150,7 @@ describe('specialized consumables parser', () => {
     const buffer = csvBuffer(
       [
         'SKU,Product name,Category,Origin,Uom,Branch,Current Stock,pcs/sets',
-        'HUB-001,Wheel hub,Trailer Parts,Local Purchase,Kg,Nairobi,3,2',
+        'HUB-001,Wheel hub,Trailer Parts,Local Purchase,Kg,Nairobi,3,2.5',
       ].join('\n')
     )
 
@@ -163,7 +163,7 @@ describe('specialized consumables parser', () => {
         category: 'trailer_parts',
         origin: 'LOCAL_PURCHASE',
         qty: 3,
-        pieces_sets: 2,
+        pieces_sets: 2.5,
         direction: 'balance',
       }),
     ])

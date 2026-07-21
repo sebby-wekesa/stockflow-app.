@@ -35,7 +35,7 @@ const createSchema = z.object({
   cost_price: z.coerce.number().nonnegative().optional().nullable(),
   selling_price: z.coerce.number().nonnegative().optional().nullable(),
   reorder_point: z.coerce.number().int().nonnegative().optional().nullable(),
-  pieces_sets: z.coerce.number().int().nonnegative().optional().default(0),
+  pieces_sets: z.coerce.number().nonnegative().optional().default(0),
   branch: z.enum(ALL_BRANCHES as [BranchCode, ...BranchCode[]]),
   vendor: z.string().max(200).optional().nullable(),
   route_type: z.enum(['FML', 'HML']).optional().nullable(),
@@ -74,7 +74,7 @@ const updateUomSchema = z.object({
 })
 
 const updatePiecesSetsSchema = z.object({
-  piecesSets: z.coerce.number().int().nonnegative(),
+  piecesSets: z.coerce.number().nonnegative(),
 })
 
 const updateCurrentStockSchema = z.object({
@@ -372,7 +372,7 @@ export async function updateProductPiecesSets(productId: string, piecesSets: num
 
   const parsed = updatePiecesSetsSchema.safeParse({ piecesSets })
   if (!parsed.success) {
-    throw new Error('PCS/Sets must be a whole number')
+    throw new Error('PCS/Sets must be zero or greater')
   }
 
   const product = await db.product.findFirst({

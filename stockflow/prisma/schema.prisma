@@ -380,7 +380,7 @@ model Product {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   organizationId  String
-  piecesSets      Int               @default(0)
+  piecesSets      Float             @default(0)
   routeType       RouteType?
   Branch          Branch?           @relation(fields: [branchId], references: [id])
   Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Product_organizationId_fk")

@@ -27,7 +27,7 @@ const lineSchema = z.object({
   product_id: z.string().min(1),
   qty: z.coerce.number().int().positive(),
   unit_price: z.coerce.number().nonnegative(),
-  pieces_sets: z.coerce.number().int().nonnegative().optional().default(0),
+  pieces_sets: z.coerce.number().nonnegative().optional().default(0),
   notes: z.string().max(500).optional().nullable(),
 })
 

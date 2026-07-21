@@ -383,7 +383,7 @@ function SalesLineRow({
             <input
               type="number"
               min="0"
-              step="1"
+              step="any"
               value={line.pieces_sets}
               onChange={(e) => onUpdate({ pieces_sets: e.target.value })}
               className="form-input font-mono"

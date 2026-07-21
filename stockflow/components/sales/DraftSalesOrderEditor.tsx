@@ -154,7 +154,7 @@ export function DraftSalesOrderEditor({
                       className="form-input font-mono text-right"
                       type="number"
                       min="0"
-                      step="1"
+                      step="any"
                       value={line.piecesSets}
                       onChange={(event) => updateLine(index, { piecesSets: event.target.value })}
                     />

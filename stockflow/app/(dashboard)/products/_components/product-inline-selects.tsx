@@ -146,8 +146,8 @@ export function ProductPiecesSetsInput({
 
   function save(nextValue = value) {
     const parsed = Number(nextValue)
-    if (!Number.isInteger(parsed) || parsed < 0) {
-      setError('Whole number only')
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Must be zero or greater')
       setValue(lastSavedValue)
       return
     }
@@ -173,7 +173,7 @@ export function ProductPiecesSetsInput({
         aria-label="PCS/Sets"
         type="number"
         min="0"
-        step="1"
+        step="any"
         value={value}
         disabled={isPending}
         onChange={(event) => setValue(event.target.value)}

@@ -382,7 +382,7 @@ export function ProductForm({
               name="pieces_sets"
               type="number"
               min="0"
-              step="1"
+              step="any"
               defaultValue={initial?.pieces_sets ?? 0}
               className="form-input w-full font-mono"
             />

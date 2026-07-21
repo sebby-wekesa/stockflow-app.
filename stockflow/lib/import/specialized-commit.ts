@@ -768,7 +768,7 @@ export async function commitConsumablesImport(
               currentStock: targetStock,
               ...productAttributes,
               ...(row.pieces_sets !== null && row.pieces_sets !== undefined
-                ? { piecesSets: Math.max(0, Math.trunc(row.pieces_sets)) }
+                ? { piecesSets: Math.max(0, row.pieces_sets) }
               : {}),
             },
           })
