@@ -270,10 +270,66 @@ function isConsumablesHeaderRow(row: unknown[]): boolean {
     cell === 'stock in' ||
     cell === 'stock out' ||
     cell === 'balance' ||
-    cell === 'bal'
+    cell === 'bal' ||
+    cell === 'current stock' ||
+    cell === 'balance stock' ||
+    cell === 'current balance'
   )
 
   return (hasProductHeader && (hasQtyHeader || hasMovementHeader)) || (hasQtyHeader && hasMovementHeader)
+}
+
+type ConsumablesSnapshotColumnMap = {
+  headerRow: number
+  product: number
+  quantity: number
+}
+
+function normalizeConsumablesHeader(value: unknown): string {
+  return (toStr(value) ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+/**
+ * Find the columns in product-list exports such as:
+ * SKU | Product name | Category | Origin | Uom | Branch | Current Stock | pcs/sets
+ *
+ * These exports are different from the older positional Product | Name | ... |
+ * Current Stock layout, so the quantity column must not be hard-coded.
+ */
+function findConsumablesSnapshotColumnMap(rows: unknown[][]): ConsumablesSnapshotColumnMap | null {
+  const snapshotQuantityHeaders = new Set([
+    'current stock',
+    'balance stock',
+    'current balance',
+    'stock on hand',
+    'quantity on hand',
+  ])
+
+  const productHeaderPriority = [
+    'product name',
+    'product',
+    'item name',
+    'item',
+    'description',
+    'particulars',
+    'sku',
+  ]
+
+  for (let headerRow = 0; headerRow < Math.min(20, rows.length); headerRow++) {
+    const headers = rows[headerRow].map(normalizeConsumablesHeader)
+    const quantity = headers.findIndex((header) => snapshotQuantityHeaders.has(header))
+    if (quantity < 0) continue
+
+    const product = productHeaderPriority
+      .map((header) => headers.findIndex((cell) => cell === header))
+      .find((index) => index >= 0)
+
+    if (product !== undefined && product !== quantity) {
+      return { headerRow, product, quantity }
+    }
+  }
+
+  return null
 }
 
 export function parseConsumablesWorkbook(
@@ -841,6 +897,40 @@ export function parseConsumablesStock(
 ): ParsedStockRow[] {
   const { rows } = readSheetAsRows(buffer, sheetName)
   const out: ParsedStockRow[] = []
+  const snapshotColumns = findConsumablesSnapshotColumnMap(rows)
+
+  if (snapshotColumns) {
+    for (let i = snapshotColumns.headerRow + 1; i < rows.length; i++) {
+      const row = rows[i]
+      const snapshotProduct = toStr(getCell(row, snapshotColumns.product))
+      const snapshotQty = toNumber(getCell(row, snapshotColumns.quantity))
+
+      if (!snapshotProduct || snapshotQty === null || snapshotQty === 0) continue
+
+      out.push({
+        source_row: i + 1,
+        movement_date: null,
+        raw_product_name: snapshotProduct,
+        branch,
+        qty: Math.abs(snapshotQty),
+        direction: snapshotQty > 0 ? 'in' : 'out',
+        reference: `${sheetName} import`,
+        notes: `Stock snapshot from ${sheetName}`,
+      })
+    }
+
+    if (out.length === 0) {
+      console.error('Consumables snapshot columns detected but no non-zero stock rows found:', {
+        sheetName,
+        headerRow: snapshotColumns.headerRow + 1,
+        productColumn: snapshotColumns.product + 1,
+        quantityColumn: snapshotColumns.quantity + 1,
+        dataRowCount: Math.max(0, rows.length - snapshotColumns.headerRow - 1),
+      })
+    }
+
+    return out
+  }
 
   // Start from row 0 and skip header-like rows
   for (let i = 0; i < rows.length; i++) {
@@ -882,7 +972,7 @@ export function parseConsumablesStock(
       })
     }
 
-    // Layout 2: Product | Name | Category | UOM | Branch | Current stock
+    // Legacy snapshot layout: Product | Name | Category | UOM | Branch | Current stock
     const snapshotProduct = toStr(getCell(row, 0))
     const snapshotQty = toNumber(getCell(row, 5))
     if (snapshotProduct && snapshotQty !== null && snapshotQty !== 0) {

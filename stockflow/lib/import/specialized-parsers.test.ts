@@ -98,4 +98,32 @@ describe('specialized consumables parser', () => {
       }),
     ])
   })
+
+  it('maps product-list snapshot columns by header instead of position', () => {
+    const buffer = workbookBuffer({
+      Sheet1: [
+        ['SKU', 'Product name', 'Category', 'Origin', 'Uom', 'Branch', 'Current Stock', 'pcs/sets'],
+        ['BRAKE LINING BC 36 DNA10', 'Brake lining DNA10', 'Brake Linings', 'Imported', 'Kg', 'Bonje', 12.5, 38],
+        ['BRAKE LINING BC 37 DNA10', 'Brake lining DNA10B', 'Brake Linings', 'Imported', 'Kg', 'Bonje', 0, 15],
+        ['BRAKE LINING BC 38 DNA10', 'Brake lining DNA10C', 'Brake Linings', 'Imported', 'Kg', 'Bonje', -2, 3],
+      ],
+    })
+
+    const rows = parseConsumablesStock(buffer, 'Sheet1', 'bonje')
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        source_row: 2,
+        raw_product_name: 'Brake lining DNA10',
+        qty: 12.5,
+        direction: 'in',
+      }),
+      expect.objectContaining({
+        source_row: 4,
+        raw_product_name: 'Brake lining DNA10C',
+        qty: 2,
+        direction: 'out',
+      }),
+    ])
+  })
 })
