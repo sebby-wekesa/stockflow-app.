@@ -31,7 +31,7 @@ export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   springs: 'Springs',
   ubolts: 'Ubolts',
   trailer_parts: 'Trailer parts',
-  break_linings: 'Break linings',
+  break_linings: 'Brake Linings',
   center_bolts: 'Center bolts',
   nuts: 'Nuts',
 }
@@ -41,7 +41,7 @@ export const CATEGORY_SHORT: Record<ProductCategory, string> = {
   springs: 'Springs',
   ubolts: 'Ubolts',
   trailer_parts: 'Trailer parts',
-  break_linings: 'Break linings',
+  break_linings: 'Brake Linings',
   center_bolts: 'Center bolts',
   nuts: 'Nuts',
 }
