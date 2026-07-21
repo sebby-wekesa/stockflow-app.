@@ -656,14 +656,30 @@ export async function commitConsumablesImport(
     })
   }
 
+  // Resolve SKU-based snapshots in one tenant-scoped query instead of one
+  // round trip per CSV row. Large product snapshots otherwise spend most of
+  // the Vercel request duration waiting on sequential database lookups.
+  const productCodes = Array.from(
+    new Set(
+      Array.from(attributesByName.values())
+        .map((attributes) => attributes.productCode)
+        .filter((code): code is string => Boolean(code))
+    )
+  )
+  const productsBySku = new Map<string, { id: string; sku: string | null }>()
+  if (productCodes.length > 0) {
+    const products = await db.product.findMany({
+      where: { sku: { in: productCodes } },
+      select: { id: true, sku: true },
+    })
+    for (const product of products) {
+      if (product.sku) productsBySku.set(product.sku, product)
+    }
+  }
+
   for (const name of uniqueNames) {
     const productCode = attributesByName.get(name)?.productCode
-    const matchByCode = productCode
-      ? await db.product.findFirst({
-          where: { sku: productCode },
-          select: { id: true },
-        })
-      : null
+    const matchByCode = productCode ? productsBySku.get(productCode) : null
     const match = matchByCode ?? (await matchProductName(name, organizationId))
     if (match?.id ?? match?.product?.id) {
       nameToProductId.set(name, match.id ?? match.product.id)
@@ -692,11 +708,28 @@ export async function commitConsumablesImport(
 
   clearAliasCache(organizationId)
 
-  const CHUNK = 20
+  const CHUNK = 100
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK)
 
     await withTenantTransaction(organizationId, async (tx) => {
+      const chunkProductIds = Array.from(
+        new Set(
+          chunk
+            .map((row) => row.raw_product_name && nameToProductId.get(row.raw_product_name))
+            .filter((productId): productId is string => Boolean(productId))
+        )
+      )
+      const currentProducts = chunkProductIds.length > 0
+        ? await tx.product.findMany({
+            where: { id: { in: chunkProductIds } },
+            select: { id: true, currentStock: true },
+          })
+        : []
+      const currentStockByProduct = new Map(
+        currentProducts.map((product) => [product.id, product.currentStock])
+      )
+
       for (const row of chunk) {
         if (!row.raw_product_name || row.qty === null) {
           result.skipped++
@@ -720,7 +753,9 @@ export async function commitConsumablesImport(
         }
 
         const saveProductAlias = async () => {
-          if (!row.raw_product_name) return
+          // SKU is already a stable identity; aliases are only needed for
+          // name-based rows and would otherwise add one write per snapshot row.
+          if (!row.raw_product_name || row.product_code) return
           await tx.productAlias.upsert({
             where: {
               product_id_alias: {
@@ -737,17 +772,14 @@ export async function commitConsumablesImport(
         }
 
         if (row.direction === 'balance') {
-          const current = await tx.product.findUnique({
-            where: { id: productId },
-            select: { currentStock: true },
-          })
-          if (!current) {
+          const currentStock = currentStockByProduct.get(productId)
+          if (currentStock === undefined) {
             result.skipped++
             continue
           }
 
           const targetStock = row.qty
-          const stockDelta = targetStock - current.currentStock
+          const stockDelta = targetStock - currentStock
           if (stockDelta !== 0) {
             await tx.stockMovement.create({
               data: {
@@ -772,6 +804,7 @@ export async function commitConsumablesImport(
               : {}),
             },
           })
+          currentStockByProduct.set(productId, targetStock)
           await saveProductAlias()
 
           result.written++
@@ -811,6 +844,10 @@ export async function commitConsumablesImport(
                     : {}),
                 },
               })
+              currentStockByProduct.set(
+                productId,
+                (currentStockByProduct.get(productId) ?? 0) + stockDelta
+              )
             } else {
               await tx.product.update({
                 where: { id: existingMovement.productId },
@@ -824,6 +861,10 @@ export async function commitConsumablesImport(
                   ...productAttributes,
                 },
               })
+              currentStockByProduct.set(
+                productId,
+                (currentStockByProduct.get(productId) ?? 0) + signedQty
+              )
             }
 
             await tx.stockMovement.update({
@@ -856,6 +897,10 @@ export async function commitConsumablesImport(
                 ...productAttributes,
               },
             })
+            currentStockByProduct.set(
+              productId,
+              (currentStockByProduct.get(productId) ?? 0) + signedQty
+            )
           }
 
           await saveProductAlias()
