@@ -10,6 +10,7 @@ export default function InviteUserModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
+  const [role, setRole] = useState("OPERATOR");
 
   useEffect(() => {
     if (isOpen) {
@@ -48,7 +49,10 @@ export default function InviteUserModal() {
     <>
       {/* The Trigger Button */}
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setRole("OPERATOR");
+          setIsOpen(true);
+        }}
         className="btn-primary"
         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
       >
@@ -185,8 +189,10 @@ export default function InviteUserModal() {
                 }}>
                   Role
                 </label>
-                <select
-                  name="role"
+                  <select
+                    name="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
                   style={{
                     width: '100%',
                     background: 'var(--surface2)',
@@ -225,7 +231,7 @@ export default function InviteUserModal() {
                 <div style={{ position: 'relative' }}>
                   <select
                     name="branchId"
-                    required
+                    required={role !== "ADMIN"}
                     style={{
                       width: '100%',
                       background: 'var(--surface2)',
@@ -241,7 +247,9 @@ export default function InviteUserModal() {
                     onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
                     onBlur={(e) => e.target.style.borderColor = 'var(--border2)'}
                   >
-                    <option value="">Select a branch...</option>
+                    <option value="">
+                      {role === "ADMIN" ? "All branches (super user)" : "Select a branch..."}
+                    </option>
                     {branches.map(b => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}

@@ -49,7 +49,10 @@ export default async function TransferPage() {
   const sourceBranchIds = sourceBranches
     .map((branch) => branchIdByCode.get(branch))
     .filter((branchId): branchId is string => Boolean(branchId))
-  const receivingBranchIds = user.branches.map((branch) => branch.id)
+  const isSuperUser = user.role === 'ADMIN' && user.branches.length === 0
+  const receivingBranchIds = isSuperUser
+    ? branchRecords.map((branch) => branch.id)
+    : user.branches.map((branch) => branch.id)
 
   const pendingTransferRecords = receivingBranchIds.length === 0
     ? []
@@ -147,7 +150,7 @@ export default async function TransferPage() {
             Move finished goods between branches and keep the handoff auditable.
           </div>
         </div>
-        <span className="badge badge-amber stock-transfer-status">{assignedBranchCode ? `${BRANCH_LABELS[assignedBranchCode]} stock` : 'Inventory movement'}</span>
+        <span className="badge badge-amber stock-transfer-status">{isSuperUser ? 'All branches' : assignedBranchCode ? `${BRANCH_LABELS[assignedBranchCode]} stock` : 'Inventory movement'}</span>
       </div>
 
       <div className="stock-transfer-layout">

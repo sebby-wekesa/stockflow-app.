@@ -268,7 +268,9 @@ export default async function UsersPage({
                   </span>
                 </td>
                 <td>
-                  {user.Branch ? (
+                  {user.role === 'ADMIN' && !user.Branch ? (
+                    <span className="badge badge-teal badge-sm">All branches</span>
+                  ) : user.Branch ? (
                     <span className="badge badge-outline badge-sm">
                       {BRANCH_LABELS[user.Branch.code as keyof typeof BRANCH_LABELS] || user.Branch.code}
                     </span>

@@ -66,6 +66,9 @@ export async function inviteUser(_prevState: unknown, formData: FormData) {
     if (typeof role !== "string" || !USER_ROLES.includes(role as typeof USER_ROLES[number])) {
       return { success: false, error: "Invalid role" };
     }
+    if (role !== "ADMIN" && !branchId) {
+      return { success: false, error: "A branch is required for non-admin users." };
+    }
 
     const existingUser = await db.user.findFirst({
       where: { email },

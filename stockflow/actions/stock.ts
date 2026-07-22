@@ -205,7 +205,8 @@ export async function confirmStockTransfer(transferId: string) {
   })
   if (!transfer) throw new Error('Transfer is no longer awaiting receipt')
 
-  const isReceivingBranchUser = user.branches.some(
+  const isSuperUser = user.role === 'ADMIN' && user.branches.length === 0
+  const isReceivingBranchUser = isSuperUser || user.branches.some(
     (branch) => branch.id === transfer.destinationBranchId
   )
   if (!isReceivingBranchUser) {
