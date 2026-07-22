@@ -141,24 +141,6 @@ export async function dispatchTransfer(formData: FormData) {
       )
     }
 
-    await tx.productBranchStock.upsert({
-      where: {
-        branchId_productId: {
-          branchId: destBranch.id,
-          productId: product.id,
-        },
-      },
-      update: data.quantity_unit === 'KG'
-        ? { availableQty: { increment: data.qty } }
-        : { availablePiecesSets: { increment: data.qty } },
-      create: {
-        productId: product.id,
-        branchId: destBranch.id,
-        availableQty: data.quantity_unit === 'KG' ? data.qty : 0,
-        availablePiecesSets: data.quantity_unit === 'PCS_SETS' ? data.qty : 0,
-      },
-    })
-
     await tx.stockMovement.create({
       data: {
         productId: data.product_id,
@@ -166,28 +148,128 @@ export async function dispatchTransfer(formData: FormData) {
         movementType: 'transfer_out',
         quantity: -data.qty,
         reference,
-        notes: `${quantityLabel} · ${data.notes ?? `Transfer to ${destBranch.name}`}`,
+        notes: `${quantityLabel} · ${data.notes ?? `Dispatched to ${destBranch.name}`}`,
       },
     })
 
-    await tx.stockMovement.create({
+    await tx.stockTransfer.create({
       data: {
-        productId: data.product_id,
-        branchId: destBranch.id,
-        movementType: 'transfer_in',
-        quantity: data.qty,
         reference,
-        notes: `${quantityLabel} · ${data.notes ?? `Transfer from ${sourceBranch.name}`}`,
+        productId: product.id,
+        sourceBranchId: sourceBranch.id,
+        destinationBranchId: destBranch.id,
+        quantity: data.qty,
+        quantityUnit: data.quantity_unit,
+        notes: data.notes ?? null,
       },
     })
 
     await tx.auditLog.create({
       data: {
         userId: user.id,
-        action: 'STOCK_TRANSFER',
-        entityType: 'Product',
+        action: 'STOCK_TRANSFER_DISPATCHED',
+        entityType: 'StockTransfer',
         entityId: data.product_id,
-        details: `Transferred ${data.qty} ${quantityLabel} of ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}. ${data.notes ?? ''}`,
+        details: `Dispatched ${data.qty} ${quantityLabel} of ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}; awaiting receipt confirmation. ${data.notes ?? ''}`,
+      },
+    })
+  }, { maxWait: 10000, timeout: 30000 })
+
+  revalidatePath('/stock')
+  revalidatePath('/stock/transfer')
+}
+
+export async function confirmStockTransfer(transferId: string) {
+  const parsed = z.string().min(1).safeParse(transferId)
+  if (!parsed.success) throw new Error('Transfer not found')
+
+  const user = await requireActiveAuth()
+  const db = getTenantPrisma(user.organizationId)
+  const transfer = await db.stockTransfer.findFirst({
+    where: {
+      id: parsed.data,
+      status: 'PENDING',
+    },
+    select: {
+      id: true,
+      reference: true,
+      productId: true,
+      destinationBranchId: true,
+      quantity: true,
+      quantityUnit: true,
+      notes: true,
+      Product: { select: { sku: true, name: true } },
+      SourceBranch: { select: { name: true } },
+      DestinationBranch: { select: { name: true } },
+    },
+  })
+  if (!transfer) throw new Error('Transfer is no longer awaiting receipt')
+
+  const canReceive = ['ADMIN', 'MANAGER'].includes(user.role) || user.branches.some(
+    (branch) => branch.id === transfer.destinationBranchId
+  )
+  if (!canReceive) {
+    throw new Error('You can only confirm stock received at your assigned branch')
+  }
+
+  if (transfer.quantityUnit !== 'KG' && transfer.quantityUnit !== 'PCS_SETS') {
+    throw new Error('Transfer has an unsupported quantity unit')
+  }
+  const quantityLabel = transfer.quantityUnit === 'KG' ? 'KG' : 'PCS/Sets'
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const claimed = await tx.stockTransfer.updateMany({
+      where: {
+        id: transfer.id,
+        status: 'PENDING',
+        destinationBranchId: transfer.destinationBranchId,
+      },
+      data: {
+        status: 'RECEIVED',
+        receivedAt: new Date(),
+        receivedById: user.id,
+      },
+    })
+    if (claimed.count === 0) {
+      throw new Error('Transfer has already been received')
+    }
+
+    await tx.productBranchStock.upsert({
+      where: {
+        branchId_productId: {
+          branchId: transfer.destinationBranchId,
+          productId: transfer.productId,
+        },
+      },
+      update: transfer.quantityUnit === 'KG'
+        ? { availableQty: { increment: transfer.quantity } }
+        : { availablePiecesSets: { increment: transfer.quantity } },
+      create: {
+        productId: transfer.productId,
+        branchId: transfer.destinationBranchId,
+        availableQty: transfer.quantityUnit === 'KG' ? transfer.quantity : 0,
+        availablePiecesSets: transfer.quantityUnit === 'PCS_SETS' ? transfer.quantity : 0,
+      },
+    })
+
+    await tx.stockMovement.create({
+      data: {
+        productId: transfer.productId,
+        branchId: transfer.destinationBranchId,
+        movementType: 'transfer_in',
+        quantity: transfer.quantity,
+        reference: transfer.reference,
+        notes: `${quantityLabel} · ${transfer.notes ?? `Received from ${transfer.SourceBranch.name}`}`,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'STOCK_TRANSFER_RECEIVED',
+        entityType: 'StockTransfer',
+        entityId: transfer.id,
+        details: `Received ${transfer.quantity} ${quantityLabel} of ${transfer.Product.sku ?? transfer.Product.name} at ${transfer.DestinationBranch.name} from ${transfer.SourceBranch.name}.`,
       },
     })
   }, { maxWait: 10000, timeout: 30000 })

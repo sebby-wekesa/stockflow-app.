@@ -58,6 +58,8 @@ model Branch {
   InventoryFinishedGoods InventoryFinishedGoods[]
   InventoryRawMaterial   InventoryRawMaterial[]
   ProductBranchStock     ProductBranchStock[]
+  StockTransfersSent     StockTransfer[]      @relation("StockTransferSourceBranch")
+  StockTransfersReceived StockTransfer[]      @relation("StockTransferDestinationBranch")
   Invitation             Invitation[]
   MaterialReceipt        MaterialReceipt[]
   Product                Product[]
@@ -360,6 +362,7 @@ model Organization {
   stages                   Stage[]
   stageLogs                StageLog[]
   stockMovements           StockMovement[]
+  stockTransfers           StockTransfer[]
   suppliers                Supplier[]
   unitOfMeasures           UnitOfMeasure[]
   User                     User[]
@@ -391,6 +394,7 @@ model Product {
   ProductReceipt  ProductReceipt[]
   ProductionOrder ProductionOrder[]
   StockMovement   StockMovement[]
+  StockTransfer   StockTransfer[]
 
   @@unique([organizationId, sku], map: "Product_org_sku_key")
   @@index([organizationId])
@@ -782,6 +786,7 @@ model User {
   OperationLog         OperationLog[]
   SaleOrderCreated     SaleOrder[]
   StageLog             StageLog[]
+  StockTransfersReceived StockTransfer[] @relation("StockTransferReceivedBy")
   Branch               Branch?               @relation(fields: [branchId], references: [id])
   Organization         Organization?         @relation(fields: [organizationId], references: [id])
 }
@@ -823,6 +828,31 @@ model StockMovement {
   Product        Product      @relation(fields: [productId], references: [id])
 
   @@index([organizationId])
+}
+
+model StockTransfer {
+  id                  String              @id @default(uuid())
+  reference           String
+  productId           String
+  sourceBranchId      String
+  destinationBranchId String
+  quantity            Float
+  quantityUnit        String              @default("KG")
+  status              StockTransferStatus @default(PENDING)
+  notes               String?
+  createdAt           DateTime            @default(now())
+  receivedAt          DateTime?
+  receivedById        String?
+  organizationId      String
+  Product             Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  SourceBranch        Branch              @relation("StockTransferSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Cascade)
+  DestinationBranch   Branch              @relation("StockTransferDestinationBranch", fields: [destinationBranchId], references: [id], onDelete: Cascade)
+  ReceivedBy          User?               @relation("StockTransferReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  Organization        Organization        @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "StockTransfer_organizationId_fk")
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
+  @@index([organizationId, destinationBranchId, status])
 }
 
 model ChartAccount {
@@ -1140,6 +1170,11 @@ enum StockStatus {
   LOW_STOCK
   OUT_OF_STOCK
   REORDER_NEEDED
+}
+
+enum StockTransferStatus {
+  PENDING
+  RECEIVED
 }
 
 enum AccountType {

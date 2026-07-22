@@ -93,7 +93,7 @@ export function TransferForm({
     startTransition(async () => {
       try {
         await dispatchTransfer(fd)
-        setSuccess(`Successfully transferred ${qty} ${unitLabel} from ${sourceBranch} to ${destBranch}`)
+        setSuccess(`Transfer dispatched: ${qty} ${unitLabel} from ${sourceBranch} to ${destBranch}. Awaiting receipt confirmation.`)
         // Reset form
         setPicked(null)
         setQty('')

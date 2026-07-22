@@ -3,6 +3,7 @@ import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, normalizeBranchCode } from '@/lib/branches'
 import { TransferForm } from '@/components/stock/TransferForm'
+import { PendingTransfers, type PendingTransferItem } from '@/components/stock/PendingTransfers'
 import type { BranchCode as Branch } from '@/lib/branches'
 
 export const dynamic = 'force-dynamic';
@@ -48,6 +49,42 @@ export default async function TransferPage() {
   const sourceBranchIds = sourceBranches
     .map((branch) => branchIdByCode.get(branch))
     .filter((branchId): branchId is string => Boolean(branchId))
+  const receivingBranchIds = ['ADMIN', 'MANAGER'].includes(user.role)
+    ? branchRecords.map((branch) => branch.id)
+    : user.branches.map((branch) => branch.id)
+
+  const pendingTransferRecords = receivingBranchIds.length === 0
+    ? []
+    : await db.stockTransfer.findMany({
+        where: {
+          status: 'PENDING',
+          destinationBranchId: { in: receivingBranchIds },
+        },
+        select: {
+          id: true,
+          reference: true,
+          quantity: true,
+          quantityUnit: true,
+          createdAt: true,
+          notes: true,
+          Product: { select: { sku: true, name: true } },
+          SourceBranch: { select: { name: true } },
+          DestinationBranch: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+  const pendingTransfers: PendingTransferItem[] = pendingTransferRecords.map((transfer) => ({
+    id: transfer.id,
+    reference: transfer.reference,
+    productCode: transfer.Product.sku ?? 'Product',
+    productName: transfer.Product.name,
+    quantity: transfer.quantity,
+    quantityUnit: transfer.quantityUnit,
+    sourceBranchName: transfer.SourceBranch.name,
+    destinationBranchName: transfer.DestinationBranch.name,
+    createdAt: transfer.createdAt.toISOString(),
+    notes: transfer.notes,
+  }))
 
   // Products are catalog rows. Load the source-branch catalogue plus products
   // that have received stock there, so a destination branch can transfer the
@@ -166,11 +203,13 @@ export default async function TransferPage() {
             <span className="badge badge-teal">Audit trail</span>
             <div className="section-title">Every move is recorded</div>
             <p className="stock-transfer-aside-copy">
-              Transfers create paired outbound and inbound movement logs so stock history stays traceable.
+              Dispatch creates the outbound log. The receiving branch confirms the inbound movement when stock arrives.
             </p>
           </section>
         </aside>
       </div>
+
+      {pendingTransfers.length > 0 && <PendingTransfers transfers={pendingTransfers} />}
 
       <div className="stock-transfer-note">
         <span className="stock-transfer-note-label">Stock control</span>
