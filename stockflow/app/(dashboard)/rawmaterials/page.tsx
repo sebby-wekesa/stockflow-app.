@@ -32,19 +32,18 @@ export default async function RawmaterialsPage({
       }
     : undefined
   const materials = await withRetry(() => db.rawMaterial.findMany({
-    where: { category: { in: [...RAW_MATERIAL_CATEGORIES] } },
     orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
   }), undefined);
 
   const matchingMaterials = (query || category)
     ? await withRetry(() => db.rawMaterial.findMany({
         where: {
-          ...(category ? { category } : { category: { in: [...RAW_MATERIAL_CATEGORIES] } }),
+          ...(category ? { category } : {}),
           ...(materialSearch ?? {}),
         },
         orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
       }), undefined)
-    : []
+    : materials
   
   const receipts = await withRetry(() => db.materialReceipt.findMany({
     include: { RawMaterial: true },
@@ -100,8 +99,8 @@ export default async function RawmaterialsPage({
       <div className="card mb-24">
         <div className="section-header mb-16">
           <div>
-            <div className="section-title">Find Raw Materials</div>
-            <div className="section-sub">Search the complete raw material database</div>
+            <div className="section-title">Raw material list</div>
+            <div className="section-sub">All raw material records in the database</div>
           </div>
         </div>
         <form action="/rawmaterials" className="mb-16" style={{display:'flex',gap:'12px',alignItems:'end',flexWrap:'wrap'}}>
@@ -134,31 +133,29 @@ export default async function RawmaterialsPage({
           {(query || category) && <Link href="/rawmaterials" className="btn btn-ghost">Clear</Link>}
         </form>
 
-        {(query || category) && (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr><th>SKU</th><th>Category</th><th>Material</th><th>Dimensions</th><th>Available kg</th><th>Reserved kg</th><th>Pieces</th></tr>
-              </thead>
-              <tbody>
-                {matchingMaterials.map((material) => (
-                  <tr key={material.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{material.sku}</td>
-                    <td>{categoryLabels[material.category as keyof typeof categoryLabels] || material.category}</td>
-                    <td>{material.materialName}</td>
-                    <td>{material.length || '—'} L · {material.width || '—'} W/D · {material.height || '—'} H · {material.diameter}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availableKg.toNumber().toLocaleString()} kg</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{material.reservedKg.toNumber().toLocaleString()} kg</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availablePieces.toLocaleString()}</td>
-                  </tr>
-                ))}
-                {matchingMaterials.length === 0 && (
-                  <tr><td colSpan={7} style={{textAlign: 'center', color: 'var(--muted)'}}>No raw materials match the selected filters.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>SKU</th><th>Category</th><th>Material</th><th>Dimensions</th><th>Available kg</th><th>Reserved kg</th><th>Pieces</th></tr>
+            </thead>
+            <tbody>
+              {matchingMaterials.map((material) => (
+                <tr key={material.id}>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{material.sku}</td>
+                  <td>{categoryLabels[material.category as keyof typeof categoryLabels] || material.category}</td>
+                  <td>{material.materialName}</td>
+                  <td>{material.length || '—'} L · {material.width || '—'} W/D · {material.height || '—'} H · {material.diameter}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availableKg.toNumber().toLocaleString()} kg</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{material.reservedKg.toNumber().toLocaleString()} kg</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availablePieces.toLocaleString()}</td>
+                </tr>
+              ))}
+              {matchingMaterials.length === 0 && (
+                <tr><td colSpan={7} style={{textAlign: 'center', color: 'var(--muted)'}}>No raw materials match the selected filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="card">
