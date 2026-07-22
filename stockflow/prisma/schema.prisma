@@ -57,6 +57,7 @@ model Branch {
   Organization           Organization             @relation(fields: [organizationId], references: [id])
   InventoryFinishedGoods InventoryFinishedGoods[]
   InventoryRawMaterial   InventoryRawMaterial[]
+  ProductBranchStock     ProductBranchStock[]
   Invitation             Invitation[]
   MaterialReceipt        MaterialReceipt[]
   Product                Product[]
@@ -344,6 +345,7 @@ model Organization {
   operationLogs            OperationLog[]
   payments                 Payment[]
   products                 Product[]
+  productBranchStocks      ProductBranchStock[]
   productAliases           ProductAlias[]
   productReceipts          ProductReceipt[]
   productionOrders         ProductionOrder[]
@@ -385,6 +387,7 @@ model Product {
   Branch          Branch?           @relation(fields: [branchId], references: [id])
   Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Product_organizationId_fk")
   ProductAlias    ProductAlias[]
+  branchStocks    ProductBranchStock[]
   ProductReceipt  ProductReceipt[]
   ProductionOrder ProductionOrder[]
   StockMovement   StockMovement[]
@@ -405,6 +408,24 @@ model ProductAlias {
   @@unique([product_id, alias])
   @@index([alias])
   @@index([organizationId])
+}
+
+model ProductBranchStock {
+  id             String       @id @default(uuid())
+  productId      String
+  branchId       String
+  availableQty   Float        @default(0)
+  reservedQty    Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  Product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  Branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ProductBranchStock_organizationId_fk")
+
+  @@unique([branchId, productId])
+  @@index([organizationId])
+  @@index([organizationId, branchId])
 }
 
 model ProductReceipt {
@@ -820,7 +841,7 @@ model ChartAccount {
   isActive       Boolean        @default(true)
   description    String?
   note           String?
-  vatApplicable  Boolean        @default(false)
+  vatApplicable  Boolean                @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   bankAccount    BankAccount?

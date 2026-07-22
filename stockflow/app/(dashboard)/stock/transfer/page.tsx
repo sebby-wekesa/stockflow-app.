@@ -45,26 +45,57 @@ export default async function TransferPage() {
     )
     return branchRecord ? [branchRecord.id, branchRecord.code, branch] : []
   })
+  const sourceBranchIds = sourceBranches
+    .map((branch) => branchIdByCode.get(branch))
+    .filter((branchId): branchId is string => Boolean(branchId))
 
-  // Products are branch-owned rows. Load the complete source-branch catalogue
-  // so the picker reflects the Product table even when currentStock is zero.
+  // Products are catalog rows. Load the source-branch catalogue plus products
+  // that have received stock there, so a destination branch can transfer the
+  // received balance onward later.
   const productRecords = await db.product.findMany({
     where: {
-      branchId: { in: sourceBranchStoredIds },
+      OR: [
+        { branchId: { in: sourceBranchStoredIds } },
+        {
+          branchStocks: {
+            some: {
+              branchId: { in: sourceBranchIds },
+            },
+          },
+        },
+      ],
+    },
+    include: {
+      branchStocks: {
+        where: { branchId: { in: sourceBranchIds } },
+        select: { branchId: true, availableQty: true },
+      },
     },
     orderBy: { sku: 'asc' }
   })
 
   const productsWithStock = productRecords.flatMap((product) => {
-    const branch = product.branchId ? branchCodeByStoredId.get(product.branchId) : null
-    if (!branch) return []
+    const stock_levels = sourceBranchIds.flatMap((branchId) => {
+      const branch = branchCodeById.get(branchId)
+      if (!branch) return []
+
+      const branchStock = product.branchStocks.find((stock) => stock.branchId === branchId)
+      const isProductOwnedByBranch = product.branchId
+        ? branchCodeByStoredId.get(product.branchId) === branch
+        : false
+      const qty = branchStock?.availableQty ?? (isProductOwnedByBranch ? product.currentStock : 0)
+
+      return [{ branch, qty }]
+    })
+
+    if (stock_levels.length === 0) return []
 
     return [{
       id: product.id,
       product_code: product.sku ?? '',
       canonical_name: product.name,
       uom: product.uom,
-      stock_levels: [{ branch, qty: product.currentStock }],
+      stock_levels,
     }]
   })
 

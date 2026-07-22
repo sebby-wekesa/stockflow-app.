@@ -10,8 +10,9 @@ import { normalizeBranchCode } from '@/lib/branches'
 // ─────────────────────────────────────────────────────────────────────────────
 // STOCK TRANSFER
 //
-// Product.currentStock is held on the branch-owned Product row. Transfers
-// validate the source branch before writing movement and audit records.
+// Product.currentStock is the organization-wide total. ProductBranchStock
+// keeps the branch-level balance so a partial transfer can move stock without
+// moving or duplicating the product catalog row.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const transferSchema = z.object({
@@ -78,20 +79,73 @@ export async function dispatchTransfer(formData: FormData) {
   const product = await db.product.findFirst({
     where: {
       id: data.product_id,
-      branchId: { in: [sourceBranch.id, sourceBranch.code, sourceBranchCode] },
+      OR: [
+        { branchId: { in: [sourceBranch.id, sourceBranch.code, sourceBranchCode] } },
+        {
+          branchStocks: {
+            some: {
+              branchId: sourceBranch.id,
+              organizationId: user.organizationId,
+            },
+          },
+        },
+      ],
     },
     select: { id: true, sku: true, name: true, currentStock: true, branchId: true },
   })
   if (!product) throw new Error('Product not found')
-  if (product.currentStock < data.qty) {
-    throw new Error(
-      `Insufficient stock: have ${product.currentStock}, need ${data.qty}`
-    )
-  }
 
   const reference = `TRANSFER-${Date.now().toString(36).toUpperCase()}`
 
   await withTenantTransaction(user.organizationId, async (tx) => {
+    // Older product rows only have the global currentStock value. Lazily seed
+    // their source-branch balance the first time they participate in a
+    // transfer; all subsequent transfers use the branch balance directly.
+    const sourceStock = await tx.productBranchStock.upsert({
+      where: {
+        branchId_productId: {
+          branchId: sourceBranch.id,
+          productId: product.id,
+        },
+      },
+      update: {},
+      create: {
+        productId: product.id,
+        branchId: sourceBranch.id,
+        availableQty: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
+          ? product.currentStock
+          : 0,
+      },
+    })
+
+    const decremented = await tx.productBranchStock.updateMany({
+      where: {
+        id: sourceStock.id,
+        availableQty: { gte: data.qty },
+      },
+      data: { availableQty: { decrement: data.qty } },
+    })
+    if (decremented.count === 0) {
+      throw new Error(
+        `Insufficient stock at ${sourceBranch.name}: need ${data.qty}`
+      )
+    }
+
+    await tx.productBranchStock.upsert({
+      where: {
+        branchId_productId: {
+          branchId: destBranch.id,
+          productId: product.id,
+        },
+      },
+      update: { availableQty: { increment: data.qty } },
+      create: {
+        productId: product.id,
+        branchId: destBranch.id,
+        availableQty: data.qty,
+      },
+    })
+
     await tx.stockMovement.create({
       data: {
         productId: data.product_id,

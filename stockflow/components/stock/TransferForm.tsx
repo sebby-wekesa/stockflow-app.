@@ -36,6 +36,7 @@ export function TransferForm({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [picked, setPicked] = useState<PickedProduct | null>(null)
+  const [productQuery, setProductQuery] = useState('')
   const firstSourceBranch = initialSourceBranch ?? sourceBranches[0] ?? 'mombasa'
   const [sourceBranch, setSourceBranch] = useState<Branch>(firstSourceBranch)
   const [destBranch, setDestBranch] = useState<Branch>(
@@ -109,6 +110,13 @@ export function TransferForm({
   const branchProducts = products.filter((product) =>
     product.stock_levels.some((stock) => stock.branch === sourceBranch)
   )
+  const normalizedProductQuery = productQuery.trim().toLowerCase()
+  const filteredProducts = normalizedProductQuery
+    ? branchProducts.filter((product) =>
+        product.product_code.toLowerCase().includes(normalizedProductQuery) ||
+        product.canonical_name.toLowerCase().includes(normalizedProductQuery)
+      )
+    : branchProducts
 
   return (
     <div className="stock-transfer-form">
@@ -137,6 +145,7 @@ export function TransferForm({
                 const nextSourceBranch = e.target.value as Branch
                 setSourceBranch(nextSourceBranch)
                 setPicked(null)
+                setProductQuery('')
                 if (destBranch === nextSourceBranch) {
                   setDestBranch(userBranches.find((branch) => branch !== nextSourceBranch) ?? nextSourceBranch)
                 }
@@ -195,31 +204,54 @@ export function TransferForm({
               </button>
             </div>
           ) : (
-            <div id="transfer-product-list" className="stock-transfer-product-list">
-              {branchProducts.map((product) => {
-                const stockAtBranch = product.stock_levels.find((stock) => stock.branch === sourceBranch)?.qty ?? 0
-                return (
-                  <button
-                    key={product.id}
-                    type="button"
-                    onClick={() => pickProduct(product, sourceBranch)}
-                    className="stock-transfer-product-option"
-                    disabled={stockAtBranch <= 0}
-                    title={stockAtBranch <= 0 ? 'No stock available at this branch' : undefined}
-                  >
-                    <div>
-                      <div className="stock-transfer-product-code">{product.product_code}</div>
-                      <div className="stock-transfer-product-name">{product.canonical_name}</div>
-                    </div>
-                    <div className="stock-transfer-product-quantity">
-                      {stockAtBranch} {product.uom} available
-                    </div>
-                  </button>
-                )
-              })}
+            <div className="stock-transfer-product-picker">
+              {branchProducts.length > 0 && (
+                <>
+                  <label className="stock-transfer-product-search-label" htmlFor="transfer-product-search">
+                    Search products
+                  </label>
+                  <input
+                    id="transfer-product-search"
+                    type="search"
+                    value={productQuery}
+                    onChange={(e) => setProductQuery(e.target.value)}
+                    className="form-input stock-transfer-product-search"
+                    placeholder="Search by SKU or product name"
+                    autoComplete="off"
+                  />
+                </>
+              )}
+              <div id="transfer-product-list" className="stock-transfer-product-list">
+                {filteredProducts.map((product) => {
+                  const stockAtBranch = product.stock_levels.find((stock) => stock.branch === sourceBranch)?.qty ?? 0
+                  return (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => pickProduct(product, sourceBranch)}
+                      className="stock-transfer-product-option"
+                      disabled={stockAtBranch <= 0}
+                      title={stockAtBranch <= 0 ? 'No stock available at this branch' : undefined}
+                    >
+                      <div>
+                        <div className="stock-transfer-product-code">{product.product_code}</div>
+                        <div className="stock-transfer-product-name">{product.canonical_name}</div>
+                      </div>
+                      <div className="stock-transfer-product-quantity">
+                        {stockAtBranch} {product.uom} available
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
               {branchProducts.length === 0 && (
                 <div className="stock-transfer-empty-products">
                   No products assigned to {BRANCH_LABELS[sourceBranch]}
+                </div>
+              )}
+              {branchProducts.length > 0 && filteredProducts.length === 0 && (
+                <div className="stock-transfer-empty-products">
+                  No products match “{productQuery}”.
                 </div>
               )}
             </div>
