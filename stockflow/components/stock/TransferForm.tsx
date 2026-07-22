@@ -24,16 +24,23 @@ type PickedProduct = {
 export function TransferForm({
   products,
   userBranches,
+  sourceBranches,
+  initialSourceBranch,
 }: {
   products: ProductWithStock[]
   userBranches: Branch[]
+  sourceBranches: Branch[]
+  initialSourceBranch?: Branch
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [picked, setPicked] = useState<PickedProduct | null>(null)
-  const [sourceBranch, setSourceBranch] = useState<Branch>('mombasa')
-  const [destBranch, setDestBranch] = useState<Branch>('nairobi')
+  const firstSourceBranch = initialSourceBranch ?? sourceBranches[0] ?? 'mombasa'
+  const [sourceBranch, setSourceBranch] = useState<Branch>(firstSourceBranch)
+  const [destBranch, setDestBranch] = useState<Branch>(
+    () => userBranches.find((branch) => branch !== firstSourceBranch) ?? firstSourceBranch
+  )
   const [qty, setQty] = useState('')
   const [notes, setNotes] = useState('')
 
@@ -127,12 +134,16 @@ export function TransferForm({
               id="transfer-source-branch"
               value={sourceBranch}
               onChange={(e) => {
-                setSourceBranch(e.target.value as Branch)
+                const nextSourceBranch = e.target.value as Branch
+                setSourceBranch(nextSourceBranch)
                 setPicked(null)
+                if (destBranch === nextSourceBranch) {
+                  setDestBranch(userBranches.find((branch) => branch !== nextSourceBranch) ?? nextSourceBranch)
+                }
               }}
               className="form-input stock-transfer-input"
             >
-              {userBranches.map((branch) => (
+              {sourceBranches.map((branch) => (
                 <option key={branch} value={branch}>
                   {BRANCH_LABELS[branch]}
                 </option>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
-import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB } from '@/lib/branches'
+import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, normalizeBranchCode } from '@/lib/branches'
 import { TransferForm } from '@/components/stock/TransferForm'
 import type { BranchCode as Branch } from '@/lib/branches'
 
@@ -11,31 +11,62 @@ export default async function TransferPage() {
   const user = await requireActiveAuth()
   const db = getTenantPrisma(user.organizationId)
 
-  // Get user branches based on role or permissions
-  const userBranches = ['ADMIN', 'MANAGER'].includes(user.role)
-    ? ALL_BRANCHES
-    : (['mombasa', 'nairobi', 'bonje'] as Branch[]) // For now, assume all branches for other roles
+  const branchRecords = await db.branch.findMany({
+    select: { id: true, name: true, code: true, location: true },
+    orderBy: { name: 'asc' },
+  })
+  const branchCodeById = new Map<string, Branch>()
+  const branchIdByCode = new Map<Branch, string>()
+  const branchCodeByStoredId = new Map<string, Branch>()
 
-  // Get products with stock in any branch (tenant scoped)
+  for (const branch of branchRecords) {
+    const code = normalizeBranchCode(branch.code, branch.name, branch.location)
+    if (code) {
+      branchCodeById.set(branch.id, code)
+      branchIdByCode.set(code, branch.id)
+      branchCodeByStoredId.set(branch.id, code)
+      branchCodeByStoredId.set(branch.code, code)
+      branchCodeByStoredId.set(code, code)
+    }
+  }
+
+  const configuredBranches = ALL_BRANCHES.filter((branch) => branchIdByCode.has(branch))
+  const assignedBranchCode = user.branches[0]
+    ? branchCodeById.get(user.branches[0].id) ?? normalizeBranchCode(user.branches[0].name)
+    : null
+  const sourceBranches = ['ADMIN', 'MANAGER'].includes(user.role)
+    ? configuredBranches
+    : assignedBranchCode && configuredBranches.includes(assignedBranchCode)
+      ? [assignedBranchCode]
+      : []
+  const sourceBranchStoredIds = sourceBranches.flatMap((branch) => {
+    const branchRecord = branchRecords.find((candidate) =>
+      normalizeBranchCode(candidate.code, candidate.name, candidate.location) === branch
+    )
+    return branchRecord ? [branchRecord.id, branchRecord.code, branch] : []
+  })
+
+  // Products are branch-owned rows. Only load source-branch stock for the picker.
   const productRecords = await db.product.findMany({
     where: {
-      OR: [
-        { currentStock: { gt: 0 } },
-        { ProductReceipt: { some: { qtyReceived: { gt: 0 } } } },
-        { StockMovement: { some: { quantity: { gt: 0 } } } }
-      ]
+      branchId: { in: sourceBranchStoredIds },
+      currentStock: { gt: 0 },
     },
     orderBy: { sku: 'asc' }
   })
 
-  // Map to the format expected by TransferForm
-  const productsWithStock = productRecords.map(p => ({
-    id: p.id,
-    product_code: p.sku ?? '',
-    canonical_name: p.name,
-    uom: p.uom,
-    stock_levels: userBranches.map(branch => ({ branch, qty: p.currentStock }))
-  }))
+  const productsWithStock = productRecords.flatMap((product) => {
+    const branch = product.branchId ? branchCodeByStoredId.get(product.branchId) : null
+    if (!branch) return []
+
+    return [{
+      id: product.id,
+      product_code: product.sku ?? '',
+      canonical_name: product.name,
+      uom: product.uom,
+      stock_levels: [{ branch, qty: product.currentStock }],
+    }]
+  })
 
   return (
     <div className="stock-transfer-page">
@@ -49,7 +80,7 @@ export default async function TransferPage() {
             Move finished goods between branches and keep the handoff auditable.
           </div>
         </div>
-        <span className="badge badge-amber stock-transfer-status">Inventory movement</span>
+        <span className="badge badge-amber stock-transfer-status">{assignedBranchCode ? `${BRANCH_LABELS[assignedBranchCode]} stock` : 'Inventory movement'}</span>
       </div>
 
       <div className="stock-transfer-layout">
@@ -67,7 +98,13 @@ export default async function TransferPage() {
 
           <TransferForm
             products={productsWithStock}
-            userBranches={userBranches}
+            userBranches={configuredBranches}
+            sourceBranches={sourceBranches}
+            initialSourceBranch={
+              assignedBranchCode && sourceBranches.includes(assignedBranchCode)
+                ? assignedBranchCode
+                : sourceBranches[0]
+            }
           />
         </section>
 
@@ -80,7 +117,7 @@ export default async function TransferPage() {
             </p>
 
             <div className="stock-transfer-branch-list">
-              {userBranches.map((branch) => (
+              {configuredBranches.map((branch) => (
                 <div key={branch} className="stock-transfer-branch-row">
                   <span className={`stock-transfer-branch-dot ${branch}`} aria-hidden="true" />
                   <div>

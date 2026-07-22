@@ -10,9 +10,8 @@ import { normalizeBranchCode } from '@/lib/branches'
 // ─────────────────────────────────────────────────────────────────────────────
 // STOCK TRANSFER
 //
-// Note: stock is tracked on Product.currentStock globally, not per-branch.
-// The "transfer" logs movements + audit entries but doesn't change
-// Product.currentStock.
+// Product.currentStock is held on the branch-owned Product row. Transfers
+// validate the source branch before writing movement and audit records.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const transferSchema = z.object({
@@ -72,9 +71,16 @@ export async function dispatchTransfer(formData: FormData) {
     throw new Error(`Destination branch "${data.dest_branch}" not found`)
   }
 
+  if (!['ADMIN', 'MANAGER'].includes(user.role) && !user.branches.some((branch) => branch.id === sourceBranch.id)) {
+    throw new Error('You can only transfer stock from your assigned branch')
+  }
+
   const product = await db.product.findFirst({
-    where: { id: data.product_id },
-    select: { id: true, sku: true, name: true, currentStock: true },
+    where: {
+      id: data.product_id,
+      branchId: { in: [sourceBranch.id, sourceBranch.code, sourceBranchCode] },
+    },
+    select: { id: true, sku: true, name: true, currentStock: true, branchId: true },
   })
   if (!product) throw new Error('Product not found')
   if (product.currentStock < data.qty) {
@@ -127,17 +133,31 @@ export async function dispatchTransfer(formData: FormData) {
 // SEARCH PRODUCTS WITH STOCK
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function searchProductsWithStock(query: string, _branch: string) {
+export async function searchProductsWithStock(query: string, branchValue: string) {
   const user = await requireActiveAuth()
   const db = getTenantPrisma(user.organizationId)
 
   if (!query || query.length < 2) return []
 
-  // _branch param accepted for backward-compat; stock is global in this schema
-  void _branch
+  const branchCode = normalizeBranchCode(branchValue)
+  if (!branchCode) return []
+
+  const branches = await db.branch.findMany({
+    select: { id: true, name: true, code: true, location: true },
+  })
+  const branch = branches.find(
+    (candidate) => normalizeBranchCode(candidate.code, candidate.name, candidate.location) === branchCode
+  )
+  if (!branch) return []
+
+  if (!['ADMIN', 'MANAGER'].includes(user.role) && !user.branches.some((userBranch) => userBranch.id === branch.id)) {
+    return []
+  }
 
   const products = await db.product.findMany({
     where: {
+      branchId: { in: [branch.id, branch.code, branchCode] },
+      currentStock: { gt: 0 },
       OR: [
         { sku: { contains: query, mode: 'insensitive' } },
         { name: { contains: query, mode: 'insensitive' } },
