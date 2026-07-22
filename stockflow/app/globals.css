@@ -267,6 +267,7 @@ select.form-input option { background: var(--surface2); }
 .stock-transfer-product-search { min-height: 38px; }
 .stock-transfer-selected-product { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 74px; padding: 13px 14px; border: 1px solid color-mix(in srgb, var(--teal) 42%, var(--border)); border-left: 3px solid var(--teal); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--teal) 5%, var(--surface2)); }
 .stock-transfer-product-availability { margin-top: 6px; color: var(--teal); font-family: var(--font-mono); font-size: 10px; }
+.stock-transfer-unit-picker { display: grid; gap: 5px; max-width: 180px; margin-top: 10px; }
 .stock-transfer-change { flex-shrink: 0; }
 .stock-transfer-empty-products { padding: 20px 14px; border: 1px dashed var(--border2); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; text-align: center; }
 .stock-transfer-form-grid { display: grid; grid-template-columns: minmax(150px, 0.65fr) minmax(0, 1.35fr); gap: 14px; }

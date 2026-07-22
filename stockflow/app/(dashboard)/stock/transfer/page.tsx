@@ -68,7 +68,7 @@ export default async function TransferPage() {
     include: {
       branchStocks: {
         where: { branchId: { in: sourceBranchIds } },
-        select: { branchId: true, availableQty: true },
+        select: { branchId: true, availableQty: true, availablePiecesSets: true },
       },
     },
     orderBy: { sku: 'asc' }
@@ -84,8 +84,9 @@ export default async function TransferPage() {
         ? branchCodeByStoredId.get(product.branchId) === branch
         : false
       const qty = branchStock?.availableQty ?? (isProductOwnedByBranch ? product.currentStock : 0)
+      const piecesSets = branchStock?.availablePiecesSets ?? (isProductOwnedByBranch ? product.piecesSets : 0)
 
-      return [{ branch, qty }]
+      return [{ branch, qty, pieces_sets: piecesSets }]
     })
 
     if (stock_levels.length === 0) return []

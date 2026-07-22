@@ -415,6 +415,7 @@ model ProductBranchStock {
   productId      String
   branchId       String
   availableQty   Float        @default(0)
+  availablePiecesSets Float   @default(0)
   reservedQty    Float        @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

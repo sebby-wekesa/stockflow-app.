@@ -1,0 +1,2 @@
+ALTER TABLE "ProductBranchStock"
+ADD COLUMN "availablePiecesSets" DOUBLE PRECISION NOT NULL DEFAULT 0;

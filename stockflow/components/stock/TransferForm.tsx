@@ -10,15 +10,23 @@ type ProductWithStock = {
   product_code: string
   canonical_name: string
   uom: string
-  stock_levels: Array<{ branch: Branch; qty: number }>
+  stock_levels: Array<{ branch: Branch; qty: number; pieces_sets: number }>
 }
+
+type TransferQuantityUnit = 'KG' | 'PCS_SETS'
 
 type PickedProduct = {
   id: string
   product_code: string
   canonical_name: string
   uom: string
-  stock_at_branch: number
+  available_kg: number
+  available_pieces_sets: number
+  quantity_unit: TransferQuantityUnit
+}
+
+function quantityUnitLabel(unit: TransferQuantityUnit) {
+  return unit === 'KG' ? 'KG' : 'PCS/Sets'
 }
 
 export function TransferForm({
@@ -59,14 +67,18 @@ export function TransferForm({
       return
     }
 
-    const transferQty = parseInt(qty)
-    if (!transferQty || transferQty <= 0) {
+    const transferQty = Number(qty)
+    if (!Number.isFinite(transferQty) || transferQty <= 0) {
       setError('Please enter a valid quantity')
       return
     }
 
-    if (transferQty > picked.stock_at_branch) {
-      setError(`Cannot transfer ${transferQty} units - only ${picked.stock_at_branch} available`)
+    const availableQty = picked.quantity_unit === 'KG'
+      ? picked.available_kg
+      : picked.available_pieces_sets
+    const unitLabel = quantityUnitLabel(picked.quantity_unit)
+    if (transferQty > availableQty) {
+      setError(`Cannot transfer ${transferQty} ${unitLabel} - only ${availableQty} available`)
       return
     }
 
@@ -75,12 +87,13 @@ export function TransferForm({
     fd.set('source_branch', sourceBranch)
     fd.set('dest_branch', destBranch)
     fd.set('qty', qty)
+    fd.set('quantity_unit', picked.quantity_unit)
     fd.set('notes', notes)
 
     startTransition(async () => {
       try {
         await dispatchTransfer(fd)
-        setSuccess(`Successfully transferred ${qty} units from ${sourceBranch} to ${destBranch}`)
+        setSuccess(`Successfully transferred ${qty} ${unitLabel} from ${sourceBranch} to ${destBranch}`)
         // Reset form
         setPicked(null)
         setQty('')
@@ -96,13 +109,17 @@ export function TransferForm({
   }
 
   function pickProduct(product: ProductWithStock, branch: Branch) {
-    const stockAtBranch = product.stock_levels.find(s => s.branch === branch)?.qty ?? 0
+    const branchStock = product.stock_levels.find(s => s.branch === branch)
+    const availableKg = branchStock?.qty ?? 0
+    const availablePiecesSets = branchStock?.pieces_sets ?? 0
     setPicked({
       id: product.id,
       product_code: product.product_code,
       canonical_name: product.canonical_name,
       uom: product.uom,
-      stock_at_branch: stockAtBranch,
+      available_kg: availableKg,
+      available_pieces_sets: availablePiecesSets,
+      quantity_unit: availableKg > 0 ? 'KG' : 'PCS_SETS',
     })
   }
 
@@ -192,7 +209,24 @@ export function TransferForm({
                 <div className="stock-transfer-product-code">{picked.product_code}</div>
                 <div className="stock-transfer-product-name">{picked.canonical_name}</div>
                 <div className="stock-transfer-product-availability">
-                  {picked.stock_at_branch} {picked.uom} available at {BRANCH_LABELS[sourceBranch]}
+                  {picked.available_kg} KG · {picked.available_pieces_sets} PCS/Sets available at {BRANCH_LABELS[sourceBranch]}
+                </div>
+                <div className="stock-transfer-unit-picker">
+                  <label className="stock-transfer-product-search-label" htmlFor="transfer-quantity-unit">
+                    Transfer unit
+                  </label>
+                  <select
+                    id="transfer-quantity-unit"
+                    value={picked.quantity_unit}
+                    onChange={(e) => {
+                      setPicked({ ...picked, quantity_unit: e.target.value as TransferQuantityUnit })
+                      setQty('')
+                    }}
+                    className="form-input stock-transfer-input"
+                  >
+                    <option value="KG" disabled={picked.available_kg <= 0}>KG</option>
+                    <option value="PCS_SETS" disabled={picked.available_pieces_sets <= 0}>PCS/Sets</option>
+                  </select>
                 </div>
               </div>
               <button
@@ -223,22 +257,25 @@ export function TransferForm({
               )}
               <div id="transfer-product-list" className="stock-transfer-product-list">
                 {filteredProducts.map((product) => {
-                  const stockAtBranch = product.stock_levels.find((stock) => stock.branch === sourceBranch)?.qty ?? 0
+                  const branchStock = product.stock_levels.find((stock) => stock.branch === sourceBranch)
+                  const stockAtBranch = branchStock?.qty ?? 0
+                  const piecesSetsAtBranch = branchStock?.pieces_sets ?? 0
+                  const hasTransferableStock = stockAtBranch > 0 || piecesSetsAtBranch > 0
                   return (
                     <button
                       key={product.id}
                       type="button"
                       onClick={() => pickProduct(product, sourceBranch)}
                       className="stock-transfer-product-option"
-                      disabled={stockAtBranch <= 0}
-                      title={stockAtBranch <= 0 ? 'No stock available at this branch' : undefined}
+                      disabled={!hasTransferableStock}
+                      title={!hasTransferableStock ? 'No stock available at this branch' : undefined}
                     >
                       <div>
                         <div className="stock-transfer-product-code">{product.product_code}</div>
                         <div className="stock-transfer-product-name">{product.canonical_name}</div>
                       </div>
                       <div className="stock-transfer-product-quantity">
-                        {stockAtBranch} {product.uom} available
+                        {stockAtBranch} KG · {piecesSetsAtBranch} PCS/Sets
                       </div>
                     </button>
                   )
@@ -261,21 +298,24 @@ export function TransferForm({
         <div className="stock-transfer-form-grid">
           <div className="form-group">
             <label className="form-label" htmlFor="transfer-quantity">
-              Quantity to transfer <span className="stock-transfer-required" aria-hidden="true">*</span>
+              Quantity to transfer{picked ? ` (${quantityUnitLabel(picked.quantity_unit)})` : ''}{' '}
+              <span className="stock-transfer-required" aria-hidden="true">*</span>
             </label>
             <input
               id="transfer-quantity"
               type="number"
-              min="1"
+              min="0.01"
+              step="any"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               className="form-input stock-transfer-input stock-transfer-quantity-input"
-              placeholder="Enter quantity"
+              placeholder={picked ? `Enter ${quantityUnitLabel(picked.quantity_unit)} quantity` : 'Enter quantity'}
               disabled={!picked}
             />
             {picked && (
               <div className="stock-transfer-help">
-                Maximum: {picked.stock_at_branch} {picked.uom}
+                Maximum: {picked.quantity_unit === 'KG' ? picked.available_kg : picked.available_pieces_sets}{' '}
+                {quantityUnitLabel(picked.quantity_unit)}
               </div>
             )}
           </div>

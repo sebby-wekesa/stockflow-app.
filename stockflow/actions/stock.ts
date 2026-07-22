@@ -19,7 +19,8 @@ const transferSchema = z.object({
   product_id: z.string().min(1),
   source_branch: z.string().min(1),
   dest_branch: z.string().min(1),
-  qty: z.coerce.number().int().positive(),
+  qty: z.coerce.number().positive(),
+  quantity_unit: z.enum(['KG', 'PCS_SETS']).default('KG'),
   notes: z.string().max(500).optional().nullable(),
 })
 
@@ -29,6 +30,7 @@ export async function dispatchTransfer(formData: FormData) {
     source_branch: formData.get('source_branch'),
     dest_branch: formData.get('dest_branch'),
     qty: formData.get('qty'),
+    quantity_unit: formData.get('quantity_unit') || 'KG',
     notes: formData.get('notes') || null,
   }
 
@@ -91,11 +93,12 @@ export async function dispatchTransfer(formData: FormData) {
         },
       ],
     },
-    select: { id: true, sku: true, name: true, currentStock: true, branchId: true },
+    select: { id: true, sku: true, name: true, currentStock: true, piecesSets: true, branchId: true },
   })
   if (!product) throw new Error('Product not found')
 
   const reference = `TRANSFER-${Date.now().toString(36).toUpperCase()}`
+  const quantityLabel = data.quantity_unit === 'KG' ? 'KG' : 'PCS/Sets'
 
   await withTenantTransaction(user.organizationId, async (tx) => {
     // Older product rows only have the global currentStock value. Lazily seed
@@ -115,19 +118,26 @@ export async function dispatchTransfer(formData: FormData) {
         availableQty: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
           ? product.currentStock
           : 0,
+        availablePiecesSets: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
+          ? product.piecesSets
+          : 0,
       },
     })
 
     const decremented = await tx.productBranchStock.updateMany({
       where: {
         id: sourceStock.id,
-        availableQty: { gte: data.qty },
+        ...(data.quantity_unit === 'KG'
+          ? { availableQty: { gte: data.qty } }
+          : { availablePiecesSets: { gte: data.qty } }),
       },
-      data: { availableQty: { decrement: data.qty } },
+      data: data.quantity_unit === 'KG'
+        ? { availableQty: { decrement: data.qty } }
+        : { availablePiecesSets: { decrement: data.qty } },
     })
     if (decremented.count === 0) {
       throw new Error(
-        `Insufficient stock at ${sourceBranch.name}: need ${data.qty}`
+        `Insufficient ${quantityLabel} stock at ${sourceBranch.name}: need ${data.qty}`
       )
     }
 
@@ -138,11 +148,14 @@ export async function dispatchTransfer(formData: FormData) {
           productId: product.id,
         },
       },
-      update: { availableQty: { increment: data.qty } },
+      update: data.quantity_unit === 'KG'
+        ? { availableQty: { increment: data.qty } }
+        : { availablePiecesSets: { increment: data.qty } },
       create: {
         productId: product.id,
         branchId: destBranch.id,
-        availableQty: data.qty,
+        availableQty: data.quantity_unit === 'KG' ? data.qty : 0,
+        availablePiecesSets: data.quantity_unit === 'PCS_SETS' ? data.qty : 0,
       },
     })
 
@@ -153,7 +166,7 @@ export async function dispatchTransfer(formData: FormData) {
         movementType: 'transfer_out',
         quantity: -data.qty,
         reference,
-        notes: data.notes ?? `Transfer to ${destBranch.name}`,
+        notes: `${quantityLabel} · ${data.notes ?? `Transfer to ${destBranch.name}`}`,
       },
     })
 
@@ -164,7 +177,7 @@ export async function dispatchTransfer(formData: FormData) {
         movementType: 'transfer_in',
         quantity: data.qty,
         reference,
-        notes: data.notes ?? `Transfer from ${sourceBranch.name}`,
+        notes: `${quantityLabel} · ${data.notes ?? `Transfer from ${sourceBranch.name}`}`,
       },
     })
 
@@ -174,7 +187,7 @@ export async function dispatchTransfer(formData: FormData) {
         action: 'STOCK_TRANSFER',
         entityType: 'Product',
         entityId: data.product_id,
-        details: `Transferred ${data.qty} ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}. ${data.notes ?? ''}`,
+        details: `Transferred ${data.qty} ${quantityLabel} of ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}. ${data.notes ?? ''}`,
       },
     })
   }, { maxWait: 10000, timeout: 30000 })
@@ -210,12 +223,33 @@ export async function searchProductsWithStock(query: string, branchValue: string
 
   const products = await db.product.findMany({
     where: {
-      branchId: { in: [branch.id, branch.code, branchCode] },
-      currentStock: { gt: 0 },
-      OR: [
-        { sku: { contains: query, mode: 'insensitive' } },
-        { name: { contains: query, mode: 'insensitive' } },
+      AND: [
+        {
+          OR: [
+            { branchId: { in: [branch.id, branch.code, branchCode] } },
+            {
+              branchStocks: {
+                some: {
+                  branchId: branch.id,
+                  organizationId: user.organizationId,
+                },
+              },
+            },
+          ],
+        },
+        {
+          OR: [
+            { sku: { contains: query, mode: 'insensitive' } },
+            { name: { contains: query, mode: 'insensitive' } },
+          ],
+        },
       ],
+    },
+    include: {
+      branchStocks: {
+        where: { branchId: branch.id },
+        select: { availableQty: true, availablePiecesSets: true },
+      },
     },
     take: 10,
     orderBy: { sku: 'asc' },
@@ -226,6 +260,7 @@ export async function searchProductsWithStock(query: string, branchValue: string
     product_code: p.sku,
     canonical_name: p.name,
     uom: p.uom,
-    stock_at_branch: p.currentStock,
+    stock_at_branch: p.branchStocks[0]?.availableQty ?? (p.branchId === branch.id ? p.currentStock : 0),
+    pieces_sets_at_branch: p.branchStocks[0]?.availablePiecesSets ?? (p.branchId === branch.id ? p.piecesSets : 0),
   }))
 }
