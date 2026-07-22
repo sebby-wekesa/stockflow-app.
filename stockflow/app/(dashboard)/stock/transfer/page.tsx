@@ -49,9 +49,7 @@ export default async function TransferPage() {
   const sourceBranchIds = sourceBranches
     .map((branch) => branchIdByCode.get(branch))
     .filter((branchId): branchId is string => Boolean(branchId))
-  const receivingBranchIds = ['ADMIN', 'MANAGER'].includes(user.role)
-    ? branchRecords.map((branch) => branch.id)
-    : user.branches.map((branch) => branch.id)
+  const receivingBranchIds = user.branches.map((branch) => branch.id)
 
   const pendingTransferRecords = receivingBranchIds.length === 0
     ? []

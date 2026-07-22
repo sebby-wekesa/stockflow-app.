@@ -205,11 +205,11 @@ export async function confirmStockTransfer(transferId: string) {
   })
   if (!transfer) throw new Error('Transfer is no longer awaiting receipt')
 
-  const canReceive = ['ADMIN', 'MANAGER'].includes(user.role) || user.branches.some(
+  const isReceivingBranchUser = user.branches.some(
     (branch) => branch.id === transfer.destinationBranchId
   )
-  if (!canReceive) {
-    throw new Error('You can only confirm stock received at your assigned branch')
+  if (!isReceivingBranchUser) {
+    throw new Error('Only a user assigned to the receiving branch can confirm this stock')
   }
 
   if (transfer.quantityUnit !== 'KG' && transfer.quantityUnit !== 'PCS_SETS') {
