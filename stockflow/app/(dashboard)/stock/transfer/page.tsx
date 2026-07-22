@@ -46,11 +46,11 @@ export default async function TransferPage() {
     return branchRecord ? [branchRecord.id, branchRecord.code, branch] : []
   })
 
-  // Products are branch-owned rows. Only load source-branch stock for the picker.
+  // Products are branch-owned rows. Load the complete source-branch catalogue
+  // so the picker reflects the Product table even when currentStock is zero.
   const productRecords = await db.product.findMany({
     where: {
       branchId: { in: sourceBranchStoredIds },
-      currentStock: { gt: 0 },
     },
     orderBy: { sku: 'asc' }
   })

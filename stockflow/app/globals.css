@@ -257,6 +257,8 @@ select.form-input option { background: var(--surface2); }
 .stock-transfer-product-list { display: grid; gap: 7px; max-height: 290px; overflow-y: auto; padding: 2px; }
 .stock-transfer-product-option { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.15s; }
 .stock-transfer-product-option:hover { border-color: var(--accent); background: var(--surface-hover); transform: translateY(-1px); }
+.stock-transfer-product-option:disabled { cursor: not-allowed; opacity: 0.55; }
+.stock-transfer-product-option:disabled:hover { border-color: var(--border); background: var(--surface2); transform: none; }
 .stock-transfer-product-code { color: var(--accent); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
 .stock-transfer-product-name { max-width: 100%; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .stock-transfer-product-quantity { flex-shrink: 0; color: var(--teal); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }

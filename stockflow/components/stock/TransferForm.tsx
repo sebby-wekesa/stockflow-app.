@@ -106,8 +106,8 @@ export function TransferForm({
   }
 
   const availableDestinations = userBranches.filter(b => b !== sourceBranch)
-  const availableProducts = products.filter((product) =>
-    product.stock_levels.some((stock) => stock.branch === sourceBranch && stock.qty > 0)
+  const branchProducts = products.filter((product) =>
+    product.stock_levels.some((stock) => stock.branch === sourceBranch)
   )
 
   return (
@@ -196,25 +196,30 @@ export function TransferForm({
             </div>
           ) : (
             <div id="transfer-product-list" className="stock-transfer-product-list">
-              {availableProducts.map((product) => (
+              {branchProducts.map((product) => {
+                const stockAtBranch = product.stock_levels.find((stock) => stock.branch === sourceBranch)?.qty ?? 0
+                return (
                   <button
                     key={product.id}
                     type="button"
                     onClick={() => pickProduct(product, sourceBranch)}
                     className="stock-transfer-product-option"
+                    disabled={stockAtBranch <= 0}
+                    title={stockAtBranch <= 0 ? 'No stock available at this branch' : undefined}
                   >
                     <div>
                       <div className="stock-transfer-product-code">{product.product_code}</div>
                       <div className="stock-transfer-product-name">{product.canonical_name}</div>
                     </div>
                     <div className="stock-transfer-product-quantity">
-                      {product.stock_levels.find(s => s.branch === sourceBranch)?.qty ?? 0} {product.uom} available
+                      {stockAtBranch} {product.uom} available
                     </div>
                   </button>
-                ))}
-              {availableProducts.length === 0 && (
+                )
+              })}
+              {branchProducts.length === 0 && (
                 <div className="stock-transfer-empty-products">
-                  No products with stock at {BRANCH_LABELS[sourceBranch]}
+                  No products assigned to {BRANCH_LABELS[sourceBranch]}
                 </div>
               )}
             </div>
