@@ -4,6 +4,7 @@ import { getUser } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { QuickImportForm } from './quick-import-form'
 import { getImportBatchHref, isQuickImportSheetType } from './import-routing'
+import { ALL_BRANCHES, normalizeBranchCode, type BranchCode } from '@/lib/branches'
 
 interface ImportCentrePageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -17,6 +18,20 @@ export default async function ImportCentrePage({ searchParams }: ImportCentrePag
   const showLegacyFlowNotice = params.legacyFlow === 'deprecated'
 
   const db = getTenantPrisma(user.organizationId)
+  const isSuperUser = user.role === 'ADMIN' && user.branches.length === 0
+  const branchRecords = isSuperUser
+    ? await db.branch.findMany({
+        select: { name: true, code: true, location: true },
+        orderBy: { name: 'asc' },
+      })
+    : []
+  const branchOptions = ALL_BRANCHES.flatMap((code): Array<{ code: BranchCode; name: string }> => {
+    const branch = branchRecords.find(
+      (candidate) => normalizeBranchCode(candidate.code, candidate.name, candidate.location) === code
+    )
+    return branch ? [{ code, name: branch.name }] : []
+  })
+  const assignedBranchCode = normalizeBranchCode(user.branches[0]?.name)
 
   // Recent batches across both flows (auto-scoped to org via tenant prisma)
   const recentBatches = await db.importBatch.findMany({
@@ -129,7 +144,12 @@ export default async function ImportCentrePage({ searchParams }: ImportCentrePag
           </div>
           <span className="badge badge-muted">Excel · CSV</span>
         </div>
-        <QuickImportForm assignedBranchName={user.branches[0]?.name ?? null} />
+        <QuickImportForm
+          assignedBranchName={user.branches[0]?.name ?? null}
+          assignedBranchCode={assignedBranchCode}
+          branchOptions={branchOptions}
+          canChooseBranch={isSuperUser}
+        />
       </div>
     </div>
   )

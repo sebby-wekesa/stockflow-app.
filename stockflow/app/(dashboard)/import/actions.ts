@@ -36,17 +36,42 @@ async function requireImporter(): Promise<AuthUser> {
   return user
 }
 
-async function getImporterBranch(user: AuthUser): Promise<{
+async function getImporterBranch(user: AuthUser, requestedBranchCode?: string | null): Promise<{
   id: string
   code: BranchCode
   name: string
 }> {
+  const db = getTenantPrisma(user.organizationId)
+  const isSuperUser = user.role === 'ADMIN' && user.branches.length === 0
+  const requestedCode = normalizeBranchCode(requestedBranchCode)
+
+  if (isSuperUser) {
+    if (!requestedCode) {
+      throw new Error('Super users must select Nairobi, Mombasa, or Bonje as the import branch')
+    }
+
+    const branches = await db.branch.findMany({
+      select: { id: true, name: true, code: true, location: true },
+    })
+    const branch = branches.find(
+      (candidate) => normalizeBranchCode(candidate.code, candidate.name, candidate.location) === requestedCode
+    )
+    const code = branch
+      ? normalizeBranchCode(branch.code, branch.name, branch.location)
+      : null
+
+    if (!branch || !code) {
+      throw new Error('The selected import branch was not found in your organization')
+    }
+
+    return { id: branch.id, code, name: branch.name }
+  }
+
   const assignedBranch = user.branches[0]
   if (!assignedBranch) {
     throw new Error('Your user account must be assigned to a branch before importing data')
   }
 
-  const db = getTenantPrisma(user.organizationId)
   const branch = await db.branch.findFirst({
     where: { id: assignedBranch.id },
     select: { id: true, name: true, code: true, location: true },
@@ -54,6 +79,10 @@ async function getImporterBranch(user: AuthUser): Promise<{
   const code = branch
     ? normalizeBranchCode(branch.code, branch.name, branch.location)
     : null
+
+  if (requestedCode && requestedCode !== code) {
+    throw new Error('You can only import data into your assigned branch')
+  }
 
   if (!branch || !code) {
     throw new Error('Your assigned branch must be Nairobi, Mombasa, or Bonje before importing data')
@@ -69,7 +98,11 @@ async function getImporterBranch(user: AuthUser): Promise<{
 export async function uploadSpecialized(formData: FormData) {
   const user = await requireImporter()
   const db = getTenantPrisma(user.organizationId)
-  const importerBranch = await getImporterBranch(user)
+  const requestedBranchCode = formData.get('target_branch')
+  const importerBranch = await getImporterBranch(
+    user,
+    typeof requestedBranchCode === 'string' ? requestedBranchCode : null
+  )
   const file = formData.get('file') as File | null
   const sheetType = formData.get('sheet_type') as SpecializedSheetType | null
   const branchOverride = importerBranch.code
@@ -182,7 +215,6 @@ export async function uploadSpecialized(formData: FormData) {
 export async function commitSpecializedBatch(batchId: string): Promise<CommitResult> {
   const user = await requireImporter()
   const db = getTenantPrisma(user.organizationId)
-  const importerBranch = await getImporterBranch(user)
 
   const batch = await db.importBatch.findFirst({ where: { id: batchId } })
   if (!batch) throw new Error('Batch not found')
@@ -190,6 +222,8 @@ export async function commitSpecializedBatch(batchId: string): Promise<CommitRes
   if (!batch.file_url) {
     throw new Error('File buffer missing — please re-upload the file')
   }
+
+  const importerBranch = await getImporterBranch(user, batch.target_branch)
 
   const bufNode = Buffer.from(batch.file_url, 'base64')
   const buffer = bufNode.buffer.slice(

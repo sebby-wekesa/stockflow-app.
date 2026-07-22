@@ -3,6 +3,12 @@
 import { useState, useTransition } from 'react'
 import { uploadSpecialized } from './actions'
 import * as XLSX from 'xlsx'
+import type { BranchCode } from '@/lib/branches'
+
+type ImportBranchOption = {
+  code: BranchCode
+  name: string
+}
 
 type SheetTypeOption = {
   value: string
@@ -49,11 +55,24 @@ const SHEET_TYPES: SheetTypeOption[] = [
   },
 ]
 
-export function QuickImportForm({ assignedBranchName }: { assignedBranchName: string | null }) {
+export function QuickImportForm({
+  assignedBranchName,
+  assignedBranchCode,
+  branchOptions,
+  canChooseBranch,
+}: {
+  assignedBranchName: string | null
+  assignedBranchCode: BranchCode | null
+  branchOptions: ImportBranchOption[]
+  canChooseBranch: boolean
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [sheetType, setSheetType] = useState<string>('sales_simple') // default to the most common case for you
+  const [selectedBranch, setSelectedBranch] = useState<BranchCode | ''>(
+    canChooseBranch ? '' : assignedBranchCode ?? ''
+  )
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
@@ -192,17 +211,40 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
       </div>
 
       <div className="card-sm import-branch">
-        <div>
+        <div style={{ flex: 1 }}>
           <div className="form-label">Import branch</div>
-          <div className="import-branch-name">
-            {assignedBranchName ?? 'No branch assigned'}
-          </div>
+          {canChooseBranch ? (
+            <select
+              name="target_branch"
+              value={selectedBranch}
+              onChange={(event) => setSelectedBranch(event.target.value as BranchCode | '')}
+              className="form-input"
+              disabled={isPending}
+              required
+            >
+              <option value="">Select a branch...</option>
+              {branchOptions.map((branch) => (
+                <option key={branch.code} value={branch.code}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <div className="import-branch-name">
+                {assignedBranchName ?? 'No branch assigned'}
+              </div>
+              <input type="hidden" name="target_branch" value={assignedBranchCode ?? ''} />
+            </>
+          )}
           <div className="section-sub">
-            Imported data is automatically assigned to your user branch.
+            {canChooseBranch
+              ? 'As a super user, choose which branch should receive this import.'
+              : 'Imported data is automatically assigned to your user branch.'}
           </div>
         </div>
-        <span className={`badge ${assignedBranchName ? 'badge-teal' : 'badge-red'}`}>
-          {assignedBranchName ? 'Assigned' : 'Required'}
+        <span className={`badge ${selectedBranch ? 'badge-teal' : 'badge-red'}`}>
+          {canChooseBranch ? (selectedBranch ? 'Selected' : 'Required') : assignedBranchName ? 'Assigned' : 'Required'}
         </span>
       </div>
 
@@ -242,7 +284,7 @@ export function QuickImportForm({ assignedBranchName }: { assignedBranchName: st
           You will review parsed rows before anything is committed. Re-importing the same file
           updates existing products, stock rows, and invoices instead of duplicating them.
         </div>
-        <button type="submit" disabled={isPending || !file || !assignedBranchName} className="btn btn-primary">
+        <button type="submit" disabled={isPending || !file || !selectedBranch} className="btn btn-primary">
           {isPending ? 'Parsing file...' : 'Parse & preview'}
         </button>
       </div>
