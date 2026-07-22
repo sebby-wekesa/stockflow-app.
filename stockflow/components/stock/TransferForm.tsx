@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { dispatchTransfer, searchProductsWithStock } from '@/actions/stock'
+import { dispatchTransfer } from '@/actions/stock'
 import { BRANCH_LABELS } from '@/lib/branches'
-import { formatKES } from '@/lib/sales-utils'
 import type { BranchCode as Branch } from '@/lib/branches'
 
 type ProductWithStock = {
@@ -100,103 +99,110 @@ export function TransferForm({
   }
 
   const availableDestinations = userBranches.filter(b => b !== sourceBranch)
+  const availableProducts = products.filter((product) =>
+    product.stock_levels.some((stock) => stock.branch === sourceBranch && stock.qty > 0)
+  )
 
   return (
-    <div className="card p-6">
+    <div className="stock-transfer-form">
       {error && (
-        <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className="stock-transfer-alert stock-transfer-alert-error" role="alert">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
+        <div className="stock-transfer-alert stock-transfer-alert-success" role="status">
           {success}
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        {/* SOURCE BRANCH */}
-        <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-            From branch <span className="text-red">*</span>
-          </label>
-          <select
-            value={sourceBranch}
-            onChange={(e) => {
-              setSourceBranch(e.target.value as Branch)
-              setPicked(null) // Reset picked product when branch changes
-            }}
-            className="input"
-          >
-            {userBranches.map((branch) => (
-              <option key={branch} value={branch}>
-                {BRANCH_LABELS[branch]}
-              </option>
-            ))}
-          </select>
-        </div>
+      <form onSubmit={handleSubmit} className="stock-transfer-form-body">
+        <div className="stock-transfer-route-fields">
+          <div className="form-group">
+            <label className="form-label" htmlFor="transfer-source-branch">
+              From branch <span className="stock-transfer-required" aria-hidden="true">*</span>
+            </label>
+            <select
+              id="transfer-source-branch"
+              value={sourceBranch}
+              onChange={(e) => {
+                setSourceBranch(e.target.value as Branch)
+                setPicked(null)
+              }}
+              className="form-input stock-transfer-input"
+            >
+              {userBranches.map((branch) => (
+                <option key={branch} value={branch}>
+                  {BRANCH_LABELS[branch]}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* DESTINATION BRANCH */}
-        <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-            To branch <span className="text-red">*</span>
-          </label>
-          <select
-            value={destBranch}
-            onChange={(e) => setDestBranch(e.target.value as Branch)}
-            className="input"
-          >
-            {availableDestinations.map((branch) => (
-              <option key={branch} value={branch}>
-                {BRANCH_LABELS[branch]}
-              </option>
-            ))}
-          </select>
+          <div className="stock-transfer-route-arrow" aria-hidden="true">→</div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="transfer-destination-branch">
+              To branch <span className="stock-transfer-required" aria-hidden="true">*</span>
+            </label>
+            <select
+              id="transfer-destination-branch"
+              value={destBranch}
+              onChange={(e) => setDestBranch(e.target.value as Branch)}
+              className="form-input stock-transfer-input"
+            >
+              {availableDestinations.map((branch) => (
+                <option key={branch} value={branch}>
+                  {BRANCH_LABELS[branch]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* PRODUCT PICKER */}
-        <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-            Product <span className="text-red">*</span>
+        <div className="form-group stock-transfer-field">
+          <label className="form-label">
+            Product <span className="stock-transfer-required" aria-hidden="true">*</span>
           </label>
           {picked ? (
-            <div className="bg-surface2 rounded-md p-3 flex items-center justify-between">
+            <div className="stock-transfer-selected-product">
               <div className="min-w-0">
-                <div className="font-mono text-accent">{picked.product_code}</div>
-                <div className="text-xs text-muted truncate">{picked.canonical_name}</div>
-                <div className="text-[10px] text-muted mt-1">
+                <div className="stock-transfer-product-code">{picked.product_code}</div>
+                <div className="stock-transfer-product-name">{picked.canonical_name}</div>
+                <div className="stock-transfer-product-availability">
                   {picked.stock_at_branch} {picked.uom} available at {BRANCH_LABELS[sourceBranch]}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setPicked(null)}
-                className="text-muted hover:text-red text-lg ml-2"
+                className="btn btn-ghost btn-sm stock-transfer-change"
               >
-                ✕
+                Change
               </button>
             </div>
           ) : (
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {products
-                .filter(p => p.stock_levels.some(s => s.branch === sourceBranch && s.qty > 0))
-                .map((product) => (
+            <div id="transfer-product-list" className="stock-transfer-product-list">
+              {availableProducts.map((product) => (
                   <button
                     key={product.id}
                     type="button"
                     onClick={() => pickProduct(product, sourceBranch)}
-                    className="w-full text-left px-3 py-2 rounded-md hover:bg-surface2 border border-border transition-colors"
+                    className="stock-transfer-product-option"
                   >
-                    <div className="font-mono text-accent">{product.product_code}</div>
-                    <div className="text-xs text-muted truncate">{product.canonical_name}</div>
-                    <div className="text-[10px] text-muted mt-1">
+                    <div>
+                      <div className="stock-transfer-product-code">{product.product_code}</div>
+                      <div className="stock-transfer-product-name">{product.canonical_name}</div>
+                    </div>
+                    <div className="stock-transfer-product-quantity">
                       {product.stock_levels.find(s => s.branch === sourceBranch)?.qty ?? 0} {product.uom} available
                     </div>
                   </button>
                 ))}
-              {products.filter(p => p.stock_levels.some(s => s.branch === sourceBranch && s.qty > 0)).length === 0 && (
-                <div className="text-xs text-muted px-3 py-2">
+              {availableProducts.length === 0 && (
+                <div className="stock-transfer-empty-products">
                   No products with stock at {BRANCH_LABELS[sourceBranch]}
                 </div>
               )}
@@ -204,49 +210,52 @@ export function TransferForm({
           )}
         </div>
 
-        {/* QUANTITY */}
-        <div className="mb-4">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-            Quantity to transfer <span className="text-red">*</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            className="input font-mono"
-            placeholder="Enter quantity"
-            disabled={!picked}
-          />
-          {picked && (
-            <div className="text-xs text-muted mt-1">
-              Maximum: {picked.stock_at_branch} {picked.uom}
-            </div>
-          )}
+        <div className="stock-transfer-form-grid">
+          <div className="form-group">
+            <label className="form-label" htmlFor="transfer-quantity">
+              Quantity to transfer <span className="stock-transfer-required" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="transfer-quantity"
+              type="number"
+              min="1"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className="form-input stock-transfer-input stock-transfer-quantity-input"
+              placeholder="Enter quantity"
+              disabled={!picked}
+            />
+            {picked && (
+              <div className="stock-transfer-help">
+                Maximum: {picked.stock_at_branch} {picked.uom}
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="transfer-notes">Notes <span className="stock-transfer-optional">Optional</span></label>
+            <textarea
+              id="transfer-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="form-input stock-transfer-input stock-transfer-notes"
+              rows={3}
+              placeholder="Reason for transfer or transport reference"
+            />
+          </div>
         </div>
 
-        {/* NOTES */}
-        <div className="mb-6">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">
-            Notes (optional)
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="input"
-            rows={3}
-            placeholder="Reason for transfer, vehicle details, etc."
-          />
-        </div>
-
-        {/* SUBMIT */}
-        <div className="flex justify-end gap-2">
+        <div className="stock-transfer-form-actions">
+          <div className="stock-transfer-action-copy">
+            <span className="stock-transfer-action-label">Ready to dispatch?</span>
+            <span>Both branch movements will be logged together.</span>
+          </div>
           <button
             type="submit"
             disabled={isPending || !picked || !qty}
             className="btn btn-primary"
           >
-            {isPending ? 'Transferring...' : 'Transfer stock'}
+            {isPending ? 'Transferring…' : 'Transfer stock'}
           </button>
         </div>
       </form>

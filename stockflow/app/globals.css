@@ -232,6 +232,81 @@ tr:hover td { background: var(--surface2); }
 .form-input:focus { outline: none; border-color: var(--accent); }
 select.form-input option { background: var(--surface2); }
 
+/* STOCK TRANSFER */
+.stock-transfer-page { max-width: 1180px; margin: 0 auto; }
+.stock-transfer-header { align-items: flex-start; margin-bottom: 20px; }
+.stock-transfer-back { display: inline-flex; margin-bottom: 8px; color: var(--muted); font-size: 11px; transition: color 0.15s; }
+.stock-transfer-back:hover { color: var(--text); }
+.stock-transfer-status { margin-top: 6px; white-space: nowrap; }
+.stock-transfer-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.8fr); gap: 16px; align-items: start; }
+.stock-transfer-card { padding: 0; overflow: hidden; border-top: 2px solid var(--accent); }
+.stock-transfer-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 21px 24px 19px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), var(--surface)); border-bottom: 1px solid var(--border); }
+.stock-transfer-kicker { margin-bottom: 6px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.stock-transfer-card-mark { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border2)); border-radius: var(--radius-sm); color: var(--accent); font-family: var(--font-mono); font-size: 18px; }
+.stock-transfer-form { padding: 22px 24px 24px; }
+.stock-transfer-alert { margin-bottom: 16px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.45; }
+.stock-transfer-alert-error { border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border)); background: color-mix(in srgb, var(--red) 10%, var(--surface2)); color: var(--red); }
+.stock-transfer-alert-success { border: 1px solid color-mix(in srgb, var(--teal) 40%, var(--border)); background: color-mix(in srgb, var(--teal) 9%, var(--surface2)); color: var(--teal); }
+.stock-transfer-form-body { display: grid; gap: 18px; }
+.stock-transfer-route-fields { display: grid; grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr); gap: 12px; align-items: end; }
+.stock-transfer-route-arrow { display: flex; align-items: center; justify-content: center; height: 38px; color: var(--accent); font-family: var(--font-mono); font-size: 20px; }
+.stock-transfer-input { width: 100%; min-height: 38px; }
+.stock-transfer-input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent); }
+.stock-transfer-required { color: var(--red); }
+.stock-transfer-optional { margin-left: 5px; color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.stock-transfer-product-list { display: grid; gap: 7px; max-height: 290px; overflow-y: auto; padding: 2px; }
+.stock-transfer-product-option { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text); font-family: var(--font-body); text-align: left; cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.15s; }
+.stock-transfer-product-option:hover { border-color: var(--accent); background: var(--surface-hover); transform: translateY(-1px); }
+.stock-transfer-product-code { color: var(--accent); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
+.stock-transfer-product-name { max-width: 100%; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-transfer-product-quantity { flex-shrink: 0; color: var(--teal); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.stock-transfer-selected-product { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 74px; padding: 13px 14px; border: 1px solid color-mix(in srgb, var(--teal) 42%, var(--border)); border-left: 3px solid var(--teal); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--teal) 5%, var(--surface2)); }
+.stock-transfer-product-availability { margin-top: 6px; color: var(--teal); font-family: var(--font-mono); font-size: 10px; }
+.stock-transfer-change { flex-shrink: 0; }
+.stock-transfer-empty-products { padding: 20px 14px; border: 1px dashed var(--border2); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; text-align: center; }
+.stock-transfer-form-grid { display: grid; grid-template-columns: minmax(150px, 0.65fr) minmax(0, 1.35fr); gap: 14px; }
+.stock-transfer-quantity-input { font-family: var(--font-mono); font-size: 16px; font-weight: 600; }
+.stock-transfer-quantity-input:disabled { cursor: not-allowed; opacity: 0.55; }
+.stock-transfer-notes { min-height: 84px; resize: vertical; }
+.stock-transfer-help { margin-top: 2px; color: var(--muted); font-size: 11px; }
+.stock-transfer-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.stock-transfer-action-copy { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 11px; }
+.stock-transfer-action-label { color: var(--text); font-size: 12px; font-weight: 700; }
+.stock-transfer-form-actions .btn { min-height: 38px; }
+.stock-transfer-form-actions .btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.stock-transfer-aside { display: grid; gap: 16px; }
+.stock-transfer-route-card, .stock-transfer-audit-card { padding: 18px; }
+.stock-transfer-aside-copy { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.stock-transfer-branch-list { display: grid; gap: 8px; margin-top: 18px; }
+.stock-transfer-branch-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 11px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.stock-transfer-branch-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+.stock-transfer-branch-dot.mombasa { background: var(--accent); }
+.stock-transfer-branch-dot.nairobi { background: var(--teal); }
+.stock-transfer-branch-dot.bonje { background: var(--purple); }
+.stock-transfer-branch-name { font-size: 12px; font-weight: 700; }
+.stock-transfer-branch-sub { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.stock-transfer-branch-code { color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
+.stock-transfer-audit-card { border-left: 3px solid var(--teal); }
+.stock-transfer-audit-card .section-title { margin-top: 12px; }
+.stock-transfer-note { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.stock-transfer-note-label { flex-shrink: 0; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; }
+
+@media (max-width: 980px) {
+  .stock-transfer-layout { grid-template-columns: 1fr; }
+  .stock-transfer-aside { grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr); align-items: start; }
+}
+
+@media (max-width: 640px) {
+  .stock-transfer-header { flex-direction: column; gap: 12px; }
+  .stock-transfer-status { margin-top: 0; }
+  .stock-transfer-card-header, .stock-transfer-form { padding-right: 16px; padding-left: 16px; }
+  .stock-transfer-route-fields, .stock-transfer-form-grid, .stock-transfer-aside { grid-template-columns: 1fr; }
+  .stock-transfer-route-arrow { width: 24px; height: 22px; transform: rotate(90deg); }
+  .stock-transfer-form-actions { align-items: stretch; flex-direction: column; }
+  .stock-transfer-form-actions .btn { width: 100%; }
+  .stock-transfer-note { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
+
 /* PRODUCTION ORDER CREATION */
 .production-new-page { display: flex; flex-direction: column; gap: 20px; max-width: 1280px; margin: 0 auto; width: 100%; }
 .production-new-hero { display: flex; align-items: stretch; justify-content: space-between; gap: 18px; padding: 22px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
