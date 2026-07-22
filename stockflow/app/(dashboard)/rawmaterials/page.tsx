@@ -3,7 +3,7 @@ import { getTenantPrisma } from "@/lib/tenant-prisma"
 import { requireActiveAuth } from "@/lib/auth"
 import { withRetry } from '@/lib/prisma'
 import { RAW_MATERIAL_CATEGORIES } from '@/lib/raw-materials'
-import { updateRawMaterialReceipt } from '@/actions/raw-materials'
+import { updateRawMaterialBalances, updateRawMaterialReceipt } from '@/actions/raw-materials'
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +19,7 @@ export default async function RawmaterialsPage({
     : ''
   const user = await requireActiveAuth();
   const db = getTenantPrisma(user.organizationId);
+  const canManageStock = ['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(user.role)
   const materialSearch = query
     ? {
         OR: [
@@ -101,6 +102,7 @@ export default async function RawmaterialsPage({
           <div>
             <div className="section-title">Raw material list</div>
             <div className="section-sub">All raw material records in the database</div>
+            {canManageStock && <div className="section-sub">Edit balances with a reason to keep the stock adjustment traceable.</div>}
           </div>
         </div>
         <form action="/rawmaterials" className="mb-16" style={{display:'flex',gap:'12px',alignItems:'end',flexWrap:'wrap'}}>
@@ -136,22 +138,101 @@ export default async function RawmaterialsPage({
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>SKU</th><th>Category</th><th>Material</th><th>Dimensions</th><th>Available kg</th><th>Reserved kg</th><th>Pieces</th></tr>
+              <tr>
+                <th>SKU</th>
+                <th>Category</th>
+                <th>Material</th>
+                <th>Dimensions</th>
+                <th>Available kg</th>
+                <th>Reserved kg</th>
+                <th>Pieces</th>
+                {canManageStock && <><th>Adjustment reason</th><th>Action</th></>}
+              </tr>
             </thead>
             <tbody>
-              {matchingMaterials.map((material) => (
-                <tr key={material.id}>
-                  <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{material.sku}</td>
-                  <td>{categoryLabels[material.category as keyof typeof categoryLabels] || material.category}</td>
-                  <td>{material.materialName}</td>
-                  <td>{material.length || '—'} L · {material.width || '—'} W/D · {material.height || '—'} H · {material.diameter}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availableKg.toNumber().toLocaleString()} kg</td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{material.reservedKg.toNumber().toLocaleString()} kg</td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{material.availablePieces.toLocaleString()}</td>
-                </tr>
-              ))}
+              {matchingMaterials.map((material) => {
+                const formId = `material-balance-${material.id}`
+                return (
+                  <tr key={material.id}>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{material.sku}</td>
+                    <td>{categoryLabels[material.category as keyof typeof categoryLabels] || material.category}</td>
+                    <td>{material.materialName}</td>
+                    <td>{material.length || '—'} L · {material.width || '—'} W/D · {material.height || '—'} H · {material.diameter}</td>
+                    <td>
+                      {canManageStock ? (
+                        <input
+                          form={formId}
+                          name="availableKg"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="form-input"
+                          defaultValue={material.availableKg.toNumber().toFixed(2)}
+                          aria-label={`Available kg for ${material.materialName}`}
+                        />
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{material.availableKg.toNumber().toLocaleString()} kg</span>
+                      )}
+                    </td>
+                    <td>
+                      {canManageStock ? (
+                        <input
+                          form={formId}
+                          name="reservedKg"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="form-input"
+                          defaultValue={material.reservedKg.toNumber().toFixed(2)}
+                          aria-label={`Reserved kg for ${material.materialName}`}
+                        />
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{material.reservedKg.toNumber().toLocaleString()} kg</span>
+                      )}
+                    </td>
+                    <td>
+                      {canManageStock ? (
+                        <input
+                          form={formId}
+                          name="availablePieces"
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="form-input"
+                          defaultValue={material.availablePieces}
+                          aria-label={`Available pieces for ${material.materialName}`}
+                        />
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{material.availablePieces.toLocaleString()}</span>
+                      )}
+                    </td>
+                    {canManageStock && (
+                      <>
+                        <td>
+                          <input
+                            form={formId}
+                            name="reason"
+                            type="text"
+                            required
+                            maxLength={200}
+                            className="form-input"
+                            placeholder="Why is this changing?"
+                            aria-label={`Adjustment reason for ${material.materialName}`}
+                          />
+                        </td>
+                        <td>
+                          <form id={formId} action={updateRawMaterialBalances}>
+                            <input type="hidden" name="materialId" value={material.id} />
+                            <button type="submit" className="btn btn-primary btn-sm">Save</button>
+                          </form>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                )
+              })}
               {matchingMaterials.length === 0 && (
-                <tr><td colSpan={7} style={{textAlign: 'center', color: 'var(--muted)'}}>No raw materials match the selected filters.</td></tr>
+                <tr><td colSpan={canManageStock ? 9 : 7} style={{textAlign: 'center', color: 'var(--muted)'}}>No raw materials match the selected filters.</td></tr>
               )}
             </tbody>
           </table>

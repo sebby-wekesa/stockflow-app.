@@ -148,6 +148,95 @@ const updateReceiptSchema = z.object({
   reference: z.string().max(200).optional().nullable(),
 })
 
+const updateRawMaterialBalancesSchema = z.object({
+  materialId: z.string().min(1),
+  availableKg: z.coerce.number().finite().nonnegative(),
+  reservedKg: z.coerce.number().finite().nonnegative(),
+  availablePieces: z.coerce.number().int().nonnegative(),
+  reason: z.string().trim().min(1, 'Please provide a reason for the stock adjustment').max(200),
+})
+
+export async function updateRawMaterialBalances(formData: FormData) {
+  const user = await requireWarehouseAccess()
+
+  const parsed = updateRawMaterialBalancesSchema.safeParse({
+    materialId: formData.get('materialId'),
+    availableKg: formData.get('availableKg'),
+    reservedKg: formData.get('reservedKg'),
+    availablePieces: formData.get('availablePieces'),
+    reason: formData.get('reason'),
+  })
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+
+  const data = parsed.data
+  const { withTenantTransaction } = await import('@/lib/tenant-prisma')
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const material = await tx.rawMaterial.findFirst({
+      where: { id: data.materialId },
+      select: {
+        id: true,
+        sku: true,
+        materialName: true,
+        availableKg: true,
+        reservedKg: true,
+        availablePieces: true,
+      },
+    })
+
+    if (!material) throw new Error('Raw material not found')
+
+    const previousValues = {
+      availableKg: Number(material.availableKg),
+      reservedKg: Number(material.reservedKg),
+      availablePieces: material.availablePieces,
+    }
+    const newValues = {
+      availableKg: data.availableKg,
+      reservedKg: data.reservedKg,
+      availablePieces: data.availablePieces,
+    }
+
+    if (
+      previousValues.availableKg === newValues.availableKg &&
+      previousValues.reservedKg === newValues.reservedKg &&
+      previousValues.availablePieces === newValues.availablePieces
+    ) {
+      return
+    }
+
+    await tx.rawMaterial.update({
+      where: { id: material.id },
+      data: {
+        availableKg: new Prisma.Decimal(data.availableKg),
+        reservedKg: new Prisma.Decimal(data.reservedKg),
+        availablePieces: data.availablePieces,
+      },
+    })
+
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'RAW_MATERIAL_STOCK_ADJUSTMENT',
+        entityType: 'RawMaterial',
+        entityId: material.id,
+        details: JSON.stringify({
+          sku: material.sku,
+          materialName: material.materialName,
+          reason: data.reason,
+          previousValues,
+          newValues,
+        }),
+      },
+    })
+  }, { maxWait: 10000, timeout: 30000 })
+
+  revalidatePath('/rawmaterials')
+  revalidatePath('/raw-materials')
+  revalidatePath('/inventory')
+  revalidatePath('/warehouse')
+}
+
 export async function updateRawMaterialReceipt(formData: FormData) {
   const user = await requireWarehouseAccess()
 
