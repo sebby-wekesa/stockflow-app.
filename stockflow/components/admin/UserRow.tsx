@@ -3,6 +3,7 @@
 
 import {
   updateUserRole,
+  makeUserSuperUser,
   deleteUser,
   updateUser,
   verifyUser,
@@ -21,6 +22,7 @@ interface UserRowProps {
     name: string | null;
     email: string;
     role: UserRole;
+    branchId?: string | null;
     department?: string | null;
     departments?: string[];
     isVerified?: boolean;
@@ -40,8 +42,27 @@ export function UserRow({ user }: UserRowProps) {
     startTransition(async () => {
       try {
         await updateUserRole(user.id, newRole);
+        router.refresh();
       } catch {
         setError("Failed to update role. Please try again.");
+      }
+    });
+  };
+
+  const handleMakeSuperUser = () => {
+    if (!window.confirm(`Make ${user.email} a super user with access to all branches?`)) return;
+
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await makeUserSuperUser(user.id);
+        if (!result.success) {
+          setError(result.error || "Failed to make user a super user.");
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setError((err as Error).message || "Failed to make user a super user.");
       }
     });
   };
@@ -171,6 +192,20 @@ export function UserRow({ user }: UserRowProps) {
         >
           Edit
         </button>
+        {user.role === 'ADMIN' && user.branchId && (
+          <button
+            disabled={isPending}
+            onClick={handleMakeSuperUser}
+            className="btn btn-primary"
+            style={{
+              padding: '4px 8px',
+              fontSize: '11px',
+              fontWeight: 600,
+            }}
+          >
+            Make super user
+          </button>
+        )}
         <button
           disabled={isPending || user.isVerified}
           onClick={handleVerify}

@@ -165,11 +165,48 @@ export async function updateUserRole(userId: string, newRole: string) {
       role: normalizedRole,
       departments: normalizedRole === 'OPERATOR' ? existingDepartments : [],
       department: normalizedRole === 'OPERATOR' ? existingDepartments[0] ?? null : null,
+      ...(normalizedRole === 'ADMIN' ? { branchId: null } : {}),
     },
   });
 
   revalidatePath('/admin/users');
   revalidatePath('/users');
+}
+
+export async function makeUserSuperUser(userId: string) {
+  try {
+    const currentUser = await assertAdminAccess();
+    const db = getTenantPrisma(currentUser.organizationId);
+
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: currentUser.organizationId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return { success: false, error: "User not found in this organization." };
+    }
+
+    await db.user.update({
+      where: { id: user.id, organizationId: currentUser.organizationId },
+      data: {
+        role: "ADMIN",
+        branchId: null,
+        departments: [],
+        department: null,
+      },
+    });
+
+    revalidatePath('/users');
+    revalidatePath('/admin/users');
+    return { success: true };
+  } catch (error) {
+    console.error("Make super user error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to make user a super user.",
+    };
+  }
 }
 
 export async function verifyUser(userId: string) {
@@ -487,7 +524,9 @@ export async function updateUser(_prevState: unknown, maybeFormData?: FormData) 
     };
 
     const isValidUuid = branchId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(branchId);
-    if (isValidUuid) {
+    if (role === 'ADMIN') {
+      updateData.branchId = null;
+    } else if (isValidUuid) {
       updateData.branchId = branchId;
     }
 
