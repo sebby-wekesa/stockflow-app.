@@ -163,7 +163,7 @@ export default async function ProductsPage({
   }
 
   return (
-    <div>
+    <div className="products-page">
       <div className="section-header mb-16">
         <div>
           <div className="section-title">Products</div>
@@ -176,7 +176,7 @@ export default async function ProductsPage({
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-16">
+      <div className="products-branch-grid grid gap-4 mb-16">
         {branchOptions.map((branch) => {
           const summary = branchSummaries[branch.code]
           const active = selectedBranch === branch.code
@@ -233,9 +233,9 @@ export default async function ProductsPage({
         <div className="section-sub">Find by SKU or name</div>
       </div>
 
-      <form className="mb-16 flex gap-2 items-end">
+      <form className="products-filter-form mb-16">
         {origin && <input type="hidden" name="origin" value={origin} />}
-        <div className="form-group max-w-md flex-1">
+        <div className="form-group products-search-field">
           <label className="form-label">Search</label>
           <input
             type="search"
@@ -245,7 +245,7 @@ export default async function ProductsPage({
             className="form-input"
           />
         </div>
-        <div className="form-group" style={{minWidth:'220px'}}>
+        <div className="form-group products-filter-field">
           <label className="form-label">Category</label>
           <select name="category" defaultValue={category ?? ''} className="form-input">
             <option value="">All categories</option>
@@ -256,7 +256,7 @@ export default async function ProductsPage({
             ))}
           </select>
         </div>
-        <div className="form-group" style={{minWidth:'180px'}}>
+        <div className="form-group products-filter-field">
           <label className="form-label">Branch</label>
           <select name="branch" defaultValue={selectedBranch ?? ''} className="form-input">
             <option value="">All branches</option>
@@ -288,9 +288,9 @@ export default async function ProductsPage({
         </div>
       </div>
 
-      <div className="card">
-        <div className="table-wrap">
-          <table>
+      <div className="card products-table-card">
+        <div className="products-table-wrap table-wrap">
+          <table className="products-table">
             <thead>
               <tr>
                 <th>SKU</th>
@@ -308,7 +308,7 @@ export default async function ProductsPage({
             <tbody>
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-muted text-sm">
+                  <td colSpan={10} className="products-empty py-12 text-center text-muted text-sm">
                     {q || origin || category ? (
                       <div>
                         No products match your search criteria.{' '}
@@ -329,30 +329,30 @@ export default async function ProductsPage({
               ) : (
                 products.map((p) => (
                   <tr key={p.id}>
-                    <td>
+                    <td data-label="SKU">
                       <Link href={`/products/${p.id}`} className="font-mono text-accent-amber hover:underline">
                         {p.sku}
                       </Link>
                     </td>
-                     <td className="truncate max-w-xs">{p.name}</td>
-                     <td>
+                     <td data-label="Product name" className="truncate max-w-xs">{p.name}</td>
+                     <td data-label="Category">
                        <ProductCategorySelect
                          productId={p.id}
                          category={p.category}
                          canEdit={canEditProducts}
                        />
                      </td>
-                     <td>
+                     <td data-label="Origin">
                        <ProductOriginSelect
                          productId={p.id}
                          origin={p.origin}
                          canEdit={canEditProducts}
                        />
                      </td>
-                    <td>
+                    <td data-label="UOM">
                       <span className="badge badge-muted">KG</span>
                     </td>
-                    <td>
+                    <td data-label="Branch">
                       {(() => {
                         const code = p.Branch
                           ? normalizeBranchCode(p.Branch.code, p.Branch.name, p.Branch.location)
@@ -367,27 +367,27 @@ export default async function ProductsPage({
                         )
                       })()}
                     </td>
-                    <td>
+                    <td data-label="Current stock">
                       <ProductCurrentStockInput
                         productId={p.id}
                         currentStock={p.currentStock}
                         canEdit={canEditProducts}
                       />
                     </td>
-                    <td>
+                    <td data-label="PCS/Sets">
                       <ProductPiecesSetsInput
                         productId={p.id}
                         piecesSets={p.piecesSets}
                         canEdit={canEditProducts}
                       />
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className="badge badge-teal">
                         Active
                       </span>
                     </td>
-                    <td>
-                      <div className="flex items-start gap-2">
+                    <td data-label="Actions">
+                      <div className="products-table-actions flex items-start gap-2">
                         <Link 
                           href={`/products/${p.id}/edit`} 
                           className="btn btn-ghost btn-sm"

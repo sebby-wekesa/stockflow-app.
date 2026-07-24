@@ -43,7 +43,7 @@ export function ProductCategorySelect({
   }
 
   return (
-    <div className="min-w-[150px]">
+    <div className="product-inline-control">
       <select
         aria-label="Product category"
         value={selectedCategory}
