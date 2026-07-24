@@ -45,7 +45,7 @@ export function ProductOriginSelect({ productId, origin, canEdit }: ProductOrigi
   }
 
   return (
-    <div className="product-inline-control">
+    <div className="min-w-[150px]">
       <select
         aria-label="Product origin"
         value={selectedOrigin}
@@ -103,7 +103,7 @@ export function ProductBranchSelect({
   }
 
   return (
-    <div className="product-inline-control">
+    <div className="min-w-[140px]">
       <select
         aria-label="Product branch"
         value={selectedBranch}
@@ -168,7 +168,7 @@ export function ProductPiecesSetsInput({
   }
 
   return (
-    <div className="product-inline-control">
+    <div className="min-w-[86px]">
       <input
         aria-label="PCS/Sets"
         type="number"
@@ -241,7 +241,7 @@ export function ProductCurrentStockInput({
   }
 
   return (
-    <div className="product-inline-control">
+    <div className="min-w-[104px]">
       <div className="flex items-center gap-1">
         <input
           aria-label="Current stock"

@@ -94,7 +94,8 @@ export function DraftSalesOrderEditor({
         setError(result.error);
         return;
       }
-      router.back();
+      router.push("/sales");
+      router.refresh();
     });
   }
 
