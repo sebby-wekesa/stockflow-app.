@@ -177,9 +177,10 @@ export default async function BranchStockPage({
             Live inventory across all three branches · {lowStockCount} items below reorder point
           </div>
         </div>
-        <Link href="/stock/transfer" className="btn btn-primary">
-          Transfer Stock
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/stock/transfer/history" className="btn btn-ghost">Transfer history</Link>
+          <Link href="/stock/transfer" className="btn btn-primary">Transfer stock</Link>
+        </div>
       </div>
 
       {/* Inventory Dashboard */}

@@ -150,7 +150,10 @@ export default async function TransferPage() {
             Move finished goods between branches and keep the handoff auditable.
           </div>
         </div>
-        <span className="badge badge-amber stock-transfer-status">{isSuperUser ? 'All branches' : assignedBranchCode ? `${BRANCH_LABELS[assignedBranchCode]} stock` : 'Inventory movement'}</span>
+        <div className="flex items-center gap-2">
+          <Link href="/stock/transfer/history" className="btn btn-ghost btn-sm">Transfer history</Link>
+          <span className="badge badge-amber stock-transfer-status">{isSuperUser ? 'All branches' : assignedBranchCode ? `${BRANCH_LABELS[assignedBranchCode]} stock` : 'Inventory movement'}</span>
+        </div>
       </div>
 
       <div className="stock-transfer-layout">

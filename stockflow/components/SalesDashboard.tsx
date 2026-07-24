@@ -85,7 +85,7 @@ export default async function SalesDashboard({ user }: { user: AuthUser }) {
           </div>
           <div className="sales-actions">
             <Link href="/sales/new" className="sales-action-card"><strong>Create sales order</strong><span>Record a customer order or invoice</span></Link>
-            <Link href="/sales" className="sales-action-card"><strong>Review order history</strong><span>Search and track all sales orders</span></Link>
+            <Link href="/sales" className="sales-action-card"><strong>View sales history</strong><span>Search and track all sales orders</span></Link>
             <Link href="/catalogue" className="sales-action-card"><strong>View available stock</strong><span>Browse products ready for sale</span></Link>
           </div>
         </div>

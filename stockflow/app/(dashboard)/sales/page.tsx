@@ -20,6 +20,8 @@ export default async function SalesPage({
   const status = STATUSES.includes(params.status as SaleStatus) ? params.status as SaleStatus : undefined
   const branch = params.branch?.trim() || undefined
   const q = params.q?.trim() ?? ''
+  const productionRequest = params.productionRequest?.trim() || undefined
+  const productionProduct = params.productionProduct?.trim() || undefined
   const page = Math.max(1, Number(params.page ?? 1))
 
   const baseWhere: Prisma.SaleOrderWhereInput = user.role === 'SALES' ? { createdBy: user.id } : {}
@@ -77,11 +79,20 @@ export default async function SalesPage({
     <div className="sales-page">
       <div className="section-header mb-16">
         <div>
-          <div className="section-title">Sales Orders</div>
-          <div className="section-sub">Search and track customer orders from the sales database</div>
+          <div className="section-title">Sales history</div>
+          <div className="section-sub">Search and track every customer order from the sales database</div>
         </div>
         <Link href="/sales/new" className="btn btn-primary">+ New sales order</Link>
       </div>
+
+      {productionRequest && (
+        <div className="stock-transfer-alert stock-transfer-alert-success" role="status">
+          <strong>Production request created.</strong>{' '}
+          {productionProduct ?? 'The selected product'} is short on stock. Request{' '}
+          <span className="font-mono">{productionRequest}</span> has been sent for manager approval.
+          The sale can be invoiced after the requested stock is available.
+        </div>
+      )}
 
       <div className="stats-grid">
         <div className="stat-card amber">

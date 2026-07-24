@@ -276,7 +276,17 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
 
     revalidatePath('/sales')
     revalidatePath('/stock')
-    redirectTo = `/sales/${result.id}`
+    if ('productionRequestCreated' in result) {
+      revalidatePath('/approvals')
+      revalidatePath('/jobs')
+      const request = new URLSearchParams({
+        productionRequest: result.orderNumber,
+        productionProduct: result.productName,
+      })
+      redirectTo = `/sales?${request.toString()}`
+    } else {
+      redirectTo = `/sales/${result.id}`
+    }
   } catch (error) {
     console.error('createSalesOrder failed:', error)
     return {

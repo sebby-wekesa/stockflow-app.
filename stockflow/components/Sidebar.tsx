@@ -65,6 +65,8 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { label: "Raw material receipts", href: "/receive" },
         { label: "Raw materials", href: "/rawmaterials" },
         { label: "Inventory overview", href: "/stock" },
+        { label: "Transfer history", href: "/stock/transfer/history" },
+        { label: "Sales history", href: "/sales" },
         { section: "Production" },
         { label: "Production approvals", href: "/approvals" },
         { label: "Production orders", href: "/jobs" },
@@ -93,6 +95,8 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { section: "Reference" },
         { label: "Design templates", href: "/designs" },
         { label: "Inventory overview", href: "/stock" },
+        { label: "Sales history", href: "/sales" },
+        { label: "Transfer history", href: "/stock/transfer/history" },
         { section: "Data" },
         { label: "Import centre", href: "/import" },
       ];
@@ -122,7 +126,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { label: "Dashboard", href: "/dashboard" },
         { label: "Sales catalogue", href: "/catalogue" },
         { label: "New sale order", href: "/sales/new" },
-        { label: "Customer orders", href: "/sales" },
+        { label: "Sales history", href: "/sales" },
       ];
 
     case 'PACKAGING':
@@ -149,6 +153,7 @@ function getRoleNavItems(role: UserRole, counts: SidebarCounts = {}): NavItem[] 
         { label: "Receive stock", href: "/receive" },
         { section: "Inventory" },
         { label: "Stock overview", href: "/stock" },
+        { label: "Transfer history", href: "/stock/transfer/history" },
       ];
 
     default:

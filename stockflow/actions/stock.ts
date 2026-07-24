@@ -177,6 +177,7 @@ export async function dispatchTransfer(formData: FormData) {
 
   revalidatePath('/stock')
   revalidatePath('/stock/transfer')
+  revalidatePath('/stock/transfer/history')
 }
 
 export async function confirmStockTransfer(transferId: string) {
@@ -277,6 +278,7 @@ export async function confirmStockTransfer(transferId: string) {
 
   revalidatePath('/stock')
   revalidatePath('/stock/transfer')
+  revalidatePath('/stock/transfer/history')
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
