@@ -276,6 +276,16 @@ export function AccountingWorkspace({
 
   return (
     <div className={`${styles.shell} dashboard-content accountingWorkspacePage`}>
+      <div className={styles.navigationRow}>
+        <button
+          type="button"
+          className={styles.backButton}
+          onClick={() => router.back()}
+        >
+          ← Previous page
+        </button>
+      </div>
+
       {showWorkspaceChrome && <header className={styles.header}>
         <div>
           <div className={styles.eyebrow}>Double-entry accounting</div>

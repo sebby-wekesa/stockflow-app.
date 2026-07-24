@@ -23,6 +23,34 @@
   margin-bottom: 14px;
 }
 
+.navigationRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.backButton {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  border: 1px solid var(--accounting-line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accounting-muted);
+  padding: 6px 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.backButton:hover {
+  border-color: var(--accounting-green);
+  background: var(--accounting-green-3);
+  color: var(--accounting-ink);
+}
+
 .eyebrow {
   margin-bottom: 5px;
   color: var(--accounting-green-2);
