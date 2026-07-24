@@ -3,6 +3,7 @@ import type { Prisma, StockTransferStatus } from '@prisma/client'
 import { requireActiveAuth } from '@/lib/auth'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { normalizeBranchCode } from '@/lib/branches'
+import { getStockTransferHistoryVisibilityWhere } from '@/lib/stock-transfer-history'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,15 +56,11 @@ export default async function StockTransferHistoryPage({
     : undefined
 
   // Managers and admins can review the organization-wide trail. Other users
-  // see only transfers touching a branch assigned to them.
-  const visibilityWhere: Prisma.StockTransferWhereInput = canSeeAllBranches
-    ? {}
-    : {
-        OR: [
-          { sourceBranchId: { in: visibleBranchIds } },
-          { destinationBranchId: { in: visibleBranchIds } },
-        ],
-      }
+  // see transfers touching an assigned branch on either side of the handoff.
+  const visibilityWhere: Prisma.StockTransferWhereInput = getStockTransferHistoryVisibilityWhere(
+    user.role,
+    visibleBranchIds,
+  )
 
   const filterWhere: Prisma.StockTransferWhereInput = {
     AND: [
@@ -136,7 +133,11 @@ export default async function StockTransferHistoryPage({
         <div>
           <Link href="/stock" className="stock-transfer-back">← Stock overview</Link>
           <div className="section-title">Stock transfer history</div>
-          <div className="section-sub">Review every branch-to-branch dispatch and receipt.</div>
+          <div className="section-sub">
+            {canSeeAllBranches
+              ? 'Review every branch-to-branch dispatch and receipt.'
+              : `Review transfers sent from or received by ${visibleBranches.map((item) => item.name).join(', ') || 'your assigned branch'}.`}
+          </div>
         </div>
         <Link href="/stock/transfer" className="btn btn-primary">+ Transfer stock</Link>
       </div>
