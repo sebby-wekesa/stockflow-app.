@@ -12,7 +12,10 @@ import { normalizeBranchCode } from '@/lib/branches'
 //
 // Product.currentStock is the organization-wide total. ProductBranchStock
 // keeps the branch-level balance so a partial transfer can move stock without
-// moving or duplicating the product catalog row.
+// duplicating the product catalog row. Product.branchId follows the latest
+// receiving branch so the product catalogue reflects the latest handoff;
+// ProductBranchStock remains authoritative when stock exists in more than one
+// branch.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const transferSchema = z.object({
@@ -254,6 +257,14 @@ export async function confirmStockTransfer(transferId: string) {
       },
     })
 
+    // A received transfer changes the product's catalogue ownership to the
+    // destination branch. Branch stock rows remain in place so any quantity
+    // still held at another branch remains visible there.
+    await tx.product.update({
+      where: { id: transfer.productId },
+      data: { branchId: transfer.destinationBranchId },
+    })
+
     await tx.stockMovement.create({
       data: {
         productId: transfer.productId,
@@ -271,12 +282,13 @@ export async function confirmStockTransfer(transferId: string) {
         action: 'STOCK_TRANSFER_RECEIVED',
         entityType: 'StockTransfer',
         entityId: transfer.id,
-        details: `Received ${transfer.quantity} ${quantityLabel} of ${transfer.Product.sku ?? transfer.Product.name} at ${transfer.DestinationBranch.name} from ${transfer.SourceBranch.name}.`,
+        details: `Received ${transfer.quantity} ${quantityLabel} of ${transfer.Product.sku ?? transfer.Product.name} at ${transfer.DestinationBranch.name} from ${transfer.SourceBranch.name}; product assigned to ${transfer.DestinationBranch.name}.`,
       },
     })
   }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/stock')
+  revalidatePath('/products')
   revalidatePath('/stock/transfer')
   revalidatePath('/stock/transfer/history')
 }

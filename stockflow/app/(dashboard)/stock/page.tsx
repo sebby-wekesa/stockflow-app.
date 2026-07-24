@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import { ALL_BRANCHES, BRANCH_LABELS, BRANCH_SUB, formatKES, normalizeBranchCode } from '@/lib/branches'
 import ExportStockButton from './_components/ExportStockButton'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABELS, CATEGORY_SHORT, isProductCategory } from '@/lib/products'
+import type { Prisma, StockStatus } from '@prisma/client'
 import type { BranchCode as Branch } from '@/lib/branches'
 
 // Status badge component
@@ -45,30 +46,69 @@ export default async function BranchStockPage({
   const db = getTenantPrisma(user.organizationId)
 
   const params = await searchParams;
-  const focusedBranch = params.branch as Branch | undefined
+  const focusedBranch = ALL_BRANCHES.includes(params.branch as Branch)
+    ? params.branch as Branch
+    : undefined
   const page = Math.max(1, Number(params.page ?? 1))
   const category = isProductCategory(params.category) ? params.category : undefined
+  const status = ['AVAILABLE', 'LOW_STOCK', 'OUT_OF_STOCK', 'REORDER_NEEDED'].includes(params.status ?? '')
+    ? params.status as StockStatus
+    : undefined
 
   // Build product filter
-  const productWhere: any = {}
+  const productFilters: Prisma.ProductWhereInput[] = []
 
   // Add search filter if provided
   if (params.search) {
-    productWhere.OR = [
+    productFilters.push({ OR: [
       { name: { contains: params.search, mode: 'insensitive' } },
       { sku: { contains: params.search, mode: 'insensitive' } },
-    ]
+    ] })
   }
 
   // Add category filter if provided
   if (category) {
-    productWhere.category = category
+    productFilters.push({ category })
   }
 
   // Add status filter if provided
-  if (params.status) {
-    productWhere.stockStatus = params.status
+  if (status) {
+    productFilters.push({ stockStatus: status })
   }
+
+  const branchRecords = await db.branch.findMany({
+    select: { id: true, code: true, name: true, location: true },
+  })
+  const branchIdByCode = new Map(
+    branchRecords.flatMap((branch) => {
+      const code = normalizeBranchCode(branch.code, branch.name, branch.location)
+      return code ? [[code, branch.id] as const] : []
+    })
+  )
+  const focusedBranchId = focusedBranch ? branchIdByCode.get(focusedBranch) : undefined
+
+  if (focusedBranchId) {
+    productFilters.push({
+      OR: [
+        { branchId: { in: [focusedBranchId, ...(focusedBranch ? [focusedBranch] : [])] } },
+        {
+          branchStocks: {
+            some: {
+              branchId: focusedBranchId,
+              OR: [
+                { availableQty: { gt: 0 } },
+                { availablePiecesSets: { gt: 0 } },
+              ],
+            },
+          },
+        },
+      ],
+    })
+  }
+
+  const productWhere: Prisma.ProductWhereInput = productFilters.length
+    ? { AND: productFilters }
+    : {}
 
   // Fetch the page data with a small fixed query count. The branch summary
   // is reduced in memory to avoid a per-branch aggregate/count fan-out.
@@ -78,6 +118,15 @@ export default async function BranchStockPage({
       orderBy: { sku: 'asc' },
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
+      include: {
+        branchStocks: {
+          select: {
+            branchId: true,
+            availableQty: true,
+            availablePiecesSets: true,
+          },
+        },
+      },
     }),
     db.product.count({ where: productWhere }),
 
@@ -363,40 +412,57 @@ export default async function BranchStockPage({
                   </td>
                 </tr>
               ) : (
-                  products.map((p) => {
-                    return (
-                      <tr key={p.id}>
-                        <td>
-                          <div className="font-mono text-accent-amber mb-1">{p.sku}</div>
-                          <div className="text-muted text-sm truncate max-w-xs">{p.name}</div>
-                        </td>
-                        <td>
-                          <span className={`badge ${CATEGORY_BADGE_CLASS[p.category] || 'badge-muted'}`}>
-                            {CATEGORY_SHORT[p.category] || p.category}
-                          </span>
-                        </td>
-                        <td>
-                          <Link
-                            href={`/stock/ledger?productId=${p.id}`}
-                            className="text-accent-amber hover:underline text-sm"
-                          >
-                            View History
-                          </Link>
-                        </td>
-                        <td className="font-mono">
-                          {p.currentStock?.toFixed(1) || '0'}
-                        </td>
-                        <td>
-                          <span className="text-muted text-sm">{p.uom}</span>
-                        </td>
-                        <td>
-                          <StatusBadge status={p.stockStatus || 'AVAILABLE'} />
-                        </td>
-                        <td className="text-right font-mono">
-                          {formatKES((p.currentStock || 0) * (p.unitCost || 0))}
-                        </td>
-                      </tr>
-                    )
+                products.map((p) => {
+                  const branchStock = focusedBranchId
+                    ? p.branchStocks.find((stock) => stock.branchId === focusedBranchId)
+                    : undefined
+                  const branchOwnedProduct = Boolean(
+                    focusedBranchId &&
+                    [focusedBranchId, ...(focusedBranch ? [focusedBranch] : [])].includes(p.branchId ?? '')
+                  )
+                  const displayedStock = focusedBranchId
+                    ? branchStock?.availableQty ?? (branchOwnedProduct ? p.currentStock : 0)
+                    : p.currentStock
+                  const displayedPiecesSets = focusedBranchId
+                    ? branchStock?.availablePiecesSets ?? (branchOwnedProduct ? p.piecesSets : 0)
+                    : p.piecesSets
+
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="font-mono text-accent-amber mb-1">{p.sku}</div>
+                        <div className="text-muted text-sm truncate max-w-xs">{p.name}</div>
+                      </td>
+                      <td>
+                        <span className={`badge ${CATEGORY_BADGE_CLASS[p.category] || 'badge-muted'}`}>
+                          {CATEGORY_SHORT[p.category] || p.category}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="font-mono">{displayedStock.toFixed(1)} {p.uom}</div>
+                        {displayedPiecesSets > 0 && (
+                          <div className="text-muted text-sm">{displayedPiecesSets.toLocaleString()} PCS/Sets</div>
+                        )}
+                      </td>
+                      <td>
+                        <span className="text-muted text-sm">{p.uom}</span>
+                      </td>
+                      <td>
+                        <StatusBadge status={p.stockStatus || 'AVAILABLE'} />
+                      </td>
+                      <td className="text-right font-mono">
+                        {formatKES((displayedStock || 0) * (p.unitCost || 0))}
+                      </td>
+                      <td>
+                        <Link
+                          href={`/stock/ledger?productId=${p.id}`}
+                          className="text-accent-amber hover:underline text-sm"
+                        >
+                          View History
+                        </Link>
+                      </td>
+                    </tr>
+                  )
                 })
               )}
             </tbody>

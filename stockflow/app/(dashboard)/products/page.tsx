@@ -4,7 +4,7 @@ import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { withRetry } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { CATEGORY_LABELS } from '@/lib/products'
-import type { ProductCategory } from '@prisma/client'
+import type { Prisma, ProductCategory } from '@prisma/client'
 import { DeleteProductButton } from './_components/delete-product-button'
 import { ProductCategorySelect } from './_components/product-category-select'
 import {
@@ -57,20 +57,29 @@ export default async function ProductsPage({
     ? params.branch as BranchCode
     : undefined
 
-  // Build the WHERE clause
-  const where: any = {}
-  if (origin) where.origin = origin
-  if (category) where.category = category
+  // Build the WHERE clause. A product can be listed for a branch either
+  // because it is owned by that branch or because it has branch stock there
+  // after a transfer.
+  const filters: Prisma.ProductWhereInput[] = []
+  if (origin) filters.push({ origin })
+  if (category) filters.push({ category })
   if (selectedBranch) {
     const branch = branchByCode.get(selectedBranch)
-    where.branchId = branch?.id ?? '__missing_branch__'
+    filters.push({
+      OR: [
+        { branchId: { in: branch ? [branch.id, branch.code, selectedBranch] : ['__missing_branch__'] } },
+        { branchStocks: { some: { branchId: branch?.id ?? '__missing_branch__' } } },
+      ],
+    })
   }
   if (q) {
-    where.OR = [
+    filters.push({ OR: [
       { sku: { contains: q, mode: 'insensitive' } },
       { name: { contains: q, mode: 'insensitive' } },
-    ]
+    ] })
   }
+  const where: Prisma.ProductWhereInput = filters.length ? { AND: filters } : {}
+  const selectedBranchRecord = selectedBranch ? branchByCode.get(selectedBranch) : undefined
 
   // Fetch in parallel: category counts, the page of products, total
   const [counts, products, total, stockByBranchRows] = await withRetry(async () => {
@@ -85,6 +94,10 @@ export default async function ProductsPage({
       skip: (page - 1) * PAGE_SIZE,
       include: {
         Branch: { select: { id: true, name: true, code: true, location: true } },
+        branchStocks: {
+          where: selectedBranchRecord ? { branchId: selectedBranchRecord.id } : undefined,
+          select: { branchId: true, availableQty: true, availablePiecesSets: true },
+        },
         _count: { select: { ProductAlias: true } },
       },
     })
@@ -327,13 +340,26 @@ export default async function ProductsPage({
                   </td>
                 </tr>
               ) : (
-                products.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <Link href={`/products/${p.id}`} className="font-mono text-accent-amber hover:underline">
-                        {p.sku}
-                      </Link>
-                    </td>
+                products.map((p) => {
+                  const selectedBranchStock = p.branchStocks[0]
+                  const productBelongsToSelectedBranch = Boolean(
+                    selectedBranchRecord &&
+                    [selectedBranchRecord.id, selectedBranchRecord.code, selectedBranch].includes(p.branchId ?? '')
+                  )
+                  const displayedCurrentStock = selectedBranch
+                    ? selectedBranchStock?.availableQty ?? (productBelongsToSelectedBranch ? p.currentStock : 0)
+                    : p.currentStock
+                  const displayedPiecesSets = selectedBranch
+                    ? selectedBranchStock?.availablePiecesSets ?? (productBelongsToSelectedBranch ? p.piecesSets : 0)
+                    : p.piecesSets
+
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <Link href={`/products/${p.id}`} className="font-mono text-accent-amber hover:underline">
+                          {p.sku}
+                        </Link>
+                      </td>
                      <td className="truncate max-w-xs">{p.name}</td>
                      <td>
                        <ProductCategorySelect
@@ -353,33 +379,48 @@ export default async function ProductsPage({
                       <span className="badge badge-muted">KG</span>
                     </td>
                     <td>
-                      {(() => {
-                        const code = p.Branch
-                          ? normalizeBranchCode(p.Branch.code, p.Branch.name, p.Branch.location)
-                          : null
-                        return (
-                          <ProductBranchSelect
-                            productId={p.id}
-                            branch={code}
-                            branchLabel={code ? BRANCH_LABELS[code] : p.Branch?.name ?? 'Unassigned'}
-                            canEdit={canEditProducts}
-                          />
-                        )
-                      })()}
+                      {selectedBranch && selectedBranchStock ? (
+                        <span>
+                          {BRANCH_LABELS[selectedBranch]}
+                          <span className="text-muted text-xs"> (stock)</span>
+                        </span>
+                      ) : (() => {
+                          const code = p.Branch
+                            ? normalizeBranchCode(p.Branch.code, p.Branch.name, p.Branch.location)
+                            : null
+                          return (
+                            <ProductBranchSelect
+                              productId={p.id}
+                              branch={code}
+                              branchLabel={code ? BRANCH_LABELS[code] : p.Branch?.name ?? 'Unassigned'}
+                              canEdit={canEditProducts}
+                            />
+                          )
+                        })()}
                     </td>
                     <td>
-                      <ProductCurrentStockInput
-                        productId={p.id}
-                        currentStock={p.currentStock}
-                        canEdit={canEditProducts}
-                      />
+                      {selectedBranch ? (
+                        <span className="font-mono text-sm">
+                          {displayedCurrentStock.toLocaleString()} <span className="text-muted">kg</span>
+                        </span>
+                      ) : (
+                        <ProductCurrentStockInput
+                          productId={p.id}
+                          currentStock={p.currentStock}
+                          canEdit={canEditProducts}
+                        />
+                      )}
                     </td>
                     <td>
-                      <ProductPiecesSetsInput
-                        productId={p.id}
-                        piecesSets={p.piecesSets}
-                        canEdit={canEditProducts}
-                      />
+                      {selectedBranch ? (
+                        <span className="font-mono text-sm">{displayedPiecesSets.toLocaleString()}</span>
+                      ) : (
+                        <ProductPiecesSetsInput
+                          productId={p.id}
+                          piecesSets={p.piecesSets}
+                          canEdit={canEditProducts}
+                        />
+                      )}
                     </td>
                     <td>
                       <span className="badge badge-teal">
@@ -399,8 +440,9 @@ export default async function ProductsPage({
                         )}
                       </div>
                     </td>
-                  </tr>
-                ))
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
