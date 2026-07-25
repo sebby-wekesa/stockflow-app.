@@ -108,6 +108,16 @@ function extractForm(formData: FormData) {
   }
 }
 
+function isProductSkuConflict(error: any): boolean {
+  if (error?.code !== 'P2002') return /unique constraint.*sku/i.test(String(error?.message))
+
+  const target = Array.isArray(error?.meta?.target)
+    ? error.meta.target.join(' ')
+    : String(error?.meta?.target ?? '')
+
+  return /sku|Product_org_sku_key/i.test(`${target} ${error?.message ?? ''}`)
+}
+
 async function resolveProductBranch(
   db: ReturnType<typeof getTenantPrisma>,
   branchCode: BranchCode
@@ -141,6 +151,13 @@ export async function createProduct(formData: FormData) {
     throw new Error(`${firstError.path.join('.')}: ${firstError.message}`)
   }
   const branch = await resolveProductBranch(db, parsed.data.branch)
+  const duplicate = await db.product.findFirst({
+    where: { sku: parsed.data.product_code },
+    select: { id: true },
+  })
+  if (duplicate) {
+    return { error: `Product code "${parsed.data.product_code}" already exists` }
+  }
 
   // Transactional create + alias (sku unique constraint in DB prevents real dups even on race)
   let product: any
@@ -183,8 +200,8 @@ export async function createProduct(formData: FormData) {
       return created
     }, { maxWait: 10000, timeout: 30000 })
   } catch (err: any) {
-    if (err?.code === 'P2002' || /unique constraint.*sku/i.test(String(err?.message))) {
-      throw new Error(`Product code "${parsed.data.product_code}" already exists`)
+    if (isProductSkuConflict(err)) {
+      return { error: `Product code "${parsed.data.product_code}" already exists` }
     }
     throw err
   }
@@ -218,7 +235,7 @@ export async function updateProduct(productId: string, formData: FormData) {
       where: { sku: parsed.data.product_code, id: { not: productId } },
     })
     if (conflict) {
-      throw new Error(`Product code "${parsed.data.product_code}" already exists`)
+      return { error: `Product code "${parsed.data.product_code}" already exists` }
     }
   }
 
@@ -226,43 +243,50 @@ export async function updateProduct(productId: string, formData: FormData) {
   const stockChanged = nextStock != null && nextStock !== existing.currentStock
   const stockDelta = stockChanged ? nextStock - existing.currentStock : 0
 
-  await withTenantTransaction(user.organizationId, async (tx) => {
-    await tx.product.update({
-      where: { id: productId },
-      data: {
-        sku: parsed.data.product_code,
-        name: parsed.data.canonical_name,
-        category: parsed.data.category as ProductCategory,
-        origin: parsed.data.origin as StockOrigin,
-        uom: parsed.data.uom,
-        unitCost: parsed.data.cost_price ?? null,
-        vendor: parsed.data.vendor ?? null,
-        reorderLevel: parsed.data.reorder_point ?? null,
-        piecesSets: parsed.data.pieces_sets ?? 0,
-        branchId: branch.id,
-        routeType: parsed.data.route_type as RouteType | null,
-        ...(stockChanged ? { currentStock: nextStock } : {}),
-      },
-    })
-
-    if (stockChanged) {
-      await syncProductShadowStock(
-        tx,
-        existing.sku,
-        parsed.data.product_code,
-        nextStock
-      )
-      await tx.stockMovement.create({
+  try {
+    await withTenantTransaction(user.organizationId, async (tx) => {
+      await tx.product.update({
+        where: { id: productId },
         data: {
-          productId,
-          movementType: 'adjustment',
-          quantity: stockDelta,
-          reference: `PRODUCT-EDIT-${Date.now().toString(36).toUpperCase()}`,
-          notes: parsed.data.adjustment_reason?.trim() ?? 'Product edit stock adjustment',
+          sku: parsed.data.product_code,
+          name: parsed.data.canonical_name,
+          category: parsed.data.category as ProductCategory,
+          origin: parsed.data.origin as StockOrigin,
+          uom: parsed.data.uom,
+          unitCost: parsed.data.cost_price ?? null,
+          vendor: parsed.data.vendor ?? null,
+          reorderLevel: parsed.data.reorder_point ?? null,
+          piecesSets: parsed.data.pieces_sets ?? 0,
+          branchId: branch.id,
+          routeType: parsed.data.route_type as RouteType | null,
+          ...(stockChanged ? { currentStock: nextStock } : {}),
         },
       })
+
+      if (stockChanged) {
+        await syncProductShadowStock(
+          tx,
+          existing.sku,
+          parsed.data.product_code,
+          nextStock
+        )
+        await tx.stockMovement.create({
+          data: {
+            productId,
+            movementType: 'adjustment',
+            quantity: stockDelta,
+            reference: `PRODUCT-EDIT-${Date.now().toString(36).toUpperCase()}`,
+            notes: parsed.data.adjustment_reason?.trim() ?? 'Product edit stock adjustment',
+          },
+        })
+      }
+    }, { maxWait: 10000, timeout: 30000 })
+  } catch (err: any) {
+    if (isProductSkuConflict(err)) {
+      return { error: `Product code "${parsed.data.product_code}" already exists` }
     }
-  }, { maxWait: 10000, timeout: 30000 })
+    throw err
+  }
 
   revalidatePath('/products')
   revalidatePath(`/products/${productId}`)

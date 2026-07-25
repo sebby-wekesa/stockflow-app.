@@ -7,6 +7,7 @@ import type { ProductCategory, RouteType, StockOrigin } from '@prisma/client'
 import { ALL_BRANCHES, BRANCH_LABELS, type BranchCode } from '@/lib/branches'
 
 type Mode = 'create' | 'edit'
+type ProductActionResult = void | { error: string }
 
 type Initial = {
   product_code?: string
@@ -38,7 +39,7 @@ export function ProductForm({
 }: {
   mode: Mode
   initial?: Initial
-  action: (formData: FormData) => Promise<void>
+  action: (formData: FormData) => Promise<ProductActionResult>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -57,7 +58,10 @@ export function ProductForm({
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
       try {
-        await action(formData)
+        const result = await action(formData)
+        if (result && 'error' in result) {
+          setError(result.error)
+        }
       } catch (err) {
         setError((err as Error).message)
       }

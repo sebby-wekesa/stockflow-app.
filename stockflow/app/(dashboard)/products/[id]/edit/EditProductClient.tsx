@@ -14,23 +14,17 @@ interface Props {
 export default function EditProductClient({ product, initialForForm }: Props) {
   const router = useRouter()
   const [success, setSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function handleUpdate(formData: FormData) {
-    setError(null)
-    try {
-      await updateProduct(product.id, formData)
-      setSuccess(true)
-      setTimeout(() => {
-        router.push('/products')
-      }, 1500)
-    } catch (err) {
-      const msg = (err as Error).message || 'Update failed'
-      console.error('Failed to update product:', err)
-      setError(msg)
-      // Re-throw so the inner ProductForm's error handler can also catch if needed
-      throw err
+    const result = await updateProduct(product.id, formData)
+    if (result && 'error' in result) {
+      return result
     }
+
+    setSuccess(true)
+    setTimeout(() => {
+      router.push('/products')
+    }, 1500)
   }
 
   return (
@@ -46,12 +40,6 @@ export default function EditProductClient({ product, initialForForm }: Props) {
           Back to products
         </Link>
       </div>
-
-      {error && (
-        <div className="mb-16 p-3 rounded-md bg-red/10 border border-red/30 text-red text-sm">
-          {error}
-        </div>
-      )}
 
       {success ? (
         <div className="mb-16 p-3 rounded-md bg-teal/10 border border-teal/30 text-teal text-sm">

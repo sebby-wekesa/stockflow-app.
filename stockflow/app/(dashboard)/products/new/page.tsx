@@ -10,17 +10,16 @@ export default function NewProductPage() {
   const [success, setSuccess] = useState(false)
 
   async function handleCreate(formData: FormData) {
-    try {
-      await createProduct(formData)
-      setSuccess(true)
-      // Redirect to products list after a short delay
-      setTimeout(() => {
-        router.push('/products')
-      }, 1500)
-    } catch (err) {
-      // Error will be shown by the ProductForm component
-      console.error('Failed to create product:', err)
+    const result = await createProduct(formData)
+    if (result && 'error' in result) {
+      return result
     }
+
+    setSuccess(true)
+    // Redirect to products list after a short delay
+    setTimeout(() => {
+      router.push('/products')
+    }, 1500)
   }
 
   return (
