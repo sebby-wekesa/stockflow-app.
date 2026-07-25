@@ -272,6 +272,16 @@ select.form-input option { background: var(--surface2); }
 .stock-transfer-unit-picker { display: grid; gap: 5px; max-width: 180px; margin-top: 10px; }
 .stock-transfer-change { flex-shrink: 0; }
 .stock-transfer-empty-products { padding: 20px 14px; border: 1px dashed var(--border2); border-radius: var(--radius-sm); color: var(--muted); font-size: 12px; text-align: center; }
+.stock-transfer-lines { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, var(--teal) 34%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--teal) 4%, var(--surface2)); }
+.stock-transfer-lines-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.stock-transfer-line-list { display: grid; gap: 8px; }
+.stock-transfer-line { display: grid; grid-template-columns: minmax(0, 1fr) 116px 112px auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.stock-transfer-line-copy { min-width: 0; }
+.stock-transfer-line-unit, .stock-transfer-line-quantity { min-height: 36px; }
+.stock-transfer-line-quantity { font-family: var(--font-mono); }
+.stock-transfer-line-remove { white-space: nowrap; }
+.stock-transfer-add-line { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 2px; }
+.stock-transfer-add-line .btn { flex-shrink: 0; min-height: 36px; }
 .stock-transfer-form-grid { display: grid; grid-template-columns: minmax(150px, 0.65fr) minmax(0, 1.35fr); gap: 14px; }
 .stock-transfer-quantity-input { font-family: var(--font-mono); font-size: 16px; font-weight: 600; }
 .stock-transfer-quantity-input:disabled { cursor: not-allowed; opacity: 0.55; }
@@ -318,9 +328,13 @@ select.form-input option { background: var(--surface2); }
   .stock-transfer-status { margin-top: 0; }
   .stock-transfer-card-header, .stock-transfer-form { padding-right: 16px; padding-left: 16px; }
   .stock-transfer-route-fields, .stock-transfer-form-grid, .stock-transfer-aside { grid-template-columns: 1fr; }
+  .stock-transfer-line { grid-template-columns: minmax(0, 1fr) 1fr 1fr; }
+  .stock-transfer-line-remove { grid-column: 1 / -1; width: 100%; }
   .stock-transfer-route-arrow { width: 24px; height: 22px; transform: rotate(90deg); }
   .stock-transfer-form-actions { align-items: stretch; flex-direction: column; }
   .stock-transfer-form-actions .btn { width: 100%; }
+  .stock-transfer-add-line { align-items: stretch; flex-direction: column; }
+  .stock-transfer-add-line .btn { width: 100%; }
   .stock-transfer-note { align-items: flex-start; flex-direction: column; gap: 3px; }
   .stock-transfer-pending-header, .stock-transfer-pending-row { align-items: stretch; flex-direction: column; }
   .stock-transfer-receive-button { width: 100%; }

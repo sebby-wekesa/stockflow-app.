@@ -163,7 +163,7 @@ export default async function TransferPage() {
               <div className="stock-transfer-kicker">New handoff</div>
               <div className="section-title">Transfer details</div>
               <div className="section-sub">
-                Choose a source, destination, product, and quantity.
+                Choose a source, destination, products, and quantities.
               </div>
             </div>
             <div className="stock-transfer-card-mark" aria-hidden="true">↗</div>
@@ -186,7 +186,7 @@ export default async function TransferPage() {
             <div className="stock-transfer-kicker">Available routes</div>
             <div className="section-title">Branch handoff</div>
             <p className="stock-transfer-aside-copy">
-              Select stock at the sending branch, then record where it is going.
+              Select one or more products at the sending branch, then record where they are going.
             </p>
 
             <div className="stock-transfer-branch-list">
@@ -217,7 +217,7 @@ export default async function TransferPage() {
 
       <div className="stock-transfer-note">
         <span className="stock-transfer-note-label">Stock control</span>
-        <span>Only available stock can be transferred. The quantity is checked against the source branch before dispatch.</span>
+        <span>Only available stock can be transferred. Each quantity is checked against the source branch before dispatch.</span>
       </div>
     </div>
   )

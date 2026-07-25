@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireActiveAuth } from '@/lib/auth'
@@ -18,29 +19,54 @@ import { normalizeBranchCode } from '@/lib/branches'
 // branch.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const transferSchema = z.object({
+const transferItemSchema = z.object({
   product_id: z.string().min(1),
-  source_branch: z.string().min(1),
-  dest_branch: z.string().min(1),
   qty: z.coerce.number().positive(),
   quantity_unit: z.enum(['KG', 'PCS_SETS']).default('KG'),
+})
+
+const transferBatchSchema = z.object({
+  items: z.array(transferItemSchema).min(1, 'Please add at least one product').max(100),
+  source_branch: z.string().min(1),
+  dest_branch: z.string().min(1),
   notes: z.string().max(500).optional().nullable(),
 })
 
-export async function dispatchTransfer(formData: FormData) {
-  const raw = {
+function readTransferItems(formData: FormData) {
+  const items = formData.get('items')
+  if (typeof items === 'string') {
+    try {
+      return JSON.parse(items) as unknown
+    } catch {
+      throw new Error('Transfer items are invalid')
+    }
+  }
+
+  // Keep the action compatible with the older single-product transfer modal.
+  return [{
     product_id: formData.get('product_id'),
-    source_branch: formData.get('source_branch'),
-    dest_branch: formData.get('dest_branch'),
     qty: formData.get('qty'),
     quantity_unit: formData.get('quantity_unit') || 'KG',
+  }]
+}
+
+export async function dispatchTransfer(formData: FormData) {
+  const raw = {
+    items: readTransferItems(formData),
+    source_branch: formData.get('source_branch'),
+    dest_branch: formData.get('dest_branch'),
     notes: formData.get('notes') || null,
   }
 
-  const parsed = transferSchema.safeParse(raw)
+  const parsed = transferBatchSchema.safeParse(raw)
   if (!parsed.success) throw new Error(parsed.error.issues[0].message)
 
   const data = parsed.data
+  const productIds = data.items.map((item) => item.product_id)
+  if (new Set(productIds).size !== productIds.length) {
+    throw new Error('Each product can only be added once per transfer')
+  }
+
   const sourceBranchCode = normalizeBranchCode(data.source_branch)
   const destBranchCode = normalizeBranchCode(data.dest_branch)
 
@@ -81,9 +107,9 @@ export async function dispatchTransfer(formData: FormData) {
     throw new Error('You can only transfer stock from your assigned branch')
   }
 
-  const product = await db.product.findFirst({
+  const products = await db.product.findMany({
     where: {
-      id: data.product_id,
+      id: { in: productIds },
       OR: [
         { branchId: { in: [sourceBranch.id, sourceBranch.code, sourceBranchCode] } },
         {
@@ -98,84 +124,95 @@ export async function dispatchTransfer(formData: FormData) {
     },
     select: { id: true, sku: true, name: true, currentStock: true, piecesSets: true, branchId: true },
   })
-  if (!product) throw new Error('Product not found')
+  const productsById = new Map(products.map((product) => [product.id, product]))
+  const missingProductId = productIds.find((productId) => !productsById.has(productId))
+  if (missingProductId) throw new Error('Product not found')
 
-  const reference = `TRANSFER-${Date.now().toString(36).toUpperCase()}`
-  const quantityLabel = data.quantity_unit === 'KG' ? 'KG' : 'PCS/Sets'
+  // All line references share a batch prefix, while remaining unique because
+  // StockTransfer.reference is unique per organization.
+  const batchReference = `TRANSFER-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`
 
   await withTenantTransaction(user.organizationId, async (tx) => {
-    // Older product rows only have the global currentStock value. Lazily seed
-    // their source-branch balance the first time they participate in a
-    // transfer; all subsequent transfers use the branch balance directly.
-    const sourceStock = await tx.productBranchStock.upsert({
-      where: {
-        branchId_productId: {
-          branchId: sourceBranch.id,
-          productId: product.id,
+    for (const [index, item] of data.items.entries()) {
+      const product = productsById.get(item.product_id)
+      if (!product) throw new Error('Product not found')
+
+      const reference = `${batchReference}-${String(index + 1).padStart(2, '0')}`
+      const quantityLabel = item.quantity_unit === 'KG' ? 'KG' : 'PCS/Sets'
+
+      // Older product rows only have the global currentStock value. Lazily
+      // seed their source-branch balance the first time they participate in a
+      // transfer; all subsequent transfers use the branch balance directly.
+      const sourceStock = await tx.productBranchStock.upsert({
+        where: {
+          branchId_productId: {
+            branchId: sourceBranch.id,
+            productId: product.id,
+          },
         },
-      },
-      update: {},
-      create: {
-        productId: product.id,
-        branchId: sourceBranch.id,
-        availableQty: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
-          ? product.currentStock
-          : 0,
-        availablePiecesSets: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
-          ? product.piecesSets
-          : 0,
-      },
-    })
+        update: {},
+        create: {
+          productId: product.id,
+          branchId: sourceBranch.id,
+          availableQty: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
+            ? product.currentStock
+            : 0,
+          availablePiecesSets: [sourceBranch.id, sourceBranch.code, sourceBranchCode].includes(product.branchId ?? '')
+            ? product.piecesSets
+            : 0,
+        },
+      })
 
-    const decremented = await tx.productBranchStock.updateMany({
-      where: {
-        id: sourceStock.id,
-        ...(data.quantity_unit === 'KG'
-          ? { availableQty: { gte: data.qty } }
-          : { availablePiecesSets: { gte: data.qty } }),
-      },
-      data: data.quantity_unit === 'KG'
-        ? { availableQty: { decrement: data.qty } }
-        : { availablePiecesSets: { decrement: data.qty } },
-    })
-    if (decremented.count === 0) {
-      throw new Error(
-        `Insufficient ${quantityLabel} stock at ${sourceBranch.name}: need ${data.qty}`
-      )
+      const decremented = await tx.productBranchStock.updateMany({
+        where: {
+          id: sourceStock.id,
+          ...(item.quantity_unit === 'KG'
+            ? { availableQty: { gte: item.qty } }
+            : { availablePiecesSets: { gte: item.qty } }),
+        },
+        data: item.quantity_unit === 'KG'
+          ? { availableQty: { decrement: item.qty } }
+          : { availablePiecesSets: { decrement: item.qty } },
+      })
+      if (decremented.count === 0) {
+        throw new Error(
+          `Insufficient ${quantityLabel} stock for ${product.sku ?? product.name} at ${sourceBranch.name}: need ${item.qty}`
+        )
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          productId: product.id,
+          branchId: sourceBranch.id,
+          movementType: 'transfer_out',
+          quantity: -item.qty,
+          reference,
+          notes: `${quantityLabel} · ${data.notes ?? `Dispatched to ${destBranch.name}`}`,
+        },
+      })
+
+      await tx.stockTransfer.create({
+        data: {
+          reference,
+          productId: product.id,
+          sourceBranchId: sourceBranch.id,
+          destinationBranchId: destBranch.id,
+          quantity: item.qty,
+          quantityUnit: item.quantity_unit,
+          notes: data.notes ?? null,
+        },
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'STOCK_TRANSFER_DISPATCHED',
+          entityType: 'StockTransfer',
+          entityId: product.id,
+          details: `Dispatched ${item.qty} ${quantityLabel} of ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}; awaiting receipt confirmation. ${data.notes ?? ''}`,
+        },
+      })
     }
-
-    await tx.stockMovement.create({
-      data: {
-        productId: data.product_id,
-        branchId: sourceBranch.id,
-        movementType: 'transfer_out',
-        quantity: -data.qty,
-        reference,
-        notes: `${quantityLabel} · ${data.notes ?? `Dispatched to ${destBranch.name}`}`,
-      },
-    })
-
-    await tx.stockTransfer.create({
-      data: {
-        reference,
-        productId: product.id,
-        sourceBranchId: sourceBranch.id,
-        destinationBranchId: destBranch.id,
-        quantity: data.qty,
-        quantityUnit: data.quantity_unit,
-        notes: data.notes ?? null,
-      },
-    })
-
-    await tx.auditLog.create({
-      data: {
-        userId: user.id,
-        action: 'STOCK_TRANSFER_DISPATCHED',
-        entityType: 'StockTransfer',
-        entityId: data.product_id,
-        details: `Dispatched ${data.qty} ${quantityLabel} of ${product.sku ?? product.name} from ${sourceBranch.name} to ${destBranch.name}; awaiting receipt confirmation. ${data.notes ?? ''}`,
-      },
-    })
   }, { maxWait: 10000, timeout: 30000 })
 
   revalidatePath('/stock')

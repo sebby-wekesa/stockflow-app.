@@ -25,8 +25,16 @@ type PickedProduct = {
   quantity_unit: TransferQuantityUnit
 }
 
+type TransferLine = PickedProduct & { qty: string }
+
 function quantityUnitLabel(unit: TransferQuantityUnit) {
   return unit === 'KG' ? 'KG' : 'PCS/Sets'
+}
+
+function availableQuantity(product: PickedProduct) {
+  return product.quantity_unit === 'KG'
+    ? product.available_kg
+    : product.available_pieces_sets
 }
 
 export function TransferForm({
@@ -44,6 +52,7 @@ export function TransferForm({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [picked, setPicked] = useState<PickedProduct | null>(null)
+  const [lines, setLines] = useState<TransferLine[]>([])
   const [productQuery, setProductQuery] = useState('')
   const firstSourceBranch = initialSourceBranch ?? sourceBranches[0] ?? 'mombasa'
   const [sourceBranch, setSourceBranch] = useState<Branch>(firstSourceBranch)
@@ -53,54 +62,115 @@ export function TransferForm({
   const [qty, setQty] = useState('')
   const [notes, setNotes] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
+  function clearPicked() {
+    setPicked(null)
+    setQty('')
+  }
 
+  function validateQuantity(product: PickedProduct, quantity: string) {
+    const transferQty = Number(quantity)
+    if (!Number.isFinite(transferQty) || transferQty <= 0) {
+      return 'Please enter a valid quantity'
+    }
+
+    const unitLabel = quantityUnitLabel(product.quantity_unit)
+    const availableQty = availableQuantity(product)
+    if (transferQty > availableQty) {
+      return `Cannot transfer ${transferQty} ${unitLabel} of ${product.product_code} - only ${availableQty} available`
+    }
+
+    return null
+  }
+
+  function addProductLine() {
+    setError(null)
     if (!picked) {
       setError('Please select a product')
       return
     }
+
+    if (lines.some((line) => line.id === picked.id)) {
+      setError(`${picked.product_code} is already in this transfer`)
+      return
+    }
+
+    const quantityError = validateQuantity(picked, qty)
+    if (quantityError) {
+      setError(quantityError)
+      return
+    }
+
+    setLines((current) => [...current, { ...picked, qty }])
+    clearPicked()
+    setProductQuery('')
+  }
+
+  function updateLineQuantity(lineId: string, nextQty: string) {
+    setLines((current) => current.map((line) => (
+      line.id === lineId ? { ...line, qty: nextQty } : line
+    )))
+  }
+
+  function updateLineUnit(lineId: string, nextUnit: TransferQuantityUnit) {
+    setLines((current) => current.map((line) => (
+      line.id === lineId
+        ? { ...line, quantity_unit: nextUnit, qty: '' }
+        : line
+    )))
+  }
+
+  function removeLine(lineId: string) {
+    setLines((current) => current.filter((line) => line.id !== lineId))
+    setError(null)
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
 
     if (sourceBranch === destBranch) {
       setError('Source and destination branches must be different')
       return
     }
 
-    const transferQty = Number(qty)
-    if (!Number.isFinite(transferQty) || transferQty <= 0) {
-      setError('Please enter a valid quantity')
+    if (picked) {
+      setError('Add the selected product to the transfer before dispatching')
       return
     }
 
-    const availableQty = picked.quantity_unit === 'KG'
-      ? picked.available_kg
-      : picked.available_pieces_sets
-    const unitLabel = quantityUnitLabel(picked.quantity_unit)
-    if (transferQty > availableQty) {
-      setError(`Cannot transfer ${transferQty} ${unitLabel} - only ${availableQty} available`)
+    if (lines.length === 0) {
+      setError('Please add at least one product')
       return
+    }
+
+    for (const line of lines) {
+      const quantityError = validateQuantity(line, line.qty)
+      if (quantityError) {
+        setError(quantityError)
+        return
+      }
     }
 
     const fd = new FormData()
-    fd.set('product_id', picked.id)
+    fd.set('items', JSON.stringify(lines.map((line) => ({
+      product_id: line.id,
+      qty: line.qty,
+      quantity_unit: line.quantity_unit,
+    }))))
     fd.set('source_branch', sourceBranch)
     fd.set('dest_branch', destBranch)
-    fd.set('qty', qty)
-    fd.set('quantity_unit', picked.quantity_unit)
     fd.set('notes', notes)
 
+    const lineCount = lines.length
     startTransition(async () => {
       try {
         await dispatchTransfer(fd)
-        setSuccess(`Transfer dispatched: ${qty} ${unitLabel} from ${sourceBranch} to ${destBranch}. Awaiting receipt confirmation.`)
-        // Reset form
-        setPicked(null)
-        setQty('')
+        setSuccess(`${lineCount} ${lineCount === 1 ? 'product' : 'products'} dispatched from ${sourceBranch} to ${destBranch}. Awaiting receipt confirmation.`)
+        setLines([])
+        clearPicked()
         setNotes('')
         setError(null)
 
-        // Clear success after a few seconds
         setTimeout(() => setSuccess(null), 4000)
       } catch (err) {
         setError((err as Error).message)
@@ -109,7 +179,7 @@ export function TransferForm({
   }
 
   function pickProduct(product: ProductWithStock, branch: Branch) {
-    const branchStock = product.stock_levels.find(s => s.branch === branch)
+    const branchStock = product.stock_levels.find((stock) => stock.branch === branch)
     const availableKg = branchStock?.qty ?? 0
     const availablePiecesSets = branchStock?.pieces_sets ?? 0
     setPicked({
@@ -121,9 +191,11 @@ export function TransferForm({
       available_pieces_sets: availablePiecesSets,
       quantity_unit: availableKg > 0 ? 'KG' : 'PCS_SETS',
     })
+    setQty('')
+    setError(null)
   }
 
-  const availableDestinations = userBranches.filter(b => b !== sourceBranch)
+  const availableDestinations = userBranches.filter((branch) => branch !== sourceBranch)
   const branchProducts = products.filter((product) =>
     product.stock_levels.some((stock) => stock.branch === sourceBranch)
   )
@@ -161,8 +233,10 @@ export function TransferForm({
               onChange={(e) => {
                 const nextSourceBranch = e.target.value as Branch
                 setSourceBranch(nextSourceBranch)
-                setPicked(null)
+                clearPicked()
+                setLines([])
                 setProductQuery('')
+                setError(null)
                 if (destBranch === nextSourceBranch) {
                   setDestBranch(userBranches.find((branch) => branch !== nextSourceBranch) ?? nextSourceBranch)
                 }
@@ -198,10 +272,58 @@ export function TransferForm({
           </div>
         </div>
 
-        {/* PRODUCT PICKER */}
+        {lines.length > 0 && (
+          <div className="stock-transfer-lines">
+            <div className="stock-transfer-lines-header">
+              <div>
+                <div className="form-label">Products in this transfer</div>
+                <div className="stock-transfer-help">Each product will be recorded as a separate stock movement.</div>
+              </div>
+              <span className="badge badge-teal">{lines.length} added</span>
+            </div>
+            <div className="stock-transfer-line-list">
+              {lines.map((line) => (
+                <div key={line.id} className="stock-transfer-line">
+                  <div className="stock-transfer-line-copy">
+                    <div className="stock-transfer-product-code">{line.product_code}</div>
+                    <div className="stock-transfer-product-name">{line.canonical_name}</div>
+                  </div>
+                  <select
+                    aria-label={`Transfer unit for ${line.product_code}`}
+                    value={line.quantity_unit}
+                    onChange={(e) => updateLineUnit(line.id, e.target.value as TransferQuantityUnit)}
+                    className="form-input stock-transfer-line-unit"
+                  >
+                    <option value="KG" disabled={line.available_kg <= 0}>KG</option>
+                    <option value="PCS_SETS" disabled={line.available_pieces_sets <= 0}>PCS/Sets</option>
+                  </select>
+                  <input
+                    aria-label={`Quantity for ${line.product_code}`}
+                    id={`transfer-line-quantity-${line.id}`}
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    value={line.qty}
+                    onChange={(e) => updateLineQuantity(line.id, e.target.value)}
+                    className="form-input stock-transfer-line-quantity"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeLine(line.id)}
+                    className="btn btn-ghost btn-sm stock-transfer-line-remove"
+                    aria-label={`Remove ${line.product_code}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="form-group stock-transfer-field">
           <label className="form-label">
-            Product <span className="stock-transfer-required" aria-hidden="true">*</span>
+            Add product <span className="stock-transfer-required" aria-hidden="true">*</span>
           </label>
           {picked ? (
             <div className="stock-transfer-selected-product">
@@ -231,7 +353,7 @@ export function TransferForm({
               </div>
               <button
                 type="button"
-                onClick={() => setPicked(null)}
+                onClick={clearPicked}
                 className="btn btn-ghost btn-sm stock-transfer-change"
               >
                 Change
@@ -261,21 +383,22 @@ export function TransferForm({
                   const stockAtBranch = branchStock?.qty ?? 0
                   const piecesSetsAtBranch = branchStock?.pieces_sets ?? 0
                   const hasTransferableStock = stockAtBranch > 0 || piecesSetsAtBranch > 0
+                  const alreadyAdded = lines.some((line) => line.id === product.id)
                   return (
                     <button
                       key={product.id}
                       type="button"
                       onClick={() => pickProduct(product, sourceBranch)}
                       className="stock-transfer-product-option"
-                      disabled={!hasTransferableStock}
-                      title={!hasTransferableStock ? 'No stock available at this branch' : undefined}
+                      disabled={!hasTransferableStock || alreadyAdded}
+                      title={alreadyAdded ? 'Already added to this transfer' : !hasTransferableStock ? 'No stock available at this branch' : undefined}
                     >
                       <div>
                         <div className="stock-transfer-product-code">{product.product_code}</div>
                         <div className="stock-transfer-product-name">{product.canonical_name}</div>
                       </div>
                       <div className="stock-transfer-product-quantity">
-                        {stockAtBranch} KG · {piecesSetsAtBranch} PCS/Sets
+                        {alreadyAdded ? 'Added' : `${stockAtBranch} KG · ${piecesSetsAtBranch} PCS/Sets`}
                       </div>
                     </button>
                   )
@@ -298,7 +421,7 @@ export function TransferForm({
         <div className="stock-transfer-form-grid">
           <div className="form-group">
             <label className="form-label" htmlFor="transfer-quantity">
-              Quantity to transfer{picked ? ` (${quantityUnitLabel(picked.quantity_unit)})` : ''}{' '}
+              Quantity to add{picked ? ` (${quantityUnitLabel(picked.quantity_unit)})` : ''}{' '}
               <span className="stock-transfer-required" aria-hidden="true">*</span>
             </label>
             <input
@@ -309,13 +432,12 @@ export function TransferForm({
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               className="form-input stock-transfer-input stock-transfer-quantity-input"
-              placeholder={picked ? `Enter ${quantityUnitLabel(picked.quantity_unit)} quantity` : 'Enter quantity'}
+              placeholder={picked ? `Enter ${quantityUnitLabel(picked.quantity_unit)} quantity` : 'Select a product first'}
               disabled={!picked}
             />
             {picked && (
               <div className="stock-transfer-help">
-                Maximum: {picked.quantity_unit === 'KG' ? picked.available_kg : picked.available_pieces_sets}{' '}
-                {quantityUnitLabel(picked.quantity_unit)}
+                Maximum: {availableQuantity(picked)} {quantityUnitLabel(picked.quantity_unit)}
               </div>
             )}
           </div>
@@ -333,17 +455,29 @@ export function TransferForm({
           </div>
         </div>
 
+        <div className="stock-transfer-add-line">
+          <span className="stock-transfer-help">Add each product and quantity, then dispatch them together.</span>
+          <button
+            type="button"
+            onClick={addProductLine}
+            disabled={!picked || !qty}
+            className="btn btn-ghost"
+          >
+            + Add product
+          </button>
+        </div>
+
         <div className="stock-transfer-form-actions">
           <div className="stock-transfer-action-copy">
             <span className="stock-transfer-action-label">Ready to dispatch?</span>
-            <span>Both branch movements will be logged together.</span>
+            <span>{lines.length} {lines.length === 1 ? 'product' : 'products'} will be logged together.</span>
           </div>
           <button
             type="submit"
-            disabled={isPending || !picked || !qty}
+            disabled={isPending || lines.length === 0 || Boolean(picked)}
             className="btn btn-primary"
           >
-            {isPending ? 'Transferring…' : 'Transfer stock'}
+            {isPending ? 'Transferring…' : `Transfer ${lines.length || ''} ${lines.length === 1 ? 'product' : 'products'}`}
           </button>
         </div>
       </form>
