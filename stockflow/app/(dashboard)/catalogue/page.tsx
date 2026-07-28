@@ -32,8 +32,6 @@ export default async function CataloguePage() {
       orderBy: { createdAt: 'desc' },
     }),
   ]);
-  const availableBySku = new Map(finishedGoods.map(item => [item.sku, item.quantity]));
-
    // Manufactured items
    const manufactured = finishedGoods.map(p => ({
      id: p.id,
@@ -59,9 +57,7 @@ export default async function CataloguePage() {
      name: p.name,
      code: p.sku || p.id.slice(0, 8),
      description: '',
-     quantity: p.sku && availableBySku.has(p.sku)
-       ? availableBySku.get(p.sku)!
-       : Math.floor(p.currentStock),
+     quantity: Math.floor(p.currentStock),
      kgProduced: 0,
      piecesSets: p.piecesSets,
      uom: p.uom,

@@ -70,3 +70,58 @@ test('packaging consumes reserved stock without decrementing available stock aga
     data: { reservedQuantity: { decrement: 5 } },
   })
 })
+
+test('confirmation deducts only product pieces/sets and records the sale movement', async () => {
+  const productUpdateMany = jest.fn().mockResolvedValue({ count: 1 })
+  const stockMovementCreate = jest.fn().mockResolvedValue({ id: 'movement-1' })
+  const tx = {
+    finishedGoods: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    product: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'product-1', sku: 'SKU-1' }),
+      updateMany: productUpdateMany,
+    },
+    stockMovement: {
+      create: stockMovementCreate,
+    },
+    saleOrder: {
+      update: jest.fn().mockResolvedValue({ id: order.id, status: 'CONFIRMED' }),
+    },
+  }
+
+  await reserveSaleOrder(
+    tx,
+    {
+      ...order,
+      SaleItem: [{
+        ...order.SaleItem[0],
+        piecesSets: 7.5,
+        unitPrice: 100,
+        totalPrice: 750,
+      }],
+    },
+    'org-1',
+  )
+
+  expect(productUpdateMany).toHaveBeenCalledWith({
+    where: {
+      id: 'product-1',
+      organizationId: 'org-1',
+      piecesSets: { gte: 7.5 },
+    },
+    data: {
+      piecesSets: { decrement: 7.5 },
+    },
+  })
+  expect(stockMovementCreate).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      organizationId: 'org-1',
+      productId: 'product-1',
+      movementType: 'sale',
+      quantity: 0,
+      piecesSets: -7.5,
+      reference: 'SO-1',
+    }),
+  })
+})

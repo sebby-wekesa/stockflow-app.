@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
+import { consumeProductKgForOperation } from "@/lib/production-stock";
 import { assertOperatorDepartment, getOperatorDepartments } from "@/lib/operator-access";
 
 export type OperatorQueueItem = {
@@ -115,6 +116,13 @@ export async function recordProductionOutput(data: {
         `Insufficient pieces for ${selectedLine.RawMaterial.materialName}. Available: ${selectedLine.RawMaterial.availablePieces}, requested: ${piecesUsed}`
       );
     }
+
+    await consumeProductKgForOperation(tx, {
+      organizationId: user.organizationId,
+      productionOrderId: order.id,
+      productId: order.productId,
+      kgIn: weightIn,
+    });
 
     await tx.rawMaterial.update({
       where: { id: selectedLine.rawMaterialId },

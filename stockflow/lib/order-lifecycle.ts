@@ -6,11 +6,110 @@ type SaleOrderWithItems = {
   SaleItem: Array<{
     finishedGoodsId: string
     quantity: number
+    piecesSets?: number
+    unitPrice?: unknown
+    totalPrice?: unknown
     FinishedGoods?: { sku: string; quantity: number; reservedQuantity: number }
   }>
 }
 
-export async function reserveSaleOrder(tx: TransactionClient, order: SaleOrderWithItems) {
+export function getSaleItemPiecesSets(
+  item: Pick<SaleOrderWithItems['SaleItem'][number], 'piecesSets' | 'unitPrice' | 'totalPrice'>
+) {
+  const piecesSets = Number(item.piecesSets)
+  if (Number.isFinite(piecesSets) && piecesSets > 0) return piecesSets
+
+  // Older SaleItem rows predate the dedicated piecesSets column. Preserve
+  // their billable quantity when they are fulfilled or cancelled.
+  const unitPrice = Number(item.unitPrice)
+  return unitPrice > 0 ? Number(item.totalPrice) / unitPrice : 0
+}
+
+async function findSaleProduct(
+  tx: TransactionClient,
+  item: SaleOrderWithItems['SaleItem'][number],
+  organizationId?: string,
+) {
+  const sku = item.FinishedGoods?.sku
+  if (!sku || !tx.product?.findFirst) return null
+
+  return tx.product.findFirst({
+    where: {
+      OR: [{ sku }, { id: sku }],
+      ...(organizationId ? { organizationId } : {}),
+    },
+    select: { id: true, sku: true },
+  })
+}
+
+async function findSaleMovement(
+  tx: TransactionClient,
+  orderId: string,
+  productId: string,
+  organizationId?: string,
+) {
+  if (!tx.stockMovement?.findFirst) return null
+
+  return tx.stockMovement.findFirst({
+    where: {
+      productId,
+      reference: orderId,
+      movementType: 'sale',
+      ...(organizationId ? { organizationId } : {}),
+    },
+    select: { id: true },
+  })
+}
+
+async function decrementProductPiecesForSale(
+  tx: TransactionClient,
+  order: SaleOrderWithItems,
+  item: SaleOrderWithItems['SaleItem'][number],
+  organizationId?: string,
+) {
+  const product = await findSaleProduct(tx, item, organizationId)
+  if (!product) return false
+
+  const piecesSets = getSaleItemPiecesSets(item)
+  const decremented = await tx.product.updateMany({
+    where: {
+      id: product.id,
+      ...(organizationId ? { organizationId } : {}),
+      piecesSets: { gte: piecesSets },
+    },
+    data: {
+      piecesSets: { decrement: piecesSets },
+    },
+  })
+
+  if (decremented.count === 0) {
+    throw new Error(
+      `Product pieces/sets stock is inconsistent for ${item.FinishedGoods?.sku ?? 'sale item'}`
+    )
+  }
+
+  if (tx.stockMovement?.create) {
+    await tx.stockMovement.create({
+      data: {
+        ...(organizationId ? { organizationId } : {}),
+        productId: product.id,
+        movementType: 'sale',
+        quantity: 0,
+        piecesSets: -piecesSets,
+        reference: order.id,
+        notes: `Sale to ${order.id} · ${piecesSets} pcs/sets`,
+      },
+    })
+  }
+
+  return true
+}
+
+export async function reserveSaleOrder(
+  tx: TransactionClient,
+  order: SaleOrderWithItems,
+  organizationId?: string,
+) {
   if (order.status !== 'PENDING') {
     throw new Error('Only pending sales orders can be confirmed')
   }
@@ -32,6 +131,10 @@ export async function reserveSaleOrder(tx: TransactionClient, order: SaleOrderWi
         `Insufficient available finished goods for ${item.FinishedGoods?.sku ?? 'sale item'}`
       )
     }
+
+    // Product pcs/sets are committed to the sale immediately. Product kg is
+    // consumed later by the production operation that records the kg input.
+    await decrementProductPiecesForSale(tx, order, item, organizationId)
   }
 
   return tx.saleOrder.update({
@@ -40,7 +143,11 @@ export async function reserveSaleOrder(tx: TransactionClient, order: SaleOrderWi
   })
 }
 
-export async function releaseSaleOrderReservation(tx: TransactionClient, order: SaleOrderWithItems) {
+export async function releaseSaleOrderReservation(
+  tx: TransactionClient,
+  order: SaleOrderWithItems,
+  organizationId?: string,
+) {
   if (order.status !== 'CONFIRMED') return
 
   for (const item of order.SaleItem) {
@@ -59,6 +166,39 @@ export async function releaseSaleOrderReservation(tx: TransactionClient, order: 
       throw new Error(
         `Reserved finished goods are inconsistent for ${item.FinishedGoods?.sku ?? 'sale item'}`
       )
+    }
+
+    const product = await findSaleProduct(tx, item, organizationId)
+    if (!product) continue
+
+    // Only restore stock that this confirmation actually consumed. This keeps
+    // cancellations of legacy confirmed orders from inflating product stock.
+    const saleMovement = await findSaleMovement(tx, order.id, product.id, organizationId)
+    if (!saleMovement) continue
+
+    const piecesSets = getSaleItemPiecesSets(item)
+    await tx.product.updateMany({
+      where: {
+        id: product.id,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      data: {
+        piecesSets: { increment: piecesSets },
+      },
+    })
+
+    if (tx.stockMovement?.create) {
+      await tx.stockMovement.create({
+        data: {
+          ...(organizationId ? { organizationId } : {}),
+          productId: product.id,
+          movementType: 'sale_reversal',
+          quantity: 0,
+          piecesSets,
+          reference: order.id,
+          notes: `Cancelled sale ${order.id} · restored ${piecesSets} pcs/sets`,
+        },
+      })
     }
   }
 }

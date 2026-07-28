@@ -274,44 +274,6 @@ export async function fulfillOrder(orderId: string) {
 
     await consumeSaleOrderReservation(tx, order);
 
-    // Product is a catalogue mirror for imported/local items. Physical stock
-    // leaves both records only when packaging fulfils the confirmed order.
-    for (const item of order.SaleItem) {
-      const product = await tx.product.findFirst({
-        where: { sku: item.FinishedGoods.sku },
-      });
-      if (!product) continue;
-
-      const piecesSets = getSaleItemPiecesSets(item);
-
-      const decremented = await tx.product.updateMany({
-        where: {
-          id: product.id,
-          currentStock: { gte: item.quantity },
-          piecesSets: { gte: piecesSets },
-        },
-        data: {
-          currentStock: { decrement: item.quantity },
-          piecesSets: { decrement: piecesSets },
-        },
-      });
-      if (decremented.count === 0) {
-        throw new Error(`Product kg or pieces/sets stock is inconsistent for ${item.FinishedGoods.sku}`);
-      }
-
-      await tx.stockMovement.create({
-        data: {
-          organizationId: user.organizationId,
-          productId: product.id,
-          movementType: 'sale',
-          quantity: -item.quantity,
-          piecesSets: -piecesSets,
-          reference: order.id,
-          notes: `Fulfilled sale to ${order.customerName} · ${piecesSets} pcs/sets`,
-        },
-      });
-    }
-
     // Packaging is complete. Dispatch is a separate controlled handoff.
     await tx.saleOrder.update({
       where: { id: orderId },

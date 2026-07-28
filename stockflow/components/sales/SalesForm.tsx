@@ -297,7 +297,7 @@ export function SalesForm({
       </div>
 
       <p className="section-sub text-right">
-        Fulfillment will deduct both the weight and pieces/sets entered for each line.
+        Confirming the sale deducts pcs/sets. Kg is deducted when production operations record the kg input.
       </p>
     </div>
   )

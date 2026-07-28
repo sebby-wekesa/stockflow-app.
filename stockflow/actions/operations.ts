@@ -10,6 +10,7 @@ import {
   PRODUCTION_FLOW_STAGE_DEFINITIONS,
   resolveProductionFlowStageKey,
 } from "@/lib/production-flow";
+import { consumeProductKgForOperation } from "@/lib/production-stock";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE DEFINITIONS
@@ -141,9 +142,28 @@ export async function startOperation(operationLogId: string) {
   if (log.status === "DONE") return { success: false, error: "Operation already completed" };
   if (log.status === "SKIPPED") return { success: false, error: "Operation was skipped" };
 
+  const productionOrder = log.sequence === 1
+    ? await db.productionOrder.findFirst({
+        where: { id: log.productionOrderId },
+        select: { id: true, productId: true, targetKg: true },
+      })
+    : null;
+  if (log.sequence === 1 && !productionOrder) {
+    return { success: false, error: "Production order not found" };
+  }
+
   const now = new Date();
 
   await db.$transaction(async (tx: any) => {
+    if (productionOrder) {
+      await consumeProductKgForOperation(tx, {
+        organizationId: user.organizationId,
+        productionOrderId: productionOrder.id,
+        productId: productionOrder.productId,
+        kgIn: Number(productionOrder.targetKg),
+      });
+    }
+
     await tx.operationLog.update({
       where: { id: operationLogId },
       data: { status: "IN_PROGRESS", startedAt: now, operatorId: user.id },
@@ -344,6 +364,15 @@ export async function completeProductionFlowStage(input: {
           : Number(order.targetKg);
       if (expectedKgIn > 0 && Math.abs(expectedKgIn - kgIn) > 0.01) {
         throw new Error(`Kg In must match the previous output of ${expectedKgIn.toFixed(2)} kg`);
+      }
+
+      if (definition.sequence === 1) {
+        await consumeProductKgForOperation(tx, {
+          organizationId: user.organizationId,
+          productionOrderId: order.id,
+          productId: order.productId,
+          kgIn,
+        });
       }
 
       const now = new Date();

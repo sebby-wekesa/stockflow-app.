@@ -6,6 +6,7 @@ import { stageLogSchema } from "@/lib/schemas";
 import { revalidatePath } from 'next/cache';
 import { reserveSaleOrder } from '@/lib/order-lifecycle';
 import { assertOperatorDepartment } from '@/lib/operator-access';
+import { consumeProductKgForOperation } from '@/lib/production-stock';
 
 export async function completeStage(data: {
   orderId: string;
@@ -92,6 +93,15 @@ export async function completeStage(data: {
     const expectedKgIn = order.StageLog.length > 0 ? order.StageLog[0].kgOut : order.targetKg;
     if (Math.abs(Number(expectedKgIn) - validatedData.kgIn) > 0.0001) {
       throw new Error(`KG input mismatch. Expected: ${expectedKgIn}, Got: ${validatedData.kgIn}`);
+    }
+
+    if (validatedData.sequence === 1) {
+      await consumeProductKgForOperation(tx, {
+        organizationId: user.organizationId,
+        productionOrderId: order.id,
+        productId: order.productId,
+        kgIn: validatedData.kgIn,
+      });
     }
 
     // Create the stage log
@@ -189,7 +199,7 @@ export async function completeStage(data: {
               include: { SaleItem: { include: { FinishedGoods: true } } },
             });
             if (!saleOrder) throw new Error('Linked sales order not found');
-            await reserveSaleOrder(tx, saleOrder);
+            await reserveSaleOrder(tx, saleOrder, user.organizationId);
           }
         }
       } else {

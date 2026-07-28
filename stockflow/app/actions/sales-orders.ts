@@ -333,7 +333,7 @@ export async function confirmSalesOrder(orderId: string) {
       throw new Error('Complete linked production orders before confirming this sale');
     }
 
-    await reserveSaleOrder(tx, order);
+    await reserveSaleOrder(tx, order, user.organizationId);
     await postSaleToLedger(tx, user.organizationId, {
       id: order.id,
       totalAmount: Number(order.totalAmount),
@@ -373,7 +373,7 @@ export async function cancelSalesOrder(orderId: string) {
       throw new Error('Cancel or complete linked production orders before cancelling this sale');
     }
 
-    await releaseSaleOrderReservation(tx, order);
+    await releaseSaleOrderReservation(tx, order, user.organizationId);
     await voidSalePosting(tx, orderId);
     await tx.productionOrder.updateMany({
       where: { saleOrderId: orderId, status: { in: ['PENDING', 'APPROVED'] } },

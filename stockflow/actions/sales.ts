@@ -144,8 +144,9 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
     }
     const productMap = new Map<string, ProductLite>(products.map((p) => [p.id, p]))
 
-    // Check both inventory dimensions before creating an invoice. Weight is
-    // kept in currentStock while pieces/sets are tracked separately.
+    // Check both inventory dimensions before creating an invoice. Only
+    // pieces/sets are consumed by the sale; kg remains available until the
+    // linked production operation records its kg input.
     const lowPiecesLine = data.lines.find(l => {
         const p = productMap.get(l.product_id)!
         return Number(l.pieces_sets) > p.piecesSets
@@ -186,15 +187,16 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
         
         // Create production request
         await tx.productionOrder.create({
-            data: {
-                orderNumber: prodOrderNumber,
-                productName: prodProduct.name,
-                quantity: Number(firstLow.qty) - prodProduct.currentStock,
-                targetKg: 0,
-                status: 'PENDING',
-                organizationId: user.organizationId,
-                routeType: null,
-            },
+          data: {
+            orderNumber: prodOrderNumber,
+            productName: prodProduct.name,
+            productId: prodProduct.id,
+            quantity: Number(firstLow.qty) - prodProduct.currentStock,
+            targetKg: Number(firstLow.qty) - prodProduct.currentStock,
+            status: 'PENDING',
+            organizationId: user.organizationId,
+            routeType: null,
+          },
         })
         
         // Return a special result indicating production request was created
@@ -278,7 +280,7 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
         include: { SaleItem: { include: { FinishedGoods: true } } },
       })
       if (!reservableOrder) throw new Error('Sales order not found after creation')
-      await reserveSaleOrder(tx, { ...reservableOrder, status: 'PENDING' })
+      await reserveSaleOrder(tx, { ...reservableOrder, status: 'PENDING' }, user.organizationId)
       await postSaleToLedger(tx, user.organizationId, {
         id: order.id,
         totalAmount: Number(order.totalAmount),
@@ -339,7 +341,7 @@ export async function confirmDraft(orderId: string) {
       throw new Error('Order is no longer pending (may have been confirmed or cancelled by another action)')
     }
 
-    await reserveSaleOrder(tx, order)
+    await reserveSaleOrder(tx, order, user.organizationId)
     await postSaleToLedger(tx, user.organizationId, {
       id: order.id,
       totalAmount: Number(order.totalAmount),
@@ -438,7 +440,7 @@ export async function updateDraftSalesOrder(formData: FormData) {
           include: { SaleItem: { include: { FinishedGoods: true } } },
         })
         if (!updated) throw new Error('Order not found after update')
-        await reserveSaleOrder(tx, updated)
+        await reserveSaleOrder(tx, updated, user.organizationId)
         await postSaleToLedger(tx, user.organizationId, {
           id: updated.id,
           totalAmount: Number(updated.totalAmount),
@@ -528,7 +530,7 @@ export async function cancelOrder(orderId: string, reason: string) {
       throw new Error('Cancel or complete linked production orders before cancelling this sale')
     }
 
-    await releaseSaleOrderReservation(tx, { ...order, status: current.status })
+    await releaseSaleOrderReservation(tx, { ...order, status: current.status }, user.organizationId)
     await voidSalePosting(tx, orderId)
 
     await tx.saleOrder.update({
@@ -562,12 +564,6 @@ export async function searchProductsForSale(query: string, branch: string) {
     orderBy: { sku: 'asc' },
   })
 
-  const finishedGoods = await db.finishedGoods.findMany({
-    where: { sku: { in: products.map((product) => product.sku).filter(Boolean) as string[] } },
-    select: { sku: true, quantity: true },
-  })
-  const availableBySku = new Map(finishedGoods.map((item) => [item.sku, item.quantity]))
-
   return products.map((p) => ({
     id: p.id,
     product_code: p.sku,
@@ -575,9 +571,9 @@ export async function searchProductsForSale(query: string, branch: string) {
     uom: p.uom,
     category: p.category,
     selling_price: p.unitCost ?? 0,
-    stock_at_branch: p.sku && availableBySku.has(p.sku)
-      ? availableBySku.get(p.sku)!
-      : p.currentStock,
+    // FinishedGoods shadows are used for reservation, but Product.currentStock
+    // is the catalogue kg balance and is consumed by production operations.
+    stock_at_branch: p.currentStock,
     piecesSets: p.piecesSets ?? 0,
   }))
 }

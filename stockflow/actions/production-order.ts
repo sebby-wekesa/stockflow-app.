@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { productionOrderSchema, ProductionOrderInput } from "@/lib/validations";
 import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { consumeProductKgForOperation } from "@/lib/production-stock";
 import { updateOrderStatus } from "@/app/actions/orders";
 import { materializeOperationsForOrder } from "@/lib/operation-routing";
 
@@ -273,6 +274,13 @@ export async function recordProductionOutput(
           `Insufficient raw material: ${rm.materialName} has ${available}kg, but ${kgIn}kg was recorded as used`
         );
       }
+
+      await consumeProductKgForOperation(tx, {
+        organizationId: user.organizationId,
+        productionOrderId: order.id,
+        productId: order.productId,
+        kgIn,
+      });
 
       await tx.rawMaterial.update({
         where: { id: targetRawMaterialId },
