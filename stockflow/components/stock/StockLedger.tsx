@@ -7,6 +7,7 @@ interface StockMovement {
   id: string
   movementType: string
   quantity: number
+  piecesSets?: number
   reference: string
   notes: string
   createdAt: string
@@ -139,6 +140,7 @@ export function StockLedger({ productId }: StockLedgerProps) {
                       : 'bg-red-500/10 text-red-600'
                   }`}>
                     {movement.quantity > 0 ? '+' : ''}{movement.quantity}
+                    {movement.piecesSets ? ` · ${movement.piecesSets > 0 ? '+' : ''}${movement.piecesSets} pcs/sets` : ''}
                   </div>
                 </div>
               ))

@@ -167,6 +167,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
           designId: line.source === 'design' ? (line.designId || line.itemId) : undefined,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
+          piecesSets: line.source === 'product' ? line.quantity : undefined,
           source: line.source,
         }))
       }

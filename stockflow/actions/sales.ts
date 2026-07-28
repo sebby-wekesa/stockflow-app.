@@ -144,7 +144,22 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
     }
     const productMap = new Map<string, ProductLite>(products.map((p) => [p.id, p]))
 
-    // Check stock availability for all products
+    // Check both inventory dimensions before creating an invoice. Weight is
+    // kept in currentStock while pieces/sets are tracked separately.
+    const lowPiecesLine = data.lines.find(l => {
+        const p = productMap.get(l.product_id)!
+        return Number(l.pieces_sets) > p.piecesSets
+    })
+    if (lowPiecesLine) {
+        const product = productMap.get(lowPiecesLine.product_id)!
+        throw new Error(
+          `Insufficient pieces/sets stock for ${product.sku ?? product.name}: need ${Number(lowPiecesLine.pieces_sets)}, available ${product.piecesSets}`
+        )
+    }
+
+    // Weight stock remains the trigger for the existing production request
+    // flow. A pieces/sets shortage is a hard validation error because this
+    // sale cannot be fulfilled from the available product inventory.
     const lowStockLines = data.lines.filter(l => {
         const p = productMap.get(l.product_id)!
         return p.currentStock < Number(l.qty)
@@ -249,6 +264,7 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
           saleOrderId: order.id,
           finishedGoodsId: fg.id,
           quantity: qty,
+          piecesSets: billablePiecesSets,
           unitPrice,
           totalPrice: billablePiecesSets * unitPrice,
         },
@@ -409,6 +425,7 @@ export async function updateDraftSalesOrder(formData: FormData) {
           where: { id: line.id },
           data: {
             quantity: line.quantity,
+            piecesSets: line.piecesSets,
             unitPrice: line.unitPrice,
             totalPrice: line.unitPrice * line.piecesSets,
           },

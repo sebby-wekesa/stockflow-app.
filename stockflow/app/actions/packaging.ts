@@ -29,6 +29,12 @@ const packagingOrderInclude = Prisma.validator<Prisma.SaleOrderInclude>()({
 type PackagingSaleOrder = Prisma.SaleOrderGetPayload<{ include: typeof packagingOrderInclude }>
 type PackagingSaleItem = PackagingSaleOrder['SaleItem'][number]
 
+function getSaleItemPiecesSets(item: Pick<PackagingSaleItem, 'piecesSets' | 'unitPrice' | 'totalPrice'>) {
+  if (item.piecesSets > 0) return item.piecesSets
+  const unitPrice = Number(item.unitPrice)
+  return unitPrice > 0 ? Number(item.totalPrice) / unitPrice : 0
+}
+
 const completedProductionInclude = Prisma.validator<Prisma.ProductionOrderInclude>()({
   design: { select: { name: true, code: true } },
   saleOrder: { select: { id: true, customerName: true } },
@@ -78,6 +84,7 @@ function toPackagingOrder(order: PackagingSaleOrder) {
       designName: item.FinishedGoods?.design?.name || 'Unknown',
       designCode: item.FinishedGoods?.design?.code || 'N/A',
       quantity: item.quantity,
+      piecesSets: getSaleItemPiecesSets(item),
       unitPrice: Number(item.unitPrice),
       totalPrice: Number(item.totalPrice),
       availableStock: item.FinishedGoods?.reservedQuantity || 0
@@ -275,12 +282,21 @@ export async function fulfillOrder(orderId: string) {
       });
       if (!product) continue;
 
+      const piecesSets = getSaleItemPiecesSets(item);
+
       const decremented = await tx.product.updateMany({
-        where: { id: product.id, currentStock: { gte: item.quantity } },
-        data: { currentStock: { decrement: item.quantity } },
+        where: {
+          id: product.id,
+          currentStock: { gte: item.quantity },
+          piecesSets: { gte: piecesSets },
+        },
+        data: {
+          currentStock: { decrement: item.quantity },
+          piecesSets: { decrement: piecesSets },
+        },
       });
       if (decremented.count === 0) {
-        throw new Error(`Product stock is inconsistent for ${item.FinishedGoods.sku}`);
+        throw new Error(`Product kg or pieces/sets stock is inconsistent for ${item.FinishedGoods.sku}`);
       }
 
       await tx.stockMovement.create({
@@ -289,8 +305,9 @@ export async function fulfillOrder(orderId: string) {
           productId: product.id,
           movementType: 'sale',
           quantity: -item.quantity,
+          piecesSets: -piecesSets,
           reference: order.id,
-          notes: `Fulfilled sale to ${order.customerName}`,
+          notes: `Fulfilled sale to ${order.customerName} · ${piecesSets} pcs/sets`,
         },
       });
     }

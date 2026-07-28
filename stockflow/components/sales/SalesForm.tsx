@@ -297,7 +297,7 @@ export function SalesForm({
       </div>
 
       <p className="section-sub text-right">
-        Confirming will generate an invoice number and decrement stock immediately.
+        Fulfillment will deduct both the weight and pieces/sets entered for each line.
       </p>
     </div>
   )
@@ -331,10 +331,12 @@ function SalesLineRow({
   const piecesSets = parseFloat(line.pieces_sets) || 0
   const price = parseFloat(line.unit_price) || 0
   const lineTotal = piecesSets * price
-  const exceedsStock =
+  const exceedsWeightStock =
     line.product &&
     line.product.stock_at_branch !== null &&
     qty > line.product.stock_at_branch
+  const exceedsPiecesStock = line.product && piecesSets > line.product.piecesSets
+  const exceedsStock = exceedsWeightStock || exceedsPiecesStock
 
   return (
     <div className="p-4">
@@ -356,7 +358,7 @@ function SalesLineRow({
               <div className="text-xs text-muted truncate">{line.product.canonical_name}</div>
               <div className="text-[10px] text-muted mt-0.5">
                 <span className={exceedsStock ? 'text-red' : 'text-teal'}>
-                  {line.product.stock_at_branch} {line.product.uom} available
+                  {line.product.stock_at_branch} kg · {line.product.piecesSets} pcs/sets available
                 </span>
               </div>
             </button>
@@ -364,7 +366,7 @@ function SalesLineRow({
 
           <div className="col-span-4 md:col-span-2">
             <label className="form-label">
-              Qty
+              Weight (kg)
             </label>
             <input
               type="number"
@@ -378,7 +380,7 @@ function SalesLineRow({
 
           <div className="col-span-4 md:col-span-1.5">
             <label className="form-label">
-              Sets
+              Pieces/sets
             </label>
             <input
               type="number"
@@ -435,7 +437,8 @@ function SalesLineRow({
 
           {exceedsStock && (
             <div className="col-span-12 text-xs text-red bg-red/10 border border-red/30 rounded p-2 px-3">
-              Quantity exceeds available stock at {BRANCH_LABELS[branch]}
+              {exceedsWeightStock && `Weight exceeds available stock at ${BRANCH_LABELS[branch]}. `}
+              {exceedsPiecesStock && 'Pieces/sets exceed available product stock.'}
             </div>
           )}
         </div>

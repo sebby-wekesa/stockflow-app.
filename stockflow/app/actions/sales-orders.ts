@@ -15,6 +15,7 @@ export async function createSalesOrder(data: {
     designId?: string;
     quantity: number;
     unitPrice: number;
+    piecesSets?: number;
     source?: 'manufactured' | 'product' | 'design';
   }[];
 }) {
@@ -36,6 +37,9 @@ export async function createSalesOrder(data: {
     }
     if (item.unitPrice < 0) {
       throw new Error('Item unit prices cannot be negative');
+    }
+    if (item.piecesSets != null && (!Number.isFinite(item.piecesSets) || item.piecesSets < 0)) {
+      throw new Error('Pieces/sets must be zero or greater');
     }
   }
 
@@ -170,6 +174,7 @@ export async function createSalesOrder(data: {
           targetKg,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          piecesSets: item.piecesSets ?? (item.source === 'product' ? item.quantity : 0),
         }
       })
     )
@@ -190,6 +195,7 @@ export async function createSalesOrder(data: {
             organizationId: user.organizationId,
             finishedGoodsId: item.finishedGoodsId,
             quantity: item.quantity,
+            piecesSets: item.piecesSets,
             unitPrice: item.unitPrice,
             totalPrice: item.unitPrice * item.quantity
           }))
@@ -297,6 +303,7 @@ export async function getSalesOrders(role?: string, limit?: number) {
       designName: item.FinishedGoods?.design?.name || 'Unknown',
       designCode: item.FinishedGoods?.design?.code || 'N/A',
       quantity: item.quantity,
+      piecesSets: item.piecesSets,
       unitPrice: Number(item.unitPrice),
       totalPrice: Number(item.totalPrice)
     }))

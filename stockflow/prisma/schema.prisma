@@ -656,6 +656,7 @@ model SaleItem {
   saleOrderId     String
   finishedGoodsId String
   quantity        Int
+  piecesSets      Float            @default(0)
   unitPrice       Decimal          @db.Decimal(10, 2)
   totalPrice      Decimal          @db.Decimal(10, 2)
   organizationId  String
@@ -819,6 +820,7 @@ model StockMovement {
   branchId       String?
   movementType   String
   quantity       Float
+  piecesSets     Float        @default(0)
   reference      String?
   notes          String?
   createdAt      DateTime     @default(now())

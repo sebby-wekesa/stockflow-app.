@@ -19,7 +19,7 @@ export function OrderActions({
   const [showCancelDialog, setShowCancelDialog] = useState(false)
 
   function handleConfirm() {
-    if (!confirm('Confirm and invoice this order? Stock will be decremented immediately.')) return
+    if (!confirm('Confirm and invoice this order? The reserved stock will be fulfilled after packaging.')) return
     setError(null)
     startTransition(async () => {
       try {

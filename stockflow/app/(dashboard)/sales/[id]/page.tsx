@@ -81,7 +81,11 @@ export default async function SalesOrderDetailPage({
               description: item.FinishedGoods.design?.name ?? item.FinishedGoods.sku,
               quantity: item.quantity,
               unitPrice,
-              piecesSets: unitPrice > 0 ? Number(item.totalPrice) / unitPrice : 0,
+              piecesSets: item.piecesSets > 0
+                ? item.piecesSets
+                : unitPrice > 0
+                  ? Number(item.totalPrice) / unitPrice
+                  : 0,
             }
           })}
         />
