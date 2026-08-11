@@ -9,6 +9,7 @@ import { postSaleToLedger, voidSalePosting } from '@/lib/accounting/sales-postin
 export async function createSalesOrder(data: {
   customerId?: string;
   customerName: string;
+  saleDate?: string;
   items: {
     finishedGoodsId?: string;
     productId?: string;
@@ -26,6 +27,13 @@ export async function createSalesOrder(data: {
 
   if (!data.items || data.items.length === 0) {
     throw new Error('At least one item is required');
+  }
+
+  const saleDate = data.saleDate
+    ? new Date(`${data.saleDate}T00:00:00.000Z`)
+    : new Date()
+  if (Number.isNaN(saleDate.getTime())) {
+    throw new Error('Sale date must be valid');
   }
 
   for (const item of data.items) {
@@ -188,6 +196,7 @@ export async function createSalesOrder(data: {
         organizationId: user.organizationId,
         customerId: data.customerId,
         customerName: data.customerName,
+        createdAt: saleDate,
         totalAmount,
         status: 'PENDING',
         SaleItem: {

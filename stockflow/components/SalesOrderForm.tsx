@@ -86,6 +86,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
   const [searchTerm, setSearchTerm] = useState('')
   const [orderLines, setOrderLines] = useState<OrderLine[]>(getInitialLines)
   const [customerName, setCustomerName] = useState('')
+  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -159,6 +160,7 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
     try {
       const orderData = {
         customerName: customerName.trim(),
+        saleDate,
         items: orderLines.map(line => ({
           // manufactured → real FinishedGoods id
           // product → Product id (server will create shadow FinishedGoods)
@@ -224,6 +226,17 @@ export function SalesOrderForm({ products, onOrderPlaced, preselectedItems }: Sa
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Enter customer name"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="sale-date">Sale / invoice date *</Label>
+            <Input
+              id="sale-date"
+              type="date"
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
               required
             />
           </div>

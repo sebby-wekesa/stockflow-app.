@@ -230,13 +230,14 @@ const result = await withTenantTransaction(user.organizationId, async (tx) => {
             : `DRAFT-${Date.now().toString(36).toUpperCase()}`
 
     const order = await tx.saleOrder.create({
-        data: {
-            id: orderNumber,
-            customerId: data.customer_id || null,
-            customerName: data.customer_name,
-            totalAmount,
-            status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
-            createdBy: user.id,
+      data: {
+        id: orderNumber,
+        customerId: data.customer_id || null,
+        customerName: data.customer_name,
+        createdAt: data.invoice_date,
+        totalAmount,
+        status: action === 'invoice' ? 'CONFIRMED' : 'PENDING',
+        createdBy: user.id,
         },
     })
 

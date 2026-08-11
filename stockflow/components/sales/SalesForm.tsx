@@ -157,7 +157,7 @@ export function SalesForm({
 
       <div className="card mb-16">
         <div className="section-header mb-16">
-          <div><div className="section-title">Order Details</div><div className="section-sub">Choose the selling branch, invoice date, and customer</div></div>
+          <div><div className="section-title">Order Details</div><div className="section-sub">Choose the selling branch, sale date, and customer</div></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -180,7 +180,7 @@ export function SalesForm({
 
           <div>
             <label className="form-label">
-              Invoice date <span className="text-red">*</span>
+              Sale / invoice date <span className="text-red">*</span>
             </label>
             <input
               type="date"
