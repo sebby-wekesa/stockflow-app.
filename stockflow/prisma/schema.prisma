@@ -43,30 +43,31 @@ model BillOfMaterials {
 }
 
 model Branch {
-  id                     String                   @id @default(uuid())
-  organizationId         String
-  name                   String                   @unique
-  location               String?
-  code                   String                   @unique
-  address                String?
-  phone                  String?
-  managerId              String?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  ChartAccount           ChartAccount[]
-  Organization           Organization             @relation(fields: [organizationId], references: [id])
-  InventoryFinishedGoods InventoryFinishedGoods[]
-  InventoryRawMaterial   InventoryRawMaterial[]
-  ProductBranchStock     ProductBranchStock[]
-  StockTransfersSent     StockTransfer[]      @relation("StockTransferSourceBranch")
-  StockTransfersReceived StockTransfer[]      @relation("StockTransferDestinationBranch")
-  Invitation             Invitation[]
-  MaterialReceipt        MaterialReceipt[]
-  Product                Product[]
-  ProductReceipt         ProductReceipt[]
-  JournalEntry           JournalEntry[]
-  StockMovement          StockMovement[]
-  User                   User[]
+  id                         String                       @id @default(uuid())
+  organizationId             String
+  name                       String                       @unique
+  location                   String?
+  code                       String                       @unique
+  address                    String?
+  phone                      String?
+  managerId                  String?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  ChartAccount               ChartAccount[]
+  Organization               Organization                 @relation(fields: [organizationId], references: [id])
+  InventoryFinishedGoods     InventoryFinishedGoods[]
+  InventoryRawMaterial       InventoryRawMaterial[]
+  FinishedGoodsProductionLog FinishedGoodsProductionLog[]
+  ProductBranchStock         ProductBranchStock[]
+  StockTransfersSent         StockTransfer[]              @relation("StockTransferSourceBranch")
+  StockTransfersReceived     StockTransfer[]              @relation("StockTransferDestinationBranch")
+  Invitation                 Invitation[]
+  MaterialReceipt            MaterialReceipt[]
+  Product                    Product[]
+  ProductReceipt             ProductReceipt[]
+  JournalEntry               JournalEntry[]
+  StockMovement              StockMovement[]
+  User                       User[]
 
   @@unique([organizationId, code], map: "Branch_org_code_key")
   @@unique([organizationId, name], map: "Branch_org_name_key")
@@ -312,91 +313,93 @@ model NotificationSettings {
 }
 
 model Organization {
-  id                       String                    @id @default(uuid())
-  name                     String
-  code                     String                    @unique
-  address                  String?
-  phone                    String?
-  email                    String?
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  slug                     String                    @unique
-  status                   OrgStatus                 @default(PENDING_APPROVAL)
-  ownerUserId              String?                   @unique
-  approvedAt               DateTime?
-  disabledAt               DateTime?
-  disabledReason           String?
-  auditLogs                AuditLog[]
-  bankAccounts             BankAccount[]
-  billOfMaterials          BillOfMaterials[]
-  Branch                   Branch[]
-  chartAccounts            ChartAccount[]
-  customers                Customer[]
-  customerPortalAccesses   CustomerPortalAccess[]
-  demandForecasts          DemandForecast[]
-  designs                  Design[]
-  finishedGoods            FinishedGoods[]
-  importBatches            ImportBatch[]
-  importRows               ImportRow[]
-  inventoryFinishedGoods   InventoryFinishedGoods[]
-  inventoryRawMaterials    InventoryRawMaterial[]
-  Invitation               Invitation[]
-  journalEntries           JournalEntry[]
-  ledgerLines              LedgerLine[]
-  materialConsumptionLogs  MaterialConsumptionLog[]
-  materialReceipts         MaterialReceipt[]
-  notificationSettings     NotificationSettings[]
-  operationLogs            OperationLog[]
-  payments                 Payment[]
-  products                 Product[]
-  productBranchStocks      ProductBranchStock[]
-  productAliases           ProductAlias[]
-  productReceipts          ProductReceipt[]
-  productionOrders         ProductionOrder[]
-  productionOrderMaterials ProductionOrderMaterial[]
-  productionRoutes         ProductionRoute[]
-  purchaseOrders           PurchaseOrder[]
-  purchaseOrderItems       PurchaseOrderItem[]
-  rawMaterials             RawMaterial[]
-  routeOperations          RouteOperation[]
-  saleItems                SaleItem[]
-  saleOrders               SaleOrder[]
-  stages                   Stage[]
-  stageLogs                StageLog[]
-  stockMovements           StockMovement[]
-  stockTransfers           StockTransfer[]
-  suppliers                Supplier[]
-  unitOfMeasures           UnitOfMeasure[]
-  User                     User[]
+  id                          String                       @id @default(uuid())
+  name                        String
+  code                        String                       @unique
+  address                     String?
+  phone                       String?
+  email                       String?
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  slug                        String                       @unique
+  status                      OrgStatus                    @default(PENDING_APPROVAL)
+  ownerUserId                 String?                      @unique
+  approvedAt                  DateTime?
+  disabledAt                  DateTime?
+  disabledReason              String?
+  auditLogs                   AuditLog[]
+  bankAccounts                BankAccount[]
+  billOfMaterials             BillOfMaterials[]
+  Branch                      Branch[]
+  chartAccounts               ChartAccount[]
+  customers                   Customer[]
+  customerPortalAccesses      CustomerPortalAccess[]
+  demandForecasts             DemandForecast[]
+  designs                     Design[]
+  finishedGoods               FinishedGoods[]
+  importBatches               ImportBatch[]
+  importRows                  ImportRow[]
+  inventoryFinishedGoods      InventoryFinishedGoods[]
+  inventoryRawMaterials       InventoryRawMaterial[]
+  Invitation                  Invitation[]
+  journalEntries              JournalEntry[]
+  ledgerLines                 LedgerLine[]
+  materialConsumptionLogs     MaterialConsumptionLog[]
+  materialReceipts            MaterialReceipt[]
+  finishedGoodsProductionLogs FinishedGoodsProductionLog[]
+  notificationSettings        NotificationSettings[]
+  operationLogs               OperationLog[]
+  payments                    Payment[]
+  products                    Product[]
+  productBranchStocks         ProductBranchStock[]
+  productAliases              ProductAlias[]
+  productReceipts             ProductReceipt[]
+  productionOrders            ProductionOrder[]
+  productionOrderMaterials    ProductionOrderMaterial[]
+  productionRoutes            ProductionRoute[]
+  purchaseOrders              PurchaseOrder[]
+  purchaseOrderItems          PurchaseOrderItem[]
+  rawMaterials                RawMaterial[]
+  routeOperations             RouteOperation[]
+  saleItems                   SaleItem[]
+  saleOrders                  SaleOrder[]
+  stages                      Stage[]
+  stageLogs                   StageLog[]
+  stockMovements              StockMovement[]
+  stockTransfers              StockTransfer[]
+  suppliers                   Supplier[]
+  unitOfMeasures              UnitOfMeasure[]
+  User                        User[]
 }
 
 model Product {
-  id              String            @id @default(uuid())
-  name            String
-  sku             String?           @unique
-  category        ProductCategory   @default(springs)
-  origin          StockOrigin       @default(FACTORY_MADE)
-  uom             String            @default("KG")
-  currentStock    Float             @default(0)
-  unitCost        Float?
-  landingCost     Float?
-  vendor          String?
-  branchId        String?
-  reorderLevel    Int?
-  stockStatus     StockStatus?      @default(AVAILABLE)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  organizationId  String
-  piecesSets      Float             @default(0)
-  routeType       RouteType?
-  Branch          Branch?           @relation(fields: [branchId], references: [id])
-  Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Product_organizationId_fk")
-  ProductAlias    ProductAlias[]
-  branchStocks    ProductBranchStock[]
-  ProductReceipt  ProductReceipt[]
-  ProductionOrder ProductionOrder[]
-  StockMovement   StockMovement[]
-  StockTransfer   StockTransfer[]
+  id                         String                       @id @default(uuid())
+  name                       String
+  sku                        String?                      @unique
+  category                   ProductCategory              @default(springs)
+  origin                     StockOrigin                  @default(FACTORY_MADE)
+  uom                        String                       @default("KG")
+  currentStock               Float                        @default(0)
+  unitCost                   Float?
+  landingCost                Float?
+  vendor                     String?
+  branchId                   String?
+  reorderLevel               Int?
+  stockStatus                StockStatus?                 @default(AVAILABLE)
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  organizationId             String
+  piecesSets                 Float                        @default(0)
+  routeType                  RouteType?
+  Branch                     Branch?                      @relation(fields: [branchId], references: [id])
+  Organization               Organization                 @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "Product_organizationId_fk")
+  ProductAlias               ProductAlias[]
+  branchStocks               ProductBranchStock[]
+  ProductReceipt             ProductReceipt[]
+  ProductionOrder            ProductionOrder[]
+  FinishedGoodsProductionLog FinishedGoodsProductionLog[]
+  StockMovement              StockMovement[]
+  StockTransfer              StockTransfer[]
 
   @@unique([organizationId, sku], map: "Product_org_sku_key")
   @@index([organizationId])
@@ -417,22 +420,42 @@ model ProductAlias {
 }
 
 model ProductBranchStock {
-  id             String       @id @default(uuid())
-  productId      String
-  branchId       String
-  availableQty   Float        @default(0)
-  availablePiecesSets Float   @default(0)
-  reservedQty    Float        @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organizationId String
-  Product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  Branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  Organization   Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ProductBranchStock_organizationId_fk")
+  id                  String       @id @default(uuid())
+  productId           String
+  branchId            String
+  availableQty        Float        @default(0)
+  availablePiecesSets Float        @default(0)
+  reservedQty         Float        @default(0)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  organizationId      String
+  Product             Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  Branch              Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  Organization        Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "ProductBranchStock_organizationId_fk")
 
   @@unique([branchId, productId])
   @@index([organizationId])
   @@index([organizationId, branchId])
+}
+
+model FinishedGoodsProductionLog {
+  id              String       @id @default(uuid())
+  jobCardNo       String
+  productionDate  DateTime
+  springProductId String
+  branchId        String
+  pcsProduced     Int
+  weightPerPiece  Decimal      @db.Decimal(10, 4)
+  totalWeight     Decimal      @db.Decimal(10, 4)
+  createdAt       DateTime     @default(now())
+  organizationId  String
+  Organization    Organization @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "FinishedGoodsProductionLog_organizationId_fk")
+  Product         Product      @relation(fields: [springProductId], references: [id])
+  Branch          Branch       @relation(fields: [branchId], references: [id])
+
+  @@index([organizationId])
+  @@index([branchId, productionDate])
+  @@index([springProductId])
 }
 
 model ProductReceipt {
@@ -770,28 +793,28 @@ model UnitOfMeasure {
 }
 
 model User {
-  id                   String                @id @default(uuid())
-  email                String                @unique
-  password             String?
-  name                 String?
-  role                 Role                  @default(PENDING)
-  department           String?
-  organizationId       String?
-  branchId             String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  lastSeenAt           DateTime?
-  departments          String[]              @default([])
-  AuditLog             AuditLog[]
-  ImportBatch          ImportBatch[]
-  SentInvitations      Invitation[]          @relation("Inviter")
-  NotificationSettings NotificationSettings?
-  OperationLog         OperationLog[]
-  SaleOrderCreated     SaleOrder[]
-  StageLog             StageLog[]
-  StockTransfersReceived StockTransfer[] @relation("StockTransferReceivedBy")
-  Branch               Branch?               @relation(fields: [branchId], references: [id])
-  Organization         Organization?         @relation(fields: [organizationId], references: [id])
+  id                     String                @id @default(uuid())
+  email                  String                @unique
+  password               String?
+  name                   String?
+  role                   Role                  @default(PENDING)
+  department             String?
+  organizationId         String?
+  branchId               String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  lastSeenAt             DateTime?
+  departments            String[]              @default([])
+  AuditLog               AuditLog[]
+  ImportBatch            ImportBatch[]
+  SentInvitations        Invitation[]          @relation("Inviter")
+  NotificationSettings   NotificationSettings?
+  OperationLog           OperationLog[]
+  SaleOrderCreated       SaleOrder[]
+  StageLog               StageLog[]
+  StockTransfersReceived StockTransfer[]       @relation("StockTransferReceivedBy")
+  Branch                 Branch?               @relation(fields: [branchId], references: [id])
+  Organization           Organization?         @relation(fields: [organizationId], references: [id])
 }
 
 model Invitation {
@@ -860,7 +883,7 @@ model StockTransfer {
 }
 
 model ChartAccount {
-  id             String         @id @default(uuid())
+  id             String                 @id @default(uuid())
   organizationId String
   code           String
   name           String
@@ -868,22 +891,22 @@ model ChartAccount {
   normalBalance  NormalBalance
   classification AccountClassification?
   statementGroup StatementGroup?
-  currency       String         @default("KES")
+  currency       String                 @default("KES")
   branchId       String?
   parentId       String?
-  isBank         Boolean        @default(false)
-  isSystem       Boolean        @default(false)
-  isActive       Boolean        @default(true)
+  isBank         Boolean                @default(false)
+  isSystem       Boolean                @default(false)
+  isActive       Boolean                @default(true)
   description    String?
   note           String?
   vatApplicable  Boolean                @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
   bankAccount    BankAccount?
-  Branch         Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  Organization   Organization   @relation(fields: [organizationId], references: [id])
-  parent         ChartAccount?  @relation("AccountTree", fields: [parentId], references: [id])
-  children       ChartAccount[] @relation("AccountTree")
+  Branch         Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  Organization   Organization           @relation(fields: [organizationId], references: [id])
+  parent         ChartAccount?          @relation("AccountTree", fields: [parentId], references: [id])
+  children       ChartAccount[]         @relation("AccountTree")
   ledgerLines    LedgerLine[]
 
   @@unique([organizationId, code])

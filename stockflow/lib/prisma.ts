@@ -1,5 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
+import { setDefaultResultOrder } from 'node:dns'
 import {
   getDefaultAutoSelectFamily,
   getDefaultAutoSelectFamilyAttemptTimeout,
@@ -15,6 +16,11 @@ function getPositiveNumber(value: string | undefined, fallback: number) {
 }
 
 function configureNetworkFamilyAttemptTimeout() {
+  // Supabase pooler endpoints can advertise IPv6 addresses that are not
+  // reachable from some developer and hosting networks. Prefer the working
+  // IPv4 route before Node attempts those addresses.
+  setDefaultResultOrder('ipv4first')
+
   if (!getDefaultAutoSelectFamily()) return
 
   const configured = Number(process.env.DB_NETWORK_FAMILY_ATTEMPT_TIMEOUT_MS)
