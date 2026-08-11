@@ -3,6 +3,7 @@ import type { Prisma, SaleStatus } from '@prisma/client'
 import { getTenantPrisma } from '@/lib/tenant-prisma'
 import { requireActiveAuth } from '@/lib/auth'
 import { STATUS_BADGE_CLASS, STATUS_LABELS, formatKES } from '@/lib/sales-utils'
+import DeleteSaleButton from '@/components/sales/DeleteSaleButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ export default async function SalesPage({
   const productionRequest = params.productionRequest?.trim() || undefined
   const productionProduct = params.productionProduct?.trim() || undefined
   const page = Math.max(1, Number(params.page ?? 1))
+  const canDeleteSales = user.role === 'ADMIN' || user.role === 'MANAGER'
 
   const baseWhere: Prisma.SaleOrderWhereInput = user.role === 'SALES' ? { createdBy: user.id } : {}
   const where: Prisma.SaleOrderWhereInput = {
@@ -196,7 +198,7 @@ export default async function SalesPage({
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Branch</th><th>Item</th><th>Items</th><th>Status</th><th>Amount</th><th>Created by</th></tr></thead>
+            <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Branch</th><th>Item</th><th>Items</th><th>Status</th><th>Amount</th><th>Created by</th>{canDeleteSales && <th>Action</th>}</tr></thead>
             <tbody>
               {orders.map((order) => {
                 const itemNames = Array.from(new Set(order.SaleItem.map((item) => (
@@ -220,10 +222,19 @@ export default async function SalesPage({
                     <td><span className={`badge ${STATUS_BADGE_CLASS[order.status]}`}>{STATUS_LABELS[order.status]}</span></td>
                     <td><span className="job-kg">{formatKES(Number(order.totalAmount))}</span></td>
                     <td className="section-sub">{order.createdByUser?.name ?? 'System'}</td>
+                    {canDeleteSales && (
+                      <td>
+                        {(['PENDING', 'CONFIRMED', 'CANCELLED'] as SaleStatus[]).includes(order.status) ? (
+                          <DeleteSaleButton orderId={order.id} customerName={order.customerName} status={order.status} />
+                        ) : (
+                          <span className="section-sub">Locked</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}
-              {orders.length === 0 && <tr><td colSpan={9} className="sales-empty">No sales orders match the selected filters.</td></tr>}
+              {orders.length === 0 && <tr><td colSpan={canDeleteSales ? 10 : 9} className="sales-empty">No sales orders match the selected filters.</td></tr>}
             </tbody>
           </table>
         </div>

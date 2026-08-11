@@ -491,6 +491,68 @@ export async function deleteDraftSalesOrder(orderId: string) {
   }
 }
 
+export async function deleteSaleOrder(orderId: string) {
+  const user = await requireActiveAuth()
+  if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+    throw new Error('Only admins and managers can delete sales')
+  }
+
+  const parsedOrderId = z.string().trim().min(1).safeParse(orderId)
+  if (!parsedOrderId.success) throw new Error('Sale order not found')
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const order = await tx.saleOrder.findFirst({
+      where: { id: parsedOrderId.data },
+      include: {
+        SaleItem: { include: { FinishedGoods: true } },
+        Payment: { select: { id: true, paymentNumber: true } },
+        ProductionOrder: { select: { id: true, orderNumber: true, status: true } },
+      },
+    })
+    if (!order) throw new Error('Sale order not found')
+
+    if (!['PENDING', 'CONFIRMED', 'CANCELLED'].includes(order.status)) {
+      throw new Error('Sales that are ready for dispatch or already shipped cannot be deleted')
+    }
+    if (order.Payment.length > 0) {
+      throw new Error('This sale has linked payments. Remove or reverse the payments before deleting it')
+    }
+    if (order.ProductionOrder.length > 0) {
+      throw new Error('This sale has linked production orders. Keep the sale for production traceability')
+    }
+
+    if (order.status === 'CONFIRMED') {
+      await releaseSaleOrderReservation(tx, order, user.organizationId)
+    }
+    await voidSalePosting(tx, order.id)
+
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'SALE_ORDER_DELETED',
+        entityType: 'SaleOrder',
+        entityId: order.id,
+        details: JSON.stringify({
+          orderId: order.id,
+          customerName: order.customerName,
+          status: order.status,
+          totalAmount: Number(order.totalAmount),
+          itemCount: order.SaleItem.length,
+        }),
+      },
+    })
+
+    await tx.saleOrder.delete({ where: { id: order.id } })
+  }, { maxWait: 10000, timeout: 30000 })
+
+  revalidatePath('/sales')
+  revalidatePath(`/sales/${parsedOrderId.data}`)
+  revalidatePath('/stock')
+  revalidatePath('/dashboard')
+  revalidatePath('/accounting/ledger')
+  revalidatePath('/accounting/debtors')
+}
+
 export async function cancelOrder(orderId: string, reason: string) {
   if (!reason || reason.trim().length < 3) {
     throw new Error('Cancellation reason is required (at least 3 characters)')
