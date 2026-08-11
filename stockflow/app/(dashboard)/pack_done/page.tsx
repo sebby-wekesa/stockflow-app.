@@ -20,62 +20,53 @@ export default async function PackDonePage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const readySalesOrders = await withRetry(() =>
-    db.saleOrder.findMany({
-      where: {
-        status: 'READY_FOR_DISPATCH',
-      },
-      include: {
-        SaleItem: {
-          include: {
-            FinishedGoods: {
-              include: { design: true },
+  const [readySalesOrders, shippedSalesOrders, dispatchedProductionWork] = await Promise.all([
+    withRetry(() =>
+      db.saleOrder.findMany({
+        where: { status: 'READY_FOR_DISPATCH' },
+        include: {
+          SaleItem: {
+            include: {
+              FinishedGoods: { include: { design: true } },
             },
           },
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-    })
-  )
-
-  const shippedSalesOrders = await withRetry(() =>
-    db.saleOrder.findMany({
-      where: {
-        status: 'SHIPPED',
-        updatedAt: { gte: today },
-      },
-      include: {
-        SaleItem: {
-          include: {
-            FinishedGoods: {
-              include: { design: true },
+        orderBy: { updatedAt: 'desc' },
+      })
+    ),
+    withRetry(() =>
+      db.saleOrder.findMany({
+        where: { status: 'SHIPPED', updatedAt: { gte: today } },
+        include: {
+          SaleItem: {
+            include: {
+              FinishedGoods: { include: { design: true } },
             },
           },
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-    })
-  )
-
-  const dispatchedProductionWork = await withRetry(() =>
-    db.productionOrder.findMany({
-      where: {
-        status: 'COMPLETED',
-        currentDept: PACKAGING_DISPATCHED_DEPT,
-        updatedAt: { gte: today },
-      },
-      include: {
-        design: { select: { name: true, code: true } },
-        saleOrder: { select: { customerName: true } },
-        StageLog: {
-          orderBy: { completedAt: 'desc' },
-          take: 1,
-          include: { User: { select: { name: true, email: true } } },
+        orderBy: { updatedAt: 'desc' },
+      })
+    ),
+    withRetry(() =>
+      db.productionOrder.findMany({
+        where: {
+          status: 'COMPLETED',
+          currentDept: PACKAGING_DISPATCHED_DEPT,
+          updatedAt: { gte: today },
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-    })
-  )
+        include: {
+          design: { select: { name: true, code: true } },
+          saleOrder: { select: { customerName: true } },
+          StageLog: {
+            orderBy: { completedAt: 'desc' },
+            take: 1,
+            include: { User: { select: { name: true, email: true } } },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      })
+    ),
+  ])
 
   const dispatchedCount = shippedSalesOrders.length + dispatchedProductionWork.length
 

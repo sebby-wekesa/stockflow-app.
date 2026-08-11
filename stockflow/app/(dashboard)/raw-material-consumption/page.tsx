@@ -43,27 +43,27 @@ export default async function RawMaterialConsumptionPage({
       }
     : undefined
 
-  const logs = await db.materialConsumptionLog.findMany({
-    where: consumedAtFilter ? { consumedAt: consumedAtFilter } : undefined,
-    include: {
-      RawMaterial: { select: { materialName: true, sku: true } },
-      ProductionOrder: {
-        select: {
-          id: true,
-          orderNumber: true,
-          materials: {
-            select: {
-              rawMaterialId: true,
-              pieces: true,
+  const [logs, orders, rawMaterials] = await Promise.all([
+    db.materialConsumptionLog.findMany({
+      where: consumedAtFilter ? { consumedAt: consumedAtFilter } : undefined,
+      include: {
+        RawMaterial: { select: { materialName: true, sku: true } },
+        ProductionOrder: {
+          select: {
+            id: true,
+            orderNumber: true,
+            materials: {
+              select: {
+                rawMaterialId: true,
+                pieces: true,
+              },
+              orderBy: { createdAt: 'asc' },
             },
-            orderBy: { createdAt: 'asc' },
           },
         },
       },
-    },
-    orderBy: { consumedAt: 'desc' },
-  })
-  const [orders, rawMaterials] = await Promise.all([
+      orderBy: { consumedAt: 'desc' },
+    }),
     db.productionOrder.findMany({
       where: { status: { in: ['APPROVED', 'IN_PRODUCTION', 'COMPLETED'] } },
       select: { id: true, orderNumber: true, productName: true },

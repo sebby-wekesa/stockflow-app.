@@ -82,12 +82,12 @@ export default async function ProductsPage({
   const selectedBranchRecord = selectedBranch ? branchByCode.get(selectedBranch) : undefined
 
   // Fetch in parallel: category counts, the page of products, total
-  const [counts, products, total, stockByBranchRows] = await withRetry(async () => {
-    const counts = await db.product.groupBy({
+  const [counts, products, total, stockByBranchRows] = await withRetry(() => Promise.all([
+    db.product.groupBy({
       by: ['origin'],
       _count: { _all: true },
-    })
-    const products = await db.product.findMany({
+    }),
+    db.product.findMany({
       where,
       orderBy: { sku: 'asc' },
       take: PAGE_SIZE,
@@ -100,16 +100,14 @@ export default async function ProductsPage({
         },
         _count: { select: { ProductAlias: true } },
       },
-    })
-    const total = await db.product.count({ where })
-    const stockByBranchRows = await db.product.groupBy({
+    }),
+    db.product.count({ where }),
+    db.product.groupBy({
       by: ['branchId'],
       _count: { _all: true },
       _sum: { currentStock: true, piecesSets: true },
-    })
-
-    return [counts, products, total, stockByBranchRows] as const
-  })
+    }),
+  ]), undefined)
 
   const totalAll = counts.reduce((sum, c) => sum + c._count._all, 0)
   const totalPages = Math.ceil(total / PAGE_SIZE)

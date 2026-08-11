@@ -19,6 +19,11 @@ export default async function ImportCentrePage({ searchParams }: ImportCentrePag
 
   const db = getTenantPrisma(user.organizationId)
   const isSuperUser = user.role === 'ADMIN' && user.branches.length === 0
+  const recentBatchesPromise = db.importBatch.findMany({
+    orderBy: { created_at: 'desc' },
+    take: 5,
+    include: { User: { select: { name: true } } },
+  })
   const branchRecords = isSuperUser
     ? await db.branch.findMany({
         select: { name: true, code: true, location: true },
@@ -34,11 +39,7 @@ export default async function ImportCentrePage({ searchParams }: ImportCentrePag
   const assignedBranchCode = normalizeBranchCode(user.branches[0]?.name)
 
   // Recent batches across both flows (auto-scoped to org via tenant prisma)
-  const recentBatches = await db.importBatch.findMany({
-    orderBy: { created_at: 'desc' },
-    take: 5,
-    include: { User: { select: { name: true } } },
-  })
+  const recentBatches = await recentBatchesPromise
 
   // Legacy in-progress batches cannot continue through the retired mapping flow.
   const inProgress = recentBatches.filter(

@@ -273,6 +273,7 @@ model MaterialConsumptionLog {
   Stage             Stage?          @relation(fields: [stageId], references: [id])
 
   @@index([organizationId])
+  @@index([organizationId, consumedAt])
 }
 
 model MaterialReceipt {
@@ -456,6 +457,7 @@ model FinishedGoodsProductionLog {
   @@index([organizationId])
   @@index([branchId, productionDate])
   @@index([springProductId])
+  @@index([organizationId, branchId, productionDate])
 }
 
 model ProductReceipt {
@@ -522,6 +524,8 @@ model ProductionOrder {
   @@index([organizationId])
   @@index([saleOrderId])
   @@index([productId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, status, completedAt])
 }
 
 model ProductionRoute {
@@ -674,6 +678,7 @@ model RawMaterial {
   @@unique([organizationId, barcode], map: "RawMaterial_org_barcode_key")
   @@unique([organizationId, sku], map: "RawMaterial_org_sku_key")
   @@index([organizationId])
+  @@index([organizationId, category, materialName])
 }
 
 model SaleItem {
@@ -711,6 +716,8 @@ model SaleOrder {
   Organization    Organization      @relation(fields: [organizationId], references: [id], onUpdate: NoAction, map: "SaleOrder_organizationId_fk")
 
   @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status, createdAt])
 }
 
 model Stage {
@@ -755,6 +762,7 @@ model StageLog {
   Stage           Stage?          @relation(fields: [stageId], references: [id])
 
   @@index([organizationId])
+  @@index([organizationId, completedAt])
 }
 
 model Supplier {
@@ -855,6 +863,7 @@ model StockMovement {
   Product        Product      @relation(fields: [productId], references: [id])
 
   @@index([organizationId])
+  @@index([organizationId, createdAt])
 }
 
 model StockTransfer {

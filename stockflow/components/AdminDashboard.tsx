@@ -114,23 +114,40 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
 
-  // Scrap this week (from StageLog)
-  const scrapWeekAgg = await safeQuery<any>('weekly scrap summary', () => db.stageLog.aggregate({
-    _sum: { kgScrap: true },
-    where: { completedAt: { gte: oneWeekAgo } },
-  }), { _sum: { kgScrap: 0 } });
+  // These dashboard sections are independent. Fetch them together so the
+  // dashboard does not wait through a chain of six remote database round trips.
+  const { getDepartmentsForOrg } = await import('@/lib/department-settings')
+  const [scrapWeekAgg, scrapDeptRaw, knownDepts, activeByDeptRaw, todayLogs, recentOrders] = await Promise.all([
+    safeQuery<any>('weekly scrap summary', () => db.stageLog.aggregate({
+      _sum: { kgScrap: true },
+      where: { completedAt: { gte: oneWeekAgo } },
+    }), { _sum: { kgScrap: 0 } }),
+    safeQuery<any[]>('scrap by department', () => db.stageLog.groupBy({
+      by: ['department'],
+      _sum: { kgScrap: true },
+      where: {
+        completedAt: { gte: oneWeekAgo },
+        department: { not: null },
+      },
+      orderBy: { _sum: { kgScrap: 'desc' } },
+    }), []),
+    getDepartmentsForOrg(organizationId),
+    safeQuery<any[]>('active jobs by department', () => db.productionOrder.groupBy({
+      by: ['currentDept'],
+      _count: { _all: true },
+      where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] }, currentDept: { not: null } },
+    }), []),
+    safeQuery<any[]>('today stage logs', () => db.stageLog.findMany({
+      where: { completedAt: { gte: todayStart }, department: { not: null } },
+      select: { department: true, operatorId: true, kgIn: true, kgOut: true, kgScrap: true },
+    }), []),
+    safeQuery<any[]>('recent production orders', () => db.productionOrder.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      include: { design: true },
+    }), []),
+  ]);
   const scrapThisWeek = toNumber(scrapWeekAgg._sum.kgScrap);
-
-  // Scrap by department this week
-  const scrapDeptRaw = await safeQuery<any[]>('scrap by department', () => db.stageLog.groupBy({
-    by: ['department'],
-    _sum: { kgScrap: true },
-    where: {
-      completedAt: { gte: oneWeekAgo },
-      department: { not: null },
-    },
-    orderBy: { _sum: { kgScrap: 'desc' } },
-  }), []);
   const totalScrapForPct = (scrapDeptRaw as any[]).reduce((s: number, r: any) => s + toNumber(r._sum.kgScrap), 0) || 1;
   const scrapByDept = (scrapDeptRaw as any[]).map((r: any) => {
     const kg = toNumber(r._sum.kgScrap);
@@ -139,22 +156,7 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
   });
 
   // Department throughput for today (from StageLog + active ProductionOrders)
-  // Load department list from tenant settings if present
-  const { getDepartmentsForOrg } = await import('@/lib/department-settings')
-  const knownDepts = await getDepartmentsForOrg(organizationId);
-
-  const activeByDeptRaw = await safeQuery<any[]>('active jobs by department', () => db.productionOrder.groupBy({
-    by: ['currentDept'],
-    _count: { _all: true },
-    where: { status: { in: ['APPROVED', 'IN_PRODUCTION'] }, currentDept: { not: null } },
-  }), []);
   const activeMap = new Map((activeByDeptRaw as any[]).map((a: any) => [ (a.currentDept || '').toLowerCase(), a._count._all ]));
-
-  // Fetch today's logs to compute distinct operators + aggregates per dept
-  const todayLogs = await safeQuery<any[]>('today stage logs', () => db.stageLog.findMany({
-    where: { completedAt: { gte: todayStart }, department: { not: null } },
-    select: { department: true, operatorId: true, kgIn: true, kgOut: true, kgScrap: true },
-  }), []);
 
     const deptToday = new Map<string, { kgIn: number; kgOut: number; kgScrap: number; ops: Set<string> }>();
    for (const log of todayLogs) {
@@ -193,13 +195,6 @@ async function getAdminStats(db: any, organizationId: string): Promise<AdminStat
        operators: ops,
      };
    });
-
-  // Recent orders (tenant-scoped via db)
-  const recentOrders = await safeQuery<any[]>('recent production orders', () => db.productionOrder.findMany({
-    take: 4,
-    orderBy: { createdAt: "desc" },
-    include: { design: true },
-  }), []);
 
     return {
       totalOrders: Number(totalOrders ?? 0),

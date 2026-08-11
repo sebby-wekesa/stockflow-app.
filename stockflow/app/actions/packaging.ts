@@ -362,64 +362,61 @@ export async function getPackagingDashboardData() {
   today.setHours(0, 0, 0, 0)
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const confirmedOrders = await packagingQuery<PackagingSaleOrder[]>('confirmed sales orders', () =>
-    db.saleOrder.findMany({
-      where: { status: 'CONFIRMED' },
-      include: packagingOrderInclude,
-      orderBy: { createdAt: 'asc' },
-    }),
-    []
-  );
-
-  const readyForDispatch = await packagingQuery<PackagingSaleOrder[]>('ready for dispatch sales orders', () =>
-    db.saleOrder.findMany({
-      where: { status: 'READY_FOR_DISPATCH' },
-      include: packagingOrderInclude,
-      orderBy: { updatedAt: 'desc' },
-      take: 6,
-    }),
-    []
-  );
-
-  const recentShipments = await packagingQuery<PackagingSaleOrder[]>('recent sales shipments', () =>
-    db.saleOrder.findMany({
-      where: { status: 'SHIPPED' },
-      include: packagingOrderInclude,
-      orderBy: { updatedAt: 'desc' },
-      take: 6,
-    }),
-    []
-  );
-
-  const shippedToday = await packagingQuery('sales shipments today count', () =>
-    db.saleOrder.count({
-      where: { status: 'SHIPPED', updatedAt: { gte: today } },
-    }),
-    0
-  );
-
-  const shippedWeek = await packagingQuery<any>('weekly shipped sales total', () =>
-    db.saleOrder.aggregate({
-      where: { status: 'SHIPPED', updatedAt: { gte: weekStart } },
-      _sum: { totalAmount: true },
-    }),
-    { _sum: { totalAmount: 0 } }
-  );
-
-  const completedProduction = await packagingQuery<CompletedProductionOrder[]>('completed production work', () =>
-    db.productionOrder.findMany({
-      where: {
-        status: 'COMPLETED',
-        OR: [
-          { currentDept: null },
-          { currentDept: { not: PACKAGING_DISPATCHED_DEPT } },
-        ],
-      },
-      include: completedProductionInclude,
-      orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
-    }),
-    []
-  );
+  const [confirmedOrders, readyForDispatch, recentShipments, shippedToday, shippedWeek, completedProduction] = await Promise.all([
+    packagingQuery<PackagingSaleOrder[]>('confirmed sales orders', () =>
+      db.saleOrder.findMany({
+        where: { status: 'CONFIRMED' },
+        include: packagingOrderInclude,
+        orderBy: { createdAt: 'asc' },
+      }),
+      []
+    ),
+    packagingQuery<PackagingSaleOrder[]>('ready for dispatch sales orders', () =>
+      db.saleOrder.findMany({
+        where: { status: 'READY_FOR_DISPATCH' },
+        include: packagingOrderInclude,
+        orderBy: { updatedAt: 'desc' },
+        take: 6,
+      }),
+      []
+    ),
+    packagingQuery<PackagingSaleOrder[]>('recent sales shipments', () =>
+      db.saleOrder.findMany({
+        where: { status: 'SHIPPED' },
+        include: packagingOrderInclude,
+        orderBy: { updatedAt: 'desc' },
+        take: 6,
+      }),
+      []
+    ),
+    packagingQuery('sales shipments today count', () =>
+      db.saleOrder.count({
+        where: { status: 'SHIPPED', updatedAt: { gte: today } },
+      }),
+      0
+    ),
+    packagingQuery<any>('weekly shipped sales total', () =>
+      db.saleOrder.aggregate({
+        where: { status: 'SHIPPED', updatedAt: { gte: weekStart } },
+        _sum: { totalAmount: true },
+      }),
+      { _sum: { totalAmount: 0 } }
+    ),
+    packagingQuery<CompletedProductionOrder[]>('completed production work', () =>
+      db.productionOrder.findMany({
+        where: {
+          status: 'COMPLETED',
+          OR: [
+            { currentDept: null },
+            { currentDept: { not: PACKAGING_DISPATCHED_DEPT } },
+          ],
+        },
+        include: completedProductionInclude,
+        orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
+      }),
+      []
+    ),
+  ]);
 
   const queue = confirmedOrders.filter(isPackableOrder).map(toPackagingOrder)
   const blockedOrders = confirmedOrders.length - queue.length

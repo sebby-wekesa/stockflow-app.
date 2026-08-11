@@ -44,7 +44,17 @@ export default async function SalesPage({
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
       include: {
-        SaleItem: { select: { quantity: true } },
+        SaleItem: {
+          select: {
+            quantity: true,
+            FinishedGoods: {
+              select: {
+                sku: true,
+                design: { select: { name: true } },
+              },
+            },
+          },
+        },
         createdByUser: { select: { name: true, Branch: { select: { name: true, code: true } } } },
       },
     }),
@@ -56,6 +66,19 @@ export default async function SalesPage({
     }),
     db.branch.findMany({ orderBy: { name: 'asc' }, select: { code: true, name: true } }),
   ])
+
+  const finishedGoodsSkus = Array.from(new Set(
+    orders.flatMap((order) => order.SaleItem.map((item) => item.FinishedGoods.sku)),
+  ))
+  const catalogueProducts = finishedGoodsSkus.length > 0
+    ? await db.product.findMany({
+        where: { sku: { in: finishedGoodsSkus } },
+        select: { sku: true, name: true },
+      })
+    : []
+  const productNamesBySku = new Map(
+    catalogueProducts.flatMap((product) => product.sku ? [[product.sku, product.name] as const] : []),
+  )
 
   const countByStatus = new Map(statusCounts.map((item) => [item.status, item._count._all]))
   const allOrders = statusCounts.reduce((sum, item) => sum + item._count._all, 0)
@@ -173,21 +196,34 @@ export default async function SalesPage({
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Branch</th><th>Items</th><th>Status</th><th>Amount</th><th>Created by</th></tr></thead>
+            <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Branch</th><th>Item</th><th>Items</th><th>Status</th><th>Amount</th><th>Created by</th></tr></thead>
             <tbody>
-              {orders.map((order) => (
-                <tr key={order.id}>
-                  <td><Link href={`/sales/${order.id}`} className="sales-order-link">{order.id}</Link></td>
-                  <td className="section-sub">{order.createdAt.toLocaleDateString()}</td>
-                  <td>{order.customerName}</td>
-                  <td>{order.createdByUser?.Branch?.name ?? 'Unassigned'}</td>
-                  <td>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
-                  <td><span className={`badge ${STATUS_BADGE_CLASS[order.status]}`}>{STATUS_LABELS[order.status]}</span></td>
-                  <td><span className="job-kg">{formatKES(Number(order.totalAmount))}</span></td>
-                  <td className="section-sub">{order.createdByUser?.name ?? 'System'}</td>
-                </tr>
-              ))}
-              {orders.length === 0 && <tr><td colSpan={8} className="sales-empty">No sales orders match the selected filters.</td></tr>}
+              {orders.map((order) => {
+                const itemNames = order.SaleItem.map((item) => (
+                  productNamesBySku.get(item.FinishedGoods.sku)
+                  ?? item.FinishedGoods.design.name
+                  ?? item.FinishedGoods.sku
+                ))
+
+                return (
+                  <tr key={order.id}>
+                    <td><Link href={`/sales/${order.id}`} className="sales-order-link">{order.id}</Link></td>
+                    <td className="section-sub">{order.createdAt.toLocaleDateString()}</td>
+                    <td>{order.customerName}</td>
+                    <td>{order.createdByUser?.Branch?.name ?? 'Unassigned'}</td>
+                    <td>
+                      {itemNames.length > 0 ? itemNames.map((name, index) => (
+                        <div key={`${name}-${index}`}>{name}</div>
+                      )) : '—'}
+                    </td>
+                    <td>{order.SaleItem.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()}</td>
+                    <td><span className={`badge ${STATUS_BADGE_CLASS[order.status]}`}>{STATUS_LABELS[order.status]}</span></td>
+                    <td><span className="job-kg">{formatKES(Number(order.totalAmount))}</span></td>
+                    <td className="section-sub">{order.createdByUser?.name ?? 'System'}</td>
+                  </tr>
+                )
+              })}
+              {orders.length === 0 && <tr><td colSpan={9} className="sales-empty">No sales orders match the selected filters.</td></tr>}
             </tbody>
           </table>
         </div>

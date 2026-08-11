@@ -32,25 +32,31 @@ export default async function RawmaterialsPage({
         ],
       }
     : undefined
-  const materials = await withRetry(() => db.rawMaterial.findMany({
+  const materialsPromise = withRetry(() => db.rawMaterial.findMany({
     orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
-  }), undefined);
+  }), undefined)
 
-  const matchingMaterials = (query || category)
-    ? await withRetry(() => db.rawMaterial.findMany({
+  const matchingMaterialsPromise = (query || category)
+    ? withRetry(() => db.rawMaterial.findMany({
         where: {
           ...(category ? { category } : {}),
           ...(materialSearch ?? {}),
         },
         orderBy: [{ category: 'asc' }, { materialName: 'asc' }],
       }), undefined)
-    : materials
+    : materialsPromise
   
-  const receipts = await withRetry(() => db.materialReceipt.findMany({
+  const receiptsPromise = withRetry(() => db.materialReceipt.findMany({
     include: { RawMaterial: true },
     orderBy: { createdAt: 'desc' },
     take: 20
-  }), undefined).catch(() => []); // Temporary fallback if schema is out of sync
+  }), undefined).catch(() => []) // Temporary fallback if schema is out of sync
+
+  const [materials, matchingMaterials, receipts] = await Promise.all([
+    materialsPromise,
+    matchingMaterialsPromise,
+    receiptsPromise,
+  ])
 
   const totalKg = materials.reduce((sum, material) => sum + material.availableKg.toNumber(), 0)
   const totalReservedKg = materials.reduce((sum, material) => sum + material.reservedKg.toNumber(), 0)

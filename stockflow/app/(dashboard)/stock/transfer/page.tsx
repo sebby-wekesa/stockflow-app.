@@ -54,9 +54,9 @@ export default async function TransferPage() {
     ? branchRecords.map((branch) => branch.id)
     : user.branches.map((branch) => branch.id)
 
-  const pendingTransferRecords = receivingBranchIds.length === 0
-    ? []
-    : await db.stockTransfer.findMany({
+  const pendingTransferRecordsPromise = receivingBranchIds.length === 0
+    ? Promise.resolve([])
+    : db.stockTransfer.findMany({
         where: {
           status: 'PENDING',
           destinationBranchId: { in: receivingBranchIds },
@@ -74,23 +74,9 @@ export default async function TransferPage() {
         },
         orderBy: { createdAt: 'desc' },
       })
-  const pendingTransfers: PendingTransferItem[] = pendingTransferRecords.map((transfer) => ({
-    id: transfer.id,
-    reference: transfer.reference,
-    productCode: transfer.Product.sku ?? 'Product',
-    productName: transfer.Product.name,
-    quantity: transfer.quantity,
-    quantityUnit: transfer.quantityUnit,
-    sourceBranchName: transfer.SourceBranch.name,
-    destinationBranchName: transfer.DestinationBranch.name,
-    createdAt: transfer.createdAt.toISOString(),
-    notes: transfer.notes,
-  }))
-
-  // Products are catalog rows. Load the source-branch catalogue plus products
-  // that have received stock there, so a destination branch can transfer the
-  // received balance onward later.
-  const productRecords = await db.product.findMany({
+  // Products and pending transfers are independent once branch access has
+  // been resolved, so fetch both without adding another server waterfall.
+  const productRecordsPromise = db.product.findMany({
     where: {
       OR: [
         { branchId: { in: sourceBranchStoredIds } },
@@ -111,6 +97,22 @@ export default async function TransferPage() {
     },
     orderBy: { sku: 'asc' }
   })
+  const [pendingTransferRecords, productRecords] = await Promise.all([
+    pendingTransferRecordsPromise,
+    productRecordsPromise,
+  ])
+  const pendingTransfers: PendingTransferItem[] = pendingTransferRecords.map((transfer) => ({
+    id: transfer.id,
+    reference: transfer.reference,
+    productCode: transfer.Product.sku ?? 'Product',
+    productName: transfer.Product.name,
+    quantity: transfer.quantity,
+    quantityUnit: transfer.quantityUnit,
+    sourceBranchName: transfer.SourceBranch.name,
+    destinationBranchName: transfer.DestinationBranch.name,
+    createdAt: transfer.createdAt.toISOString(),
+    notes: transfer.notes,
+  }))
 
   const productsWithStock = productRecords.flatMap((product) => {
     const stock_levels = sourceBranchIds.flatMap((branchId) => {

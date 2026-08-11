@@ -20,32 +20,31 @@ export default async function AnalyticsPage(props: { searchParams: Promise<{ bra
   //   }
   // } : {};
 
-  // 1. Fetch total stats (kgIn, kgOut, kgScrap) - tenant scoped
-  const logs = await db.stageLog.aggregate({
-    where: { organizationId: user.organizationId },
-    _sum: {
-      kgIn: true,
-      kgOut: true,
-      kgScrap: true,
-    }
-  });
-
-  // 2. Fetch scrap distribution by reason - tenant scoped
-  const scrapData = await db.stageLog.groupBy({
-    by: ['scrapReason'],
-    _sum: { kgScrap: true },
-    where: {
-      organizationId: user.organizationId,
-      kgScrap: { gt: 0 }
-    }
-  });
-
-  // 3. Fetch yield by Stage/Department for performance visualization - tenant scoped
-  const deptData = await db.stageLog.groupBy({
-    by: ['stageName'],
-    _sum: { kgIn: true, kgOut: true },
-    where: { organizationId: user.organizationId }
-  });
+  // These aggregates are independent; run them together so dashboard latency
+  // is bounded by the slowest query instead of the sum of all three.
+  const [logs, scrapData, deptData] = await Promise.all([
+    db.stageLog.aggregate({
+      where: { organizationId: user.organizationId },
+      _sum: {
+        kgIn: true,
+        kgOut: true,
+        kgScrap: true,
+      }
+    }),
+    db.stageLog.groupBy({
+      by: ['scrapReason'],
+      _sum: { kgScrap: true },
+      where: {
+        organizationId: user.organizationId,
+        kgScrap: { gt: 0 }
+      }
+    }),
+    db.stageLog.groupBy({
+      by: ['stageName'],
+      _sum: { kgIn: true, kgOut: true },
+      where: { organizationId: user.organizationId }
+    }),
+  ]);
 
   // 4. Format data for the charts
   const formattedDeptData = deptData.map(d => ({

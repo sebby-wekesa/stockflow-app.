@@ -44,7 +44,7 @@ export default async function FinishedgoodsPage({
       }
     : undefined;
 
-  const mombasaBranch = await db.branch.findFirst({
+  const mombasaBranchPromise = db.branch.findFirst({
     where: {
       OR: [
         { code: 'MSA' },
@@ -54,34 +54,7 @@ export default async function FinishedgoodsPage({
     },
     select: { id: true, code: true },
   });
-
-  const mombasaSpringWhere = mombasaBranch
-    ? {
-        category: 'springs' as const,
-        OR: [
-          { branchId: { in: [mombasaBranch.id, mombasaBranch.code, 'mombasa'] } },
-          { branchStocks: { some: { branchId: mombasaBranch.id } } },
-        ],
-      }
-    : { category: 'springs' as const, id: '__no_mombasa_branch__' };
-
-  const springTypes = await db.product.findMany({
-    where: mombasaSpringWhere,
-    select: { id: true, name: true, sku: true },
-    orderBy: { name: 'asc' },
-  });
-  const manualLogs = mombasaBranch
-    ? await db.finishedGoodsProductionLog.findMany({
-        where: {
-          branchId: mombasaBranch.id,
-          ...(productionDateFilter ? { productionDate: productionDateFilter } : {}),
-        },
-        include: { Product: { select: { name: true } } },
-        orderBy: [{ productionDate: 'desc' }, { createdAt: 'desc' }],
-      })
-    : [];
-
-  const orders = await db.productionOrder.findMany({
+  const ordersPromise = db.productionOrder.findMany({
     where: {
       status: 'COMPLETED',
     },
@@ -109,6 +82,35 @@ export default async function FinishedgoodsPage({
     },
     orderBy: { completedAt: 'desc' },
   });
+  const [mombasaBranch, orders] = await Promise.all([mombasaBranchPromise, ordersPromise]);
+
+  const mombasaSpringWhere = mombasaBranch
+    ? {
+        category: 'springs' as const,
+        OR: [
+          { branchId: { in: [mombasaBranch.id, mombasaBranch.code, 'mombasa'] } },
+          { branchStocks: { some: { branchId: mombasaBranch.id } } },
+        ],
+      }
+    : { category: 'springs' as const, id: '__no_mombasa_branch__' };
+
+  const [springTypes, manualLogs] = await Promise.all([
+    db.product.findMany({
+      where: mombasaSpringWhere,
+      select: { id: true, name: true, sku: true },
+      orderBy: { name: 'asc' },
+    }),
+    mombasaBranch
+      ? db.finishedGoodsProductionLog.findMany({
+          where: {
+            branchId: mombasaBranch.id,
+            ...(productionDateFilter ? { productionDate: productionDateFilter } : {}),
+          },
+          include: { Product: { select: { name: true } } },
+          orderBy: [{ productionDate: 'desc' }, { createdAt: 'desc' }],
+        })
+      : Promise.resolve([]),
+  ]);
 
   const completedRows = orders.map((order) => {
     const lastStage = order.StageLog[0];

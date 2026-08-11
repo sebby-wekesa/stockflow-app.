@@ -8,33 +8,30 @@ import { requireActiveAuth } from "@/lib/auth";
 async function getYieldData(organizationId: string) {
   const db = getTenantPrisma(organizationId);
   try {
-    // 1. Fetch Department Aggregates
-    const stats = await db.stageLog.groupBy({
-      by: ['stageName'],
-      _sum: { kgIn: true, kgOut: true, kgScrap: true }
-    });
-
-    // 2. Fetch Scrap Distribution by Reason
-    const scrapLogs = await db.stageLog.groupBy({
-      by: ['scrapReason'],
-      _sum: { kgScrap: true },
-      where: { kgScrap: { gt: 0 } }
-    });
-
-    // 3. Fetch WIP (Work in Progress)
-    const wipOrders = await db.productionOrder.findMany({
-      where: { status: 'IN_PRODUCTION' },
-      select: {
-        currentDept: true,
-        targetKg: true,
-        id: true,
-        StageLog: {
-          select: { kgOut: true },
-          orderBy: { completedAt: 'desc' },
-          take: 1
+    const [stats, scrapLogs, wipOrders] = await Promise.all([
+      db.stageLog.groupBy({
+        by: ['stageName'],
+        _sum: { kgIn: true, kgOut: true, kgScrap: true }
+      }),
+      db.stageLog.groupBy({
+        by: ['scrapReason'],
+        _sum: { kgScrap: true },
+        where: { kgScrap: { gt: 0 } }
+      }),
+      db.productionOrder.findMany({
+        where: { status: 'IN_PRODUCTION' },
+        select: {
+          currentDept: true,
+          targetKg: true,
+          id: true,
+          StageLog: {
+            select: { kgOut: true },
+            orderBy: { completedAt: 'desc' },
+            take: 1
+          }
         }
-      }
-    });
+      }),
+    ]);
 
     const wipMap: Record<string, { kgRemaining: number; orderCount: number }> = {};
     for (const order of wipOrders) {
