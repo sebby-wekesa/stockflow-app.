@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 50
 const STATUSES: SaleStatus[] = ['PENDING', 'CONFIRMED', 'READY_FOR_DISPATCH', 'SHIPPED', 'CANCELLED']
 
+function formatFinishedGoodsReference(reference: string) {
+  return reference.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export default async function SalesPage({
   searchParams,
 }: {
@@ -52,7 +56,7 @@ export default async function SalesPage({
             FinishedGoods: {
               select: {
                 sku: true,
-                design: { select: { name: true } },
+                design: { select: { name: true, code: true } },
               },
             },
           },
@@ -74,12 +78,20 @@ export default async function SalesPage({
   ))
   const catalogueProducts = finishedGoodsSkus.length > 0
     ? await db.product.findMany({
-        where: { sku: { in: finishedGoodsSkus } },
-        select: { sku: true, name: true },
+        where: {
+          OR: [
+            { sku: { in: finishedGoodsSkus } },
+            { id: { in: finishedGoodsSkus } },
+          ],
+        },
+        select: { id: true, sku: true, name: true },
       })
     : []
-  const productNamesBySku = new Map(
-    catalogueProducts.flatMap((product) => product.sku ? [[product.sku, product.name] as const] : []),
+  const productNamesByReference = new Map(
+    catalogueProducts.flatMap((product) => [
+      [product.id, product.name] as const,
+      ...(product.sku ? [[product.sku, product.name] as const] : []),
+    ]),
   )
 
   const countByStatus = new Map(statusCounts.map((item) => [item.status, item._count._all]))
@@ -202,9 +214,10 @@ export default async function SalesPage({
             <tbody>
               {orders.map((order) => {
                 const itemNames = Array.from(new Set(order.SaleItem.map((item) => (
-                  productNamesBySku.get(item.FinishedGoods.sku)
-                  ?? item.FinishedGoods.design.name
-                  ?? item.FinishedGoods.sku
+                  productNamesByReference.get(item.FinishedGoods.sku)
+                  ?? (item.FinishedGoods.design.code !== 'IMPORTED'
+                    ? item.FinishedGoods.design.name
+                    : formatFinishedGoodsReference(item.FinishedGoods.sku))
                 ))))
 
                 return (
