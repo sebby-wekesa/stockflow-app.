@@ -199,11 +199,11 @@ export default async function SalesPage({
             <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Branch</th><th>Item</th><th>Items</th><th>Status</th><th>Amount</th><th>Created by</th></tr></thead>
             <tbody>
               {orders.map((order) => {
-                const itemNames = order.SaleItem.map((item) => (
+                const itemNames = Array.from(new Set(order.SaleItem.map((item) => (
                   productNamesBySku.get(item.FinishedGoods.sku)
                   ?? item.FinishedGoods.design.name
                   ?? item.FinishedGoods.sku
-                ))
+                ))))
 
                 return (
                   <tr key={order.id}>

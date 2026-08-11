@@ -442,6 +442,7 @@ model ProductBranchStock {
 model FinishedGoodsProductionLog {
   id              String       @id @default(uuid())
   jobCardNo       String
+  submissionId    String?
   productionDate  DateTime
   springProductId String
   branchId        String
@@ -458,6 +459,7 @@ model FinishedGoodsProductionLog {
   @@index([branchId, productionDate])
   @@index([springProductId])
   @@index([organizationId, branchId, productionDate])
+  @@unique([organizationId, submissionId], map: "FinishedGoodsProductionLog_org_submissionId_key")
 }
 
 model ProductReceipt {

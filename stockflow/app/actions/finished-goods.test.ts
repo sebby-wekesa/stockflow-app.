@@ -38,6 +38,7 @@ it('increments the selected spring product and its Mombasa stock in the same pro
   const stockMovementCreate = jest.fn().mockResolvedValue({ id: 'movement-1' })
   const tx = {
     finishedGoodsProductionLog: {
+      findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: 'production-log-1' }),
     },
     product: { update: productUpdate },
@@ -102,4 +103,47 @@ it('increments the selected spring product and its Mombasa stock in the same pro
       reference: 'JC-1001',
     }),
   })
+})
+
+it('ignores a repeated submission for an existing job card', async () => {
+  const branchFindFirst = jest.fn().mockResolvedValue({
+    id: 'branch-mombasa',
+    code: 'MSA',
+    name: 'Mombasa',
+  })
+  const productFindFirst = jest.fn().mockResolvedValue({
+    id: 'spring-product-1',
+    name: 'Spring 100 x 200',
+  })
+  const productionLogFindFirst = jest.fn().mockResolvedValue({ id: 'production-log-1' })
+  const productionLogCreate = jest.fn()
+  const tx = {
+    finishedGoodsProductionLog: {
+      findFirst: productionLogFindFirst,
+      create: productionLogCreate,
+    },
+  }
+
+  mockedRequireActiveAuth.mockResolvedValue({
+    id: 'user-1',
+    organizationId: 'org-1',
+    role: 'MANAGER',
+  } as never)
+  mockedGetTenantPrisma.mockReturnValue({
+    branch: { findFirst: branchFindFirst },
+    product: { findFirst: productFindFirst },
+  } as never)
+  mockedWithTenantTransaction.mockImplementation(async (_organizationId, callback) => callback(tx as never))
+
+  const formData = new FormData()
+  formData.set('jobCardNo', 'JC-1001')
+  formData.set('productionDate', '2026-08-11')
+  formData.set('springProductId', 'spring-product-1')
+  formData.set('pcsProduced', '10')
+  formData.set('weightPerPiece', '2.45')
+  formData.set('totalWeight', '24.5')
+
+  await recordFinishedGoodsProduction(formData)
+
+  expect(productionLogCreate).not.toHaveBeenCalled()
 })

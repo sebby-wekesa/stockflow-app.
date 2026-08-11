@@ -1,8 +1,8 @@
 import Link from "next/link"
 import { getTenantPrisma } from "@/lib/tenant-prisma"
 import { requireActiveAuth } from "@/lib/auth"
-import { recordFinishedGoodsProduction } from "@/app/actions/finished-goods"
-import SpringTypePicker from "@/components/finished-goods/SpringTypePicker"
+import FinishedGoodsProductionForm from "@/components/finished-goods/FinishedGoodsProductionForm"
+import DeleteFinishedGoodsProductionButton from "@/components/finished-goods/DeleteFinishedGoodsProductionButton"
 
 export const dynamic = 'force-dynamic';
 
@@ -226,35 +226,7 @@ export default async function FinishedgoodsPage({
         </div>
 
         <div className="table-wrap mb-24">
-          <form action={recordFinishedGoodsProduction}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Job Card No</th>
-                  <th>Date</th>
-                  <th>Spring Type</th>
-                  <th>Pcs Produced</th>
-                  <th>Weight per Pcs</th>
-                  <th>Total Weight</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><input className="form-input" name="jobCardNo" placeholder="Job card No" required /></td>
-                  <td><input className="form-input" name="productionDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></td>
-                  <td style={{ minWidth: '240px' }}>
-                    <SpringTypePicker options={springTypes} name="springProductId" id="finished-goods-spring-picker" />
-                    <input className="form-input" name="newSpringType" placeholder="Or add new spring type" style={{ marginTop: '6px' }} />
-                  </td>
-                  <td><input className="form-input" name="pcsProduced" type="number" min="1" step="1" placeholder="0" required /></td>
-                  <td><input className="form-input" name="weightPerPiece" type="number" min="0.0001" step="0.0001" placeholder="0.0000" required /></td>
-                  <td><input className="form-input" name="totalWeight" type="number" min="0.0001" step="0.0001" placeholder="0.0000" required /></td>
-                  <td><button type="submit" className="btn btn-primary btn-sm">Save</button></td>
-                </tr>
-              </tbody>
-            </table>
-          </form>
+          <FinishedGoodsProductionForm springTypes={springTypes} disabled={!mombasaBranch} />
         </div>
 
         {!mombasaBranch && <div className="section-sub" style={{ marginTop: '-12px', marginBottom: '24px', color: 'var(--danger)' }}>Mombasa Branch is not configured, so production cannot be recorded.</div>}
@@ -267,7 +239,7 @@ export default async function FinishedgoodsPage({
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Job Card No</th><th>Date</th><th>Spring Type</th><th>Source</th><th>Pcs Produced</th><th>Weight per Pcs</th><th>Total Weight</th></tr></thead>
+            <thead><tr><th>Job Card No</th><th>Date</th><th>Spring Type</th><th>Source</th><th>Pcs Produced</th><th>Weight per Pcs</th><th>Total Weight</th><th>Action</th></tr></thead>
             <tbody>
               {productionRows.map((row) => (
                 <tr key={`${row.source}-${row.id}`}>
@@ -284,10 +256,17 @@ export default async function FinishedgoodsPage({
                   <td style={{ fontFamily: 'var(--font-mono)' }}>{row.pcsProduced.toLocaleString()}</td>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>{row.weightPerPiece != null ? `${row.weightPerPiece.toFixed(4)} kg` : '—'}</td>
                   <td><span className="job-kg">{row.totalWeight.toFixed(2)} kg</span></td>
+                  <td>
+                    {row.source === 'Manual entry' ? (
+                      <DeleteFinishedGoodsProductionButton logId={row.id} jobCardNo={row.jobCard} />
+                    ) : (
+                      <span className="section-sub">Managed by job</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {productionRows.length === 0 && (
-                <tr><td colSpan={7} style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)' }}>No production records match this filter.</td></tr>
+                <tr><td colSpan={8} style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)' }}>No production records match this filter.</td></tr>
               )}
             </tbody>
           </table>

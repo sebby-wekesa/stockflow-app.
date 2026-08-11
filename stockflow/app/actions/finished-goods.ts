@@ -3,11 +3,13 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { requireActiveAuth } from "@/lib/auth";
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 
 const finishedGoodsProductionSchema = z.object({
   jobCardNo: z.string().trim().min(1, "Job card number is required"),
+  submissionId: z.string().uuid().optional(),
   productionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date"),
   springProductId: z.string().trim().optional(),
   newSpringType: z.string().trim().max(200, "Spring type is too long").optional(),
@@ -44,8 +46,10 @@ export async function recordFinishedGoodsProduction(formData: FormData) {
 
   const springProductId = String(formData.get("springProductId") ?? "").trim();
   const newSpringType = String(formData.get("newSpringType") ?? "").trim();
+  const submissionId = String(formData.get("submissionId") ?? "").trim();
   const parsed = finishedGoodsProductionSchema.safeParse({
     jobCardNo: formData.get("jobCardNo"),
+    submissionId: submissionId || undefined,
     productionDate: formData.get("productionDate"),
     springProductId: springProductId || undefined,
     newSpringType: newSpringType || undefined,
@@ -94,98 +98,210 @@ export async function recordFinishedGoodsProduction(formData: FormData) {
     throw new Error("That spring type does not exist in Mombasa Springs");
   }
 
-  await withTenantTransaction(user.organizationId, async (tx) => {
-    let productId = product?.id;
-    let productName = product?.name;
-
-    if (!productId || !productName) {
-      const created = await tx.product.create({
-        data: {
-          name: newSpringType,
-          sku: `SPR-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6).toUpperCase()}`,
-          category: "springs",
-          origin: "FACTORY_MADE",
-          uom: "KG",
-          branchId: mombasaBranch.id,
-          currentStock: 0,
-          piecesSets: 0,
-        },
-        select: { id: true, name: true },
+  let transactionResult: { duplicate: boolean } | undefined;
+  try {
+    transactionResult = await withTenantTransaction(user.organizationId, async (tx) => {
+      const existingLog = await tx.finishedGoodsProductionLog.findFirst({
+        where: data.submissionId
+          ? { submissionId: data.submissionId }
+          : { jobCardNo: data.jobCardNo },
+        select: { id: true },
       });
-      productId = created.id;
-      productName = created.name;
-    }
-    if (!productId || !productName) throw new Error("Spring type could not be resolved");
+      if (existingLog) return { duplicate: true };
 
-    const log = await tx.finishedGoodsProductionLog.create({
-      data: {
-        jobCardNo: data.jobCardNo,
-        productionDate,
-        springProductId: productId,
-        branchId: mombasaBranch.id,
-        pcsProduced: data.pcsProduced,
-        weightPerPiece: data.weightPerPiece,
-        totalWeight: data.totalWeight,
-      },
-    });
+      let productId = product?.id;
+      let productName = product?.name;
 
-    await tx.product.update({
-      where: { id: productId },
-      data: {
-        currentStock: { increment: data.totalWeight },
-        piecesSets: { increment: data.pcsProduced },
-      },
-    });
+      if (!productId || !productName) {
+        const created = await tx.product.create({
+          data: {
+            name: newSpringType,
+            sku: `SPR-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6).toUpperCase()}`,
+            category: "springs",
+            origin: "FACTORY_MADE",
+            uom: "KG",
+            branchId: mombasaBranch.id,
+            currentStock: 0,
+            piecesSets: 0,
+          },
+          select: { id: true, name: true },
+        });
+        productId = created.id;
+        productName = created.name;
+      }
+      if (!productId || !productName) throw new Error("Spring type could not be resolved");
 
-    await tx.productBranchStock.upsert({
-      where: {
-        branchId_productId: {
+      const log = await tx.finishedGoodsProductionLog.create({
+        data: {
+          jobCardNo: data.jobCardNo,
+          submissionId: data.submissionId ?? null,
+          productionDate,
+          springProductId: productId,
           branchId: mombasaBranch.id,
-          productId,
+          pcsProduced: data.pcsProduced,
+          weightPerPiece: data.weightPerPiece,
+          totalWeight: data.totalWeight,
         },
-      },
-      update: {
-        availableQty: { increment: data.totalWeight },
-        availablePiecesSets: { increment: data.pcsProduced },
-      },
-      create: {
-        productId,
-        branchId: mombasaBranch.id,
-        availableQty: data.totalWeight,
-        availablePiecesSets: data.pcsProduced,
+      });
+
+      await tx.product.update({
+        where: { id: productId },
+        data: {
+          currentStock: { increment: data.totalWeight },
+          piecesSets: { increment: data.pcsProduced },
+        },
+      });
+
+      await tx.productBranchStock.upsert({
+        where: {
+          branchId_productId: {
+            branchId: mombasaBranch.id,
+            productId,
+          },
+        },
+        update: {
+          availableQty: { increment: data.totalWeight },
+          availablePiecesSets: { increment: data.pcsProduced },
+        },
+        create: {
+          productId,
+          branchId: mombasaBranch.id,
+          availableQty: data.totalWeight,
+          availablePiecesSets: data.pcsProduced,
+        },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          productId,
+          branchId: mombasaBranch.id,
+          movementType: "production",
+          quantity: data.totalWeight,
+          piecesSets: data.pcsProduced,
+          reference: data.jobCardNo,
+          notes: "Finished-goods production recorded",
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "FINISHED_GOODS_PRODUCTION_RECORDED",
+          entityType: "FinishedGoodsProductionLog",
+          entityId: log.id,
+          details: JSON.stringify({
+            jobCardNo: data.jobCardNo,
+            springType: productName,
+            pcsProduced: data.pcsProduced,
+            weightPerPiece: data.weightPerPiece,
+            totalWeight: data.totalWeight,
+            branch: mombasaBranch.name,
+          }),
+        },
+      });
+
+      return { duplicate: false, logId: log.id };
+    }, { maxWait: 10000, timeout: 30000 });
+  } catch (error) {
+    // The unique submission-ID constraint also protects against two identical
+    // submissions that reach the database at the same time.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return;
+    }
+    throw error;
+  }
+
+  if (transactionResult?.duplicate) return;
+
+  revalidatePath("/finishedgoods");
+  revalidatePath("/products");
+  revalidatePath("/stock");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteFinishedGoodsProduction(logId: string) {
+  const user = await requireActiveAuth();
+  if (!["ADMIN", "MANAGER"].includes(user.role)) {
+    throw new Error("Only admins and managers can delete finished-goods production records");
+  }
+
+  const parsedLogId = z.string().trim().min(1).safeParse(logId);
+  if (!parsedLogId.success) throw new Error("Production record not found");
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const log = await tx.finishedGoodsProductionLog.findFirst({
+      where: { id: parsedLogId.data },
+      select: {
+        id: true,
+        jobCardNo: true,
+        springProductId: true,
+        branchId: true,
+        pcsProduced: true,
+        totalWeight: true,
       },
     });
+    if (!log) throw new Error("Finished-goods production record not found");
+
+    const totalWeight = Number(log.totalWeight);
+    const branchStock = await tx.productBranchStock.updateMany({
+      where: {
+        productId: log.springProductId,
+        branchId: log.branchId,
+        availableQty: { gte: totalWeight },
+        availablePiecesSets: { gte: log.pcsProduced },
+      },
+      data: {
+        availableQty: { decrement: totalWeight },
+        availablePiecesSets: { decrement: log.pcsProduced },
+      },
+    });
+    if (branchStock.count === 0) {
+      throw new Error("Cannot delete this record because some of its stock has already been used or transferred");
+    }
+
+    const productStock = await tx.product.updateMany({
+      where: {
+        id: log.springProductId,
+        currentStock: { gte: totalWeight },
+        piecesSets: { gte: log.pcsProduced },
+      },
+      data: {
+        currentStock: { decrement: totalWeight },
+        piecesSets: { decrement: log.pcsProduced },
+      },
+    });
+    if (productStock.count === 0) {
+      throw new Error("Cannot delete this record because the product stock has already been used");
+    }
 
     await tx.stockMovement.create({
       data: {
-        productId,
-        branchId: mombasaBranch.id,
-        movementType: "production",
-        quantity: data.totalWeight,
-        piecesSets: data.pcsProduced,
-        reference: data.jobCardNo,
-        notes: "Finished-goods production recorded",
+        productId: log.springProductId,
+        branchId: log.branchId,
+        movementType: "production_reversal",
+        quantity: -totalWeight,
+        piecesSets: -log.pcsProduced,
+        reference: log.jobCardNo,
+        notes: "Finished-goods production record deleted",
       },
     });
 
     await tx.auditLog.create({
       data: {
         userId: user.id,
-        action: "FINISHED_GOODS_PRODUCTION_RECORDED",
+        action: "FINISHED_GOODS_PRODUCTION_DELETED",
         entityType: "FinishedGoodsProductionLog",
         entityId: log.id,
         details: JSON.stringify({
-          jobCardNo: data.jobCardNo,
-          springType: productName,
-          pcsProduced: data.pcsProduced,
-          weightPerPiece: data.weightPerPiece,
-          totalWeight: data.totalWeight,
-          branch: mombasaBranch.name,
+          jobCardNo: log.jobCardNo,
+          pcsProduced: log.pcsProduced,
+          totalWeight,
+          branchId: log.branchId,
         }),
       },
     });
 
-    return log;
+    await tx.finishedGoodsProductionLog.delete({ where: { id: log.id } });
   }, { maxWait: 10000, timeout: 30000 });
 
   revalidatePath("/finishedgoods");
