@@ -124,19 +124,28 @@ export async function recordProductionOutput(data: {
       kgIn: weightIn,
     });
 
-    await tx.rawMaterial.update({
-      where: { id: selectedLine.rawMaterialId },
+    const stockUpdate = await tx.rawMaterial.updateMany({
+      where: {
+        id: selectedLine.rawMaterialId,
+        availableKg: { gte: weightIn },
+        availablePieces: { gte: piecesUsed },
+      },
       data: {
         availableKg: { decrement: weightIn },
         availablePieces: { decrement: piecesUsed },
       },
     });
+    if (stockUpdate.count === 0) {
+      throw new Error(`Raw material stock changed before consumption could be recorded`);
+    }
 
     await tx.materialConsumptionLog.create({
       data: {
         productionOrderId: order.id,
         rawMaterialId: selectedLine.rawMaterialId,
         quantityConsumed: weightIn,
+        piecesCut: piecesUsed,
+        weightPerPiece: weightIn / piecesUsed,
         notes: data.notes?.trim() || `Consumed ${weightIn}kg and ${piecesUsed} pieces/sets when direct order output was recorded`,
       },
     });

@@ -250,7 +250,7 @@ export async function recordProductionOutput(
     // Decide which raw material to consume. If the production person named a
     // material line, use it; otherwise default to the order's single/first
     // material line that is linked to an actual RawMaterial record.
-    type MatLine = { id: string; rawMaterialId: string | null };
+    type MatLine = { id: string; rawMaterialId: string | null; pieces: number };
     const linkedMaterials = order.materials.filter((m: MatLine) => m.rawMaterialId);
     let targetRawMaterialId: string | null = null;
 
@@ -268,10 +268,20 @@ export async function recordProductionOutput(
       const rm = await tx.rawMaterial.findUnique({ where: { id: targetRawMaterialId } });
       if (!rm) throw new Error("Linked raw material not found");
 
+      const piecesUsed = Number(order.materials.find((m: MatLine) => m.rawMaterialId === targetRawMaterialId)?.pieces ?? 0);
+      if (!Number.isInteger(piecesUsed) || piecesUsed <= 0) {
+        throw new Error("Selected material line has no valid pieces cut value");
+      }
+
       const available = Number(rm.availableKg);
       if (available < kgIn) {
         throw new Error(
           `Insufficient raw material: ${rm.materialName} has ${available}kg, but ${kgIn}kg was recorded as used`
+        );
+      }
+      if (rm.availablePieces < piecesUsed) {
+        throw new Error(
+          `Insufficient raw material: ${rm.materialName} has ${rm.availablePieces} pieces, but ${piecesUsed} pieces were recorded as used`
         );
       }
 
@@ -282,14 +292,24 @@ export async function recordProductionOutput(
         kgIn,
       });
 
-      await tx.rawMaterial.update({
-        where: { id: targetRawMaterialId },
-        data: { availableKg: { decrement: kgIn } },
+      const stockUpdate = await tx.rawMaterial.updateMany({
+        where: {
+          id: targetRawMaterialId,
+          availableKg: { gte: kgIn },
+          availablePieces: { gte: piecesUsed },
+        },
+        data: {
+          availableKg: { decrement: kgIn },
+          availablePieces: { decrement: piecesUsed },
+        },
       });
+      if (stockUpdate.count === 0) throw new Error("Raw material stock changed before consumption could be recorded");
 
       await tx.materialConsumptionLog.create({
         data: {
           quantityConsumed: kgIn,
+          piecesCut: piecesUsed,
+          weightPerPiece: kgIn / piecesUsed,
           notes: `Consumed on production recording (${actual} pcs produced)`,
           ProductionOrder: { connect: { id: orderId } },
           RawMaterial: { connect: { id: targetRawMaterialId } },

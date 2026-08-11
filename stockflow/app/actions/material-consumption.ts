@@ -1,6 +1,7 @@
 "use server";
 
-import { getTenantPrisma } from "@/lib/tenant-prisma";
+import { revalidatePath } from "next/cache";
+import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
 import { requireActiveAuth } from "@/lib/auth";
 import { z } from "zod";
 
@@ -13,6 +14,112 @@ const materialConsumptionSchema = z.object({
     unitOfMeasure: z.string().default("kg")
   }))
 });
+
+const manualConsumptionSchema = z.object({
+  jobCardNo: z.string().trim().min(1, "Job card number is required"),
+  rawMaterialId: z.string().min(1, "Raw material is required"),
+  consumedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date"),
+  piecesCut: z.coerce.number().finite().int().positive("Pieces cut must be a positive whole number"),
+  weightPerPiece: z.coerce.number().finite().positive("Weight per piece must be positive"),
+  totalWeightCut: z.coerce.number().finite().positive("Total weight cut must be positive"),
+});
+
+export async function recordManualMaterialConsumption(formData: FormData) {
+  const user = await requireActiveAuth();
+  if (!['ADMIN', 'MANAGER'].includes(user.role)) {
+    throw new Error('Only admins and managers can record raw material consumption');
+  }
+
+  const parsed = manualConsumptionSchema.safeParse({
+    jobCardNo: formData.get('jobCardNo'),
+    rawMaterialId: formData.get('rawMaterialId'),
+    consumedAt: formData.get('consumedAt'),
+    piecesCut: formData.get('piecesCut'),
+    weightPerPiece: formData.get('weightPerPiece'),
+    totalWeightCut: formData.get('totalWeightCut'),
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const data = parsed.data;
+  const consumedAt = new Date(`${data.consumedAt}T00:00:00.000Z`);
+  if (Number.isNaN(consumedAt.getTime()) || consumedAt.toISOString().slice(0, 10) !== data.consumedAt) {
+    throw new Error('Enter a valid date');
+  }
+
+  const expectedTotal = data.piecesCut * data.weightPerPiece;
+  if (Math.abs(expectedTotal - data.totalWeightCut) > 0.01) {
+    throw new Error('Total weight cut must equal pieces cut multiplied by weight per piece');
+  }
+
+  const db = getTenantPrisma(user.organizationId);
+  const [order, material] = await Promise.all([
+    db.productionOrder.findFirst({
+      where: { orderNumber: data.jobCardNo },
+      select: { id: true, orderNumber: true, status: true },
+    }),
+    db.rawMaterial.findFirst({
+      where: { id: data.rawMaterialId },
+      select: { id: true, materialName: true, availableKg: true, availablePieces: true },
+    }),
+  ]);
+
+  if (!order) throw new Error(`Job card "${data.jobCardNo}" not found`);
+  if (!['APPROVED', 'IN_PRODUCTION', 'COMPLETED'].includes(order.status)) {
+    throw new Error('Raw material can only be recorded for an approved or active job card');
+  }
+  if (!material) throw new Error('Raw material not found');
+
+  await withTenantTransaction(user.organizationId, async (tx) => {
+    const stockUpdate = await tx.rawMaterial.updateMany({
+      where: {
+        id: material.id,
+        availableKg: { gte: data.totalWeightCut },
+        availablePieces: { gte: data.piecesCut },
+      },
+      data: {
+        availableKg: { decrement: data.totalWeightCut },
+        availablePieces: { decrement: data.piecesCut },
+      },
+    });
+
+    if (stockUpdate.count === 0) {
+      throw new Error(
+        `Insufficient stock for ${material.materialName}. Required: ${data.totalWeightCut} kg and ${data.piecesCut} pieces`,
+      );
+    }
+
+    await tx.materialConsumptionLog.create({
+      data: {
+        productionOrderId: order.id,
+        rawMaterialId: material.id,
+        quantityConsumed: data.totalWeightCut,
+        piecesCut: data.piecesCut,
+        weightPerPiece: data.weightPerPiece,
+        consumedAt,
+        notes: `Manually recorded by ${user.email}`,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'RAW_MATERIAL_CONSUMPTION_RECORDED',
+        entityType: 'MaterialConsumptionLog',
+        entityId: order.id,
+        details: JSON.stringify({
+          orderNumber: order.orderNumber,
+          rawMaterialId: material.id,
+          piecesCut: data.piecesCut,
+          weightPerPiece: data.weightPerPiece,
+          totalWeightCut: data.totalWeightCut,
+        }),
+      },
+    });
+  }, { maxWait: 10000, timeout: 30000 });
+
+  revalidatePath('/raw-material-consumption');
+  revalidatePath('/rawmaterials');
+}
 
 export async function consumeMaterialsForOrder(productionOrderId: string) {
   const user = await requireActiveAuth();

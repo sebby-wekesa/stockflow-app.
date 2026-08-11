@@ -260,6 +260,8 @@ model MaterialConsumptionLog {
   productionOrderId String
   rawMaterialId     String
   quantityConsumed  Decimal         @db.Decimal(10, 4)
+  piecesCut         Int?
+  weightPerPiece    Decimal?        @db.Decimal(10, 4)
   consumedAt        DateTime        @default(now())
   stageId           String?
   notes             String?
