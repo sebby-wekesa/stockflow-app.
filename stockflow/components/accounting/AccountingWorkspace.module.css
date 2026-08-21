@@ -930,6 +930,100 @@
   line-height: 1.45;
 }
 
+.payrollToolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--accounting-line);
+  border-radius: var(--radius);
+  background: var(--accounting-soft);
+  padding: 12px;
+}
+
+.payrollToolbar .field {
+  min-width: 150px;
+}
+
+.payrollToolbar .field span {
+  color: var(--accounting-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.payrollSummary {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  gap: 18px;
+  color: var(--accounting-muted);
+  font-size: 12px;
+}
+
+.payrollSummary strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--accounting-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.payrollActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.payrollTable {
+  min-width: 2100px;
+}
+
+.payrollTable th {
+  white-space: nowrap;
+}
+
+.payrollTable td {
+  vertical-align: top;
+}
+
+.payrollTable .input,
+.payrollTable .select {
+  min-width: 96px;
+  min-height: 34px;
+  padding: 6px 7px;
+  font-size: 12px;
+}
+
+.payrollTable td:first-child .select {
+  min-width: 170px;
+}
+
+.payrollNotice,
+.payrollNote {
+  border: 1px solid var(--accounting-line);
+  border-radius: var(--radius);
+  background: var(--accounting-soft);
+  color: var(--accounting-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.payrollNote {
+  margin-top: 12px;
+}
+
+.payrollHistory {
+  margin-top: 22px;
+}
+
+.payrollHistory > .panelTitle {
+  margin-bottom: 10px;
+}
+
 .formGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1335,5 +1429,16 @@
 
   .groupBalance {
     text-align: left;
+  }
+
+  .payrollToolbar,
+  .payrollSummary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .payrollSummary {
+    justify-content: flex-start;
+    gap: 8px;
   }
 }

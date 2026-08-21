@@ -17,6 +17,7 @@ import {
   summarizeCurrencyBalances,
 } from "@/lib/accounting/workspace";
 import { getTenantPrisma, withTenantTransaction } from "@/lib/tenant-prisma";
+import type { PayrollWorkspaceData } from "@/actions/accounting-payroll";
 
 const ACCOUNTING_ROLES = ["ADMIN", "MANAGER", "ACCOUNTS"] as const;
 const CASH_HAND_TERMS = [
@@ -172,6 +173,7 @@ export type AccountingWorkspaceData = {
     rows: EmployeeLedgerRow[];
     total: number;
   };
+  payroll: PayrollWorkspaceData;
   options: {
     branches: BranchOption[];
     accounts: AccountOption[];
@@ -837,6 +839,14 @@ export async function getAccountingWorkspaceData(): Promise<AccountingWorkspaceD
     employees,
     systemAccounts,
   );
+  const payrollRuns = await db.payrollRun.findMany({
+    orderBy: [{ period: "desc" }, { createdAt: "desc" }],
+    take: 12,
+    include: {
+      journalEntry: { select: { entryNumber: true } },
+      _count: { select: { entries: true } },
+    },
+  });
 
   let trialDebit = 0;
   let trialCredit = 0;
@@ -942,6 +952,24 @@ export async function getAccountingWorkspaceData(): Promise<AccountingWorkspaceD
     debtors: ageing.debtors,
     creditors: ageing.creditors,
     employees: employeeLedger,
+    payroll: {
+      employees: employees.map((employee) => ({
+        id: employee.id,
+        name: employee.name || employee.email,
+        email: employee.email,
+      })),
+      runs: payrollRuns.map((run) => ({
+        id: run.id,
+        period: run.period,
+        payDate: run.payDate.toISOString().slice(0, 10),
+        status: run.status,
+        entryNumber: run.journalEntry?.entryNumber ?? null,
+        employeeCount: run._count.entries,
+        totalGrossPay: Number(run.totalGrossPay),
+        totalDeductions: Number(run.totalDeductions),
+        totalNetPay: Number(run.totalNetPay),
+      })),
+    },
     options: {
       branches,
       accounts,

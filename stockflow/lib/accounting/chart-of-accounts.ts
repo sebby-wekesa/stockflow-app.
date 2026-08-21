@@ -31,6 +31,12 @@ export const SYSTEM_ACCOUNT_KEYS = {
   VAT_INPUT: "vat_input",
   CASH: "cash_on_hand",
   RETAINED_EARNINGS: "retained_earnings",
+  SALARIES_WAGES: "salaries_wages",
+  PAYE_PAYABLE: "paye_payable",
+  NSSF_PAYABLE: "nssf_payable",
+  SHIF_PAYABLE: "shif_payable",
+  HOUSING_LEVY_PAYABLE: "housing_levy_payable",
+  NITA_PAYABLE: "nita_payable",
 } as const;
 
 const K = SYSTEM_ACCOUNT_KEYS;
@@ -52,9 +58,12 @@ export const KENYA_SME_CHART: SeedAccount[] = [
   // ── 2000 LIABILITIES (credit-normal) ────────────────────────────────────
   { code: "2000", name: "Accounts Payable (Creditors)", type: "LIABILITY", normalBalance: "CREDIT", key: K.ACCOUNTS_PAYABLE },
   { code: "2100", name: "VAT Output (Payable)", type: "LIABILITY", normalBalance: "CREDIT", key: K.VAT_OUTPUT },
-  { code: "2110", name: "PAYE Payable", type: "LIABILITY", normalBalance: "CREDIT" },
+  { code: "2110", name: "PAYE Payable", type: "LIABILITY", normalBalance: "CREDIT", key: K.PAYE_PAYABLE },
   { code: "2120", name: "NHIF Payable", type: "LIABILITY", normalBalance: "CREDIT" },
-  { code: "2130", name: "NSSF Payable", type: "LIABILITY", normalBalance: "CREDIT" },
+  { code: "2130", name: "NSSF Payable", type: "LIABILITY", normalBalance: "CREDIT", key: K.NSSF_PAYABLE },
+  { code: "2140", name: "SHIF Payable", type: "LIABILITY", normalBalance: "CREDIT", key: K.SHIF_PAYABLE },
+  { code: "2150", name: "Affordable Housing Levy Payable", type: "LIABILITY", normalBalance: "CREDIT", key: K.HOUSING_LEVY_PAYABLE },
+  { code: "2160", name: "NITA Payable", type: "LIABILITY", normalBalance: "CREDIT", key: K.NITA_PAYABLE },
   { code: "2200", name: "Accrued Expenses", type: "LIABILITY", normalBalance: "CREDIT" },
   { code: "2210", name: "Employee Payables", type: "LIABILITY", normalBalance: "CREDIT", key: K.EMPLOYEE_PAYABLES },
   { code: "2300", name: "Loans Payable", type: "LIABILITY", normalBalance: "CREDIT" },
@@ -71,7 +80,7 @@ export const KENYA_SME_CHART: SeedAccount[] = [
 
   // ── 5000 EXPENSES (debit-normal) ────────────────────────────────────────
   { code: "5000", name: "Cost of Sales", type: "EXPENSE", normalBalance: "DEBIT", key: K.COST_OF_SALES },
-  { code: "5100", name: "Salaries & Wages", type: "EXPENSE", normalBalance: "DEBIT" },
+  { code: "5100", name: "Salaries & Wages", type: "EXPENSE", normalBalance: "DEBIT", key: K.SALARIES_WAGES },
   { code: "5200", name: "Rent", type: "EXPENSE", normalBalance: "DEBIT" },
   { code: "5210", name: "Electricity & Water", type: "EXPENSE", normalBalance: "DEBIT" },
   { code: "5220", name: "Fuel & Transport", type: "EXPENSE", normalBalance: "DEBIT" },

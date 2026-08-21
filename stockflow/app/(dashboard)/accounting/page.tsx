@@ -19,7 +19,7 @@ export default async function AccountingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireRole("ADMIN", "MANAGER", "ACCOUNTS");
-  const data = await getAccountingWorkspaceData();
+  const accountingData = await getAccountingWorkspaceData();
   const params = await searchParams;
 
   const initialView = resolveAccountingView(params.view);
@@ -27,7 +27,7 @@ export default async function AccountingPage({
   return (
     <AccountingWorkspace
       key={initialView}
-      data={data}
+      data={accountingData}
       initialView={initialView}
     />
   );

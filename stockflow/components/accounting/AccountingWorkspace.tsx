@@ -27,6 +27,7 @@ import {
   useTransition,
 } from "react";
 import { seedChartOfAccounts } from "@/actions/accounting";
+import { PayrollPanel } from "@/components/accounting/PayrollPanel";
 import {
   createCashBookAccount,
   deactivateCashBookAccount,
@@ -50,7 +51,7 @@ import {
 import styles from "./AccountingWorkspace.module.css";
 
 type PrimaryView = "overview" | "workspace" | "recent" | "ledgers" | "reports";
-type PostTab = "cash-book" | "revenue" | "purchases";
+type PostTab = "cash-book" | "revenue" | "purchases" | "payroll";
 type RecentTab =
   | "All"
   | "Administrative Expenses"
@@ -80,6 +81,7 @@ const POST_TABS: { key: PostTab; label: string }[] = [
   { key: "cash-book", label: "Cash Book" },
   { key: "revenue", label: "Revenue" },
   { key: "purchases", label: "Purchases" },
+  { key: "payroll", label: "Payroll" },
 ];
 
 const RECENT_TABS: RecentTab[] = [
@@ -406,6 +408,10 @@ export function AccountingWorkspace({
 
       {primaryView === "workspace" && postTab === "purchases" && (
         <PurchasesPanel data={data} />
+      )}
+
+      {primaryView === "workspace" && postTab === "payroll" && (
+        <PayrollPanel payroll={data.payroll} pending={pending} runAction={runAction} />
       )}
 
       {primaryView === "recent" && (

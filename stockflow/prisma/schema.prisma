@@ -350,6 +350,8 @@ model Organization {
   finishedGoodsProductionLogs FinishedGoodsProductionLog[]
   notificationSettings        NotificationSettings[]
   operationLogs               OperationLog[]
+  payrollRuns                 PayrollRun[]
+  payrollEntries              PayrollEntry[]
   payments                    Payment[]
   products                    Product[]
   productBranchStocks         ProductBranchStock[]
@@ -820,11 +822,70 @@ model User {
   SentInvitations        Invitation[]          @relation("Inviter")
   NotificationSettings   NotificationSettings?
   OperationLog           OperationLog[]
+  payrollEntries         PayrollEntry[]
   SaleOrderCreated       SaleOrder[]
   StageLog               StageLog[]
   StockTransfersReceived StockTransfer[]       @relation("StockTransferReceivedBy")
   Branch                 Branch?               @relation(fields: [branchId], references: [id])
   Organization           Organization?         @relation(fields: [organizationId], references: [id])
+}
+
+model PayrollRun {
+  id                 String           @id @default(uuid())
+  organizationId     String
+  period             String
+  payDate            DateTime
+  status             PayrollRunStatus @default(POSTED)
+  journalEntryId     String?          @unique
+  totalGrossPay      Decimal          @default(0) @db.Decimal(14, 2)
+  totalDeductions    Decimal          @default(0) @db.Decimal(14, 2)
+  totalNetPay        Decimal          @default(0) @db.Decimal(14, 2)
+  createdBy          String?
+  postedAt           DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  Organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  journalEntry       JournalEntry?    @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+  entries            PayrollEntry[]
+
+  @@unique([organizationId, period])
+  @@index([organizationId])
+  @@index([organizationId, period])
+}
+
+model PayrollEntry {
+  id               String       @id @default(uuid())
+  organizationId   String
+  payrollRunId     String
+  employeeId       String
+  basicSalary      Decimal      @db.Decimal(14, 2)
+  absenteeism      Decimal      @db.Decimal(14, 2)
+  leaveArrears     Decimal      @db.Decimal(14, 2)
+  benefits         Decimal      @db.Decimal(14, 2)
+  overtime         Decimal      @db.Decimal(14, 2)
+  houseAllowance   Decimal      @db.Decimal(14, 2)
+  grossPay         Decimal      @db.Decimal(14, 2)
+  nssf             Decimal      @db.Decimal(14, 2)
+  taxablePay       Decimal      @db.Decimal(14, 2)
+  grossPaye        Decimal      @db.Decimal(14, 2)
+  personalRelief   Decimal      @db.Decimal(14, 2)
+  insuranceRelief  Decimal      @db.Decimal(14, 2)
+  shif             Decimal      @db.Decimal(14, 2)
+  housingLevy      Decimal      @db.Decimal(14, 2)
+  nita             Decimal      @db.Decimal(14, 2)
+  advanceLoan      Decimal      @db.Decimal(14, 2)
+  netPaye          Decimal      @db.Decimal(14, 2)
+  totalDeductions  Decimal      @db.Decimal(14, 2)
+  netPay           Decimal      @db.Decimal(14, 2)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  Organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payrollRun       PayrollRun   @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee         User         @relation(fields: [employeeId], references: [id])
+
+  @@unique([payrollRunId, employeeId])
+  @@index([organizationId])
+  @@index([organizationId, employeeId])
 }
 
 model Invitation {
@@ -946,6 +1007,7 @@ model JournalEntry {
   Organization   Organization  @relation(fields: [organizationId], references: [id])
   lines          LedgerLine[]
   payments       Payment[]
+  payrollRun     PayrollRun?
 
   @@unique([organizationId, entryNumber])
   @@unique([organizationId, source, sourceType, sourceId], map: "JournalEntry_org_source_sourcetype_sourceid_key")
@@ -1139,6 +1201,12 @@ enum Role {
   WAREHOUSE
   SALES
   PACKAGING
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  POSTED
+  VOID
 }
 
 enum OrgStatus {
