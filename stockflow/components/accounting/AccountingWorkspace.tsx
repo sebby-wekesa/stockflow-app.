@@ -199,13 +199,15 @@ function formatKsh(value: number) {
 export function AccountingWorkspace({
   data,
   initialView = "workspace",
+  initialPostTab = "cash-book",
 }: {
   data: AccountingWorkspaceData;
   initialView?: PrimaryView;
+  initialPostTab?: PostTab;
 }) {
   const router = useRouter();
   const [primaryView, setPrimaryView] = useState<PrimaryView>(initialView);
-  const [postTab, setPostTab] = useState<PostTab>("cash-book");
+  const [postTab, setPostTab] = useState<PostTab>(initialPostTab);
   const [recentTab, setRecentTab] = useState<RecentTab>("All");
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
