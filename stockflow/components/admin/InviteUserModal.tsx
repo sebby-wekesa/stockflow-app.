@@ -53,7 +53,7 @@ export default function InviteUserModal() {
           setRole("OPERATOR");
           setIsOpen(true);
         }}
-        className="btn-primary"
+        className="btn btn-primary"
         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
       >
         <UserPlus size={16} />

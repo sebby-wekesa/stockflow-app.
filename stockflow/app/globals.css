@@ -24,6 +24,7 @@
   --font-mono: 'DM Mono', 'Courier New', monospace;
   --radius: 10px;
   --radius-sm: 6px;
+  --button-radius: 9999px;
 }
 
 html.light {
@@ -176,7 +177,12 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .section-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; }
 .section-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.btn { padding: 7px 14px; border-radius: var(--radius-sm); border: none; font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"] { border-radius: var(--button-radius) !important; }
+.btn { padding: 7px 14px; border-radius: var(--button-radius); border: none; font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
 .btn-primary { background: var(--accent); color: #000; }
 .btn-primary:hover { background: color-mix(in srgb, var(--accent) 82%, white); }
 .btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
